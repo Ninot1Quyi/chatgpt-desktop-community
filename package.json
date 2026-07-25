@@ -1,0 +1,32 @@
+{
+  "name": "chatgpt-desktop-community",
+  "productName": "Codex",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Community desktop client for ChatGPT and Codex, powered by the local codex app-server",
+  "main": "main/index.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite dev --port 5175\" \"wait-on http://localhost:5175 && cross-env ELECTRON_RENDERER_URL=http://localhost:5175 electron .\"",
+    "build": "vite build",
+    "start": "npm run build && electron .",
+    "electron": "electron ."
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@vitejs/plugin-react": "^4.6.0",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^37.2.0",
+    "tailwindcss": "^4.1.11",
+    "vite": "^7.0.0",
+    "wait-on": "^8.0.3"
+  },
+  "dependencies": {
+    "@xterm/xterm": "^6.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zustand": "^5.0.6"
+  }
+}

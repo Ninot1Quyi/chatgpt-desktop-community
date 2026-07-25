@@ -1,0 +1,6 @@
+node_modules/
+dist-renderer/
+_analysis/asar-out/
+_analysis/reference/
+*.log
+.DS_Store
