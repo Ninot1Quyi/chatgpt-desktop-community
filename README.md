@@ -8,9 +8,9 @@ This project recreates the focused workspace experience of the desktop app with 
 
 ## Why this project exists
 
-The official desktop experience is useful because it keeps conversation, project context, code review, files, a terminal, and browser tools in one window. This repository makes that interaction model inspectable and hackable for the community while keeping the implementation independent.
+More and more apps borrow the look of ChatGPT Desktop, but few reproduce the full experience closely enough. This project started from a simple idea: build the faithful community reimplementation we wanted to use ourselves.
 
-The goal is not to clone every surface. The goal is to provide a credible desktop client that is pleasant to use, easy to study, and grounded in the real local app-server protocol.
+Our goal is to recreate ChatGPT Desktop as closely as practical while keeping it useful for everyday work. Because the implementation is open and grounded in the real local `codex app-server` protocol, we can add the features we want instead of waiting for them elsewhere.
 
 ## What works today
 
