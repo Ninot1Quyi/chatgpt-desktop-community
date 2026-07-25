@@ -57,8 +57,15 @@ export const useStore = create((set, get) => ({
   status: "starting",
   codexHome: null,
   binary: null,
+  binaryCandidates: [],
+  backendError: null,
   appInfo: null,
   account: null,
+  accountChecked: false,
+  requiresOpenaiAuth: false,
+  loginStatus: "idle",
+  loginError: null,
+  loginId: null,
   models: [],
 
   // ---- thread list ----
@@ -180,8 +187,14 @@ export const useStore = create((set, get) => ({
   // boot
   // =======================================================================
   async init() {
-    api.onStatus(({ status, codexHome, binary }) => {
-      set({ status, codexHome, binary });
+    api.onStatus(({ status, codexHome, binary, binaryCandidates, error }) => {
+      set({
+        status,
+        codexHome,
+        binary,
+        binaryCandidates: binaryCandidates || [],
+        backendError: error || null,
+      });
       if (status === "ready") get().bootstrap();
     });
     api.onNotification(({ method, params }) => get().handleNotification(method, params));
@@ -197,7 +210,13 @@ export const useStore = create((set, get) => ({
     // Status may have become ready before we subscribed — pull it explicitly.
     const st = await api.getStatus().catch(() => null);
     if (st) {
-      set({ status: st.status, codexHome: st.codexHome, binary: st.binary });
+      set({
+        status: st.status,
+        codexHome: st.codexHome,
+        binary: st.binary,
+        binaryCandidates: st.binaryCandidates || [],
+        backendError: st.error || null,
+      });
       if (st.status === "ready") get().bootstrap();
     }
   },
@@ -215,25 +234,59 @@ export const useStore = create((set, get) => ({
     if (get()._booted) return;
     set({ _booted: true });
     try {
-      const [acct, models] = await Promise.all([
-        api.rpc("account/read", { refreshToken: false }).catch(() => null),
-        api.rpc("model/list", { limit: 100 }).catch(() => null),
-      ]);
-      if (acct) set({ account: acct.account ?? null });
-      // Display name + avatar via the desktop profile endpoint (main process).
-      api.profileRead().then((p) => p && set({ profile: p })).catch(() => {});
-      if (models?.data) {
-        const visible = models.data.filter((m) => !m.hidden);
-        set({ models: visible });
-        const cur = get().model;
-        if (!cur || !visible.some((m) => m.model === cur)) {
-          const def = visible.find((m) => m.isDefault) || visible[0];
-          if (def) get().setModel(def.model);
-        }
+      const account = await get().refreshAccountAndModels();
+      if (account || !get().requiresOpenaiAuth) {
+        api.profileRead().then((p) => p && set({ profile: p })).catch(() => {});
+        await get().loadThreads();
       }
-      await get().loadThreads();
     } catch (e) {
       get().toast(`Initialization failed: ${e.message}`, "error");
+    }
+  },
+
+  async refreshAccountAndModels(refreshToken = false) {
+    const [acct, models] = await Promise.all([
+      api.rpc("account/read", { refreshToken }).catch(() => null),
+      api.rpc("model/list", { limit: 100 }).catch(() => null),
+    ]);
+    const account = acct?.account ?? null;
+    set({
+      account,
+      accountChecked: true,
+      requiresOpenaiAuth: acct?.requiresOpenaiAuth ?? false,
+    });
+    if (models?.data) {
+      const visible = models.data.filter((m) => !m.hidden);
+      set({ models: visible });
+      const cur = get().model;
+      if (!cur || !visible.some((m) => m.model === cur)) {
+        const def = visible.find((m) => m.isDefault) || visible[0];
+        if (def) get().setModel(def.model);
+      }
+    }
+    return account;
+  },
+
+  async startChatgptLogin() {
+    if (get().loginStatus === "starting") return;
+    set({ loginStatus: "starting", loginError: null, loginId: null });
+    try {
+      const result = await api.rpc("account/login/start", { type: "chatgpt" });
+      if (result?.type !== "chatgpt" || !result.authUrl || !result.loginId) {
+        throw new Error("The Codex backend returned an invalid login response.");
+      }
+      set({ loginId: result.loginId, loginStatus: "waiting" });
+      await api.openExternal(result.authUrl);
+    } catch (error) {
+      set({ loginStatus: "idle", loginError: error.message, loginId: null });
+    }
+  },
+
+  async cancelChatgptLogin() {
+    const loginId = get().loginId;
+    set({ loginStatus: "idle", loginError: null, loginId: null });
+    if (loginId) {
+      await api.rpc("account/login/cancel", { loginId }).catch(() => {});
     }
   },
 
@@ -818,8 +871,28 @@ export const useStore = create((set, get) => ({
         }
         break;
       case "account/login/completed":
+        if (!params.success) {
+          set({
+            loginStatus: "idle",
+            loginError: params.error || "ChatGPT sign-in failed.",
+            loginId: null,
+          });
+          break;
+        }
+        set({ loginStatus: "completing", loginError: null });
+        s.refreshAccountAndModels(true)
+          .then((account) => {
+            if (!account) throw new Error("Sign-in completed, but no local account was returned.");
+            set({ loginStatus: "idle", loginId: null });
+            s.setMode("chatgpt");
+            api.showMainWindow();
+            api.profileRead(true).then((p) => p && set({ profile: p })).catch(() => {});
+            s.loadThreads();
+          })
+          .catch((error) => set({ loginStatus: "idle", loginError: error.message, loginId: null }));
+        break;
       case "account/updated":
-        api.rpc("account/read", { refreshToken: false }).then((a) => set({ account: a?.account ?? null })).catch(() => {});
+        s.refreshAccountAndModels(false);
         break;
       default:
         break;

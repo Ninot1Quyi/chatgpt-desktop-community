@@ -7,6 +7,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 const crypto = require("node:crypto");
 const { pathToFileURL } = require("node:url");
+const { resolveCodexBinary } = require("./codex-runtime");
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 const communityIconPath = path.join(__dirname, "..", "assets", "community-icon.png");
@@ -43,23 +44,26 @@ class AppServerBridge {
     this.listeners = new Set(); // webContents to broadcast to
     this.codexHome = null;
     this.userAgent = null;
+    this.binary = null;
+    this.binaryCandidates = [];
+    this.lastError = null;
   }
 
   resolveBinary() {
-    if (process.env.CODEX_CLI_PATH && fs.existsSync(process.env.CODEX_CLI_PATH)) {
-      return process.env.CODEX_CLI_PATH;
-    }
-    const bundled = "/Applications/ChatGPT.app/Contents/Resources/codex";
-    if (fs.existsSync(bundled)) return bundled;
-    // Fall back to PATH lookup.
-    return "codex";
+    const resolution = resolveCodexBinary({
+      homePath: app.getPath("home"),
+    });
+    this.binaryCandidates = resolution.candidates;
+    return resolution.binary;
   }
 
   start() {
     if (this.proc) return;
     this.status = "starting";
+    this.lastError = null;
     this.broadcastStatus();
     const bin = this.resolveBinary();
+    this.binary = bin;
     const args = ["-c", "features.code_mode_host=true", "-c", "features.realtime_conversation=true", "app-server", "--analytics-default-enabled"];
     console.log(`[bridge] spawning ${bin} ${args.join(" ")}`);
     this.proc = spawn(bin, args, {
@@ -74,6 +78,7 @@ class AppServerBridge {
     this.proc.on("error", (err) => {
       console.error("[bridge] spawn error:", err.message);
       this.status = "crashed";
+      this.lastError = err.message;
       this.proc = null;
       this.failAll(new Error(`Failed to spawn codex app-server: ${err.message}`));
       this.broadcastStatus();
@@ -83,6 +88,7 @@ class AppServerBridge {
       const wasReady = this.status === "ready";
       this.proc = null;
       this.status = "crashed";
+      this.lastError = `app-server exited (code ${code})`;
       this.failAll(new Error(`app-server exited (code ${code})`));
       this.broadcastStatus();
       if (wasReady) this.restartSoon();
@@ -119,6 +125,7 @@ class AppServerBridge {
         this.codexHome = result?.codexHome || null;
         this.userAgent = result?.userAgent || null;
         this.status = "ready";
+        this.lastError = null;
         console.log(`[bridge] ready. codexHome=${this.codexHome}`);
         this.broadcastStatus();
       },
@@ -126,6 +133,7 @@ class AppServerBridge {
         clearTimeout(timer);
         console.error("[bridge] initialize failed:", err.message);
         this.status = "crashed";
+        this.lastError = err.message;
         this.broadcastStatus();
       },
     });
@@ -214,7 +222,9 @@ class AppServerBridge {
       status: this.status,
       codexHome: this.codexHome,
       userAgent: this.userAgent,
-      binary: this.proc ? this.proc.spawnfile : this.resolveBinary(),
+      binary: this.proc ? this.proc.spawnfile : this.binary || this.resolveBinary(),
+      binaryCandidates: this.binaryCandidates,
+      error: this.lastError,
     });
   }
 
@@ -226,7 +236,9 @@ class AppServerBridge {
         status: this.status,
         codexHome: this.codexHome,
         userAgent: this.userAgent,
-        binary: this.proc ? this.proc.spawnfile : this.resolveBinary(),
+        binary: this.proc ? this.proc.spawnfile : this.binary || this.resolveBinary(),
+        binaryCandidates: this.binaryCandidates,
+        error: this.lastError,
       });
     }
   }
@@ -495,7 +507,9 @@ ipcMain.handle("appserver:get-status", () => ({
   status: bridge.status,
   codexHome: bridge.codexHome,
   userAgent: bridge.userAgent,
-  binary: bridge.proc ? bridge.proc.spawnfile : bridge.resolveBinary(),
+  binary: bridge.proc ? bridge.proc.spawnfile : bridge.binary || bridge.resolveBinary(),
+  binaryCandidates: bridge.binaryCandidates,
+  error: bridge.lastError,
 }));
 ipcMain.handle("dialog:pick-directory", async (e, { defaultPath } = {}) => {
   const win = BrowserWindow.fromWebContents(e.sender);

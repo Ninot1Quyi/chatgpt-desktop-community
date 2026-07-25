@@ -17,8 +17,10 @@ import { IconSearch, IconChat, IconSidebar, IconChevronLeft, IconChevronRight, I
 export default function App() {
   const init = useStore((s) => s.init);
   const status = useStore((s) => s.status);
+  const account = useStore((s) => s.account);
+  const accountChecked = useStore((s) => s.accountChecked);
+  const requiresOpenaiAuth = useStore((s) => s.requiresOpenaiAuth);
   const ui = useStore((s) => s.ui);
-  const mode = useStore((s) => s.mode);
   const setUi = useStore((s) => s.setUi);
 
   useEffect(() => { init(); }, []);
@@ -92,41 +94,15 @@ export default function App() {
   if (status !== "ready") {
     return <BootScreen status={status} />;
   }
+  if (!accountChecked) {
+    return <BootScreen status="checking-account" />;
+  }
+  if (requiresOpenaiAuth && !account) {
+    return <AuthScreen />;
+  }
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-(--surface)">
-      {mode === "chatgpt" ? (
-        // Product switcher "ChatGPT": the whole window becomes the ChatGPT web
-        // app, exactly like the reference. The drag strip keeps the frameless
-        // window movable; the web app renders its own navigation.
-        <div className="absolute inset-0">
-          <webview
-            ref={(el) => {
-              if (!el || el.__codexWired) return;
-              el.__codexWired = true;
-              // The embedded variant links back to the desktop app via the
-              // codex:// scheme — switch back to the Codex product.
-              const onNav = (e) => {
-                if (String(e.url || "").startsWith("codex://")) {
-                  e.preventDefault?.();
-                  useStore.getState().setMode("codex");
-                }
-              };
-              el.addEventListener("will-navigate", onNav);
-              el.addEventListener("new-window", onNav);
-            }}
-            src="https://chatgpt.com/?source=codex"
-            className="h-full w-full"
-            // eslint-disable-next-line react/no-unknown-property
-            webpreferences="contextIsolation=yes, nodeIntegration=no, sandbox=yes"
-            // eslint-disable-next-line react/no-unknown-property
-            allowpopups="true"
-            // eslint-disable-next-line react/no-unknown-property
-            partition="persist:chatgpt"
-          />
-          <div className="app-drag absolute inset-x-0 top-0 z-40 h-[46px]" />
-        </div>
-      ) : (
       <>
       {/* full-height regions; the 46px header floats transparently on top,
           so vertical separators run from y=0 exactly like the reference app */}
@@ -200,7 +176,6 @@ export default function App() {
       <Settings />
       <Toasts />
       </>
-      )}
     </div>
   );
 }
@@ -503,7 +478,8 @@ function DragHandle({ onDrag }) {
 // ---------------------------------------------------------------------------
 function BootScreen({ status }) {
   const binary = useStore((s) => s.binary);
-  const codexHome = useStore((s) => s.codexHome);
+  const binaryCandidates = useStore((s) => s.binaryCandidates);
+  const backendError = useStore((s) => s.backendError);
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-(--surface)">
       {status === "crashed" ? (
@@ -512,8 +488,16 @@ function BootScreen({ status }) {
           <div className="max-w-[420px] text-center text-[13px] text-(--fg-tertiary)">
             Tried to launch: <span className="font-mono">{binary || "codex"}</span>
             <br />
-            Make sure the codex CLI is installed and you are signed in (~/.codex/auth.json).
+            {backendError || "The bundled Codex runtime could not be started."}
           </div>
+          {binaryCandidates.length > 0 && (
+            <details className="max-w-[560px] text-[12px] text-(--fg-tertiary)">
+              <summary className="cursor-pointer text-center">Show searched locations</summary>
+              <div className="mt-2 break-all rounded-lg bg-(--surface-secondary) px-3 py-2 font-mono">
+                {binaryCandidates.join("\n")}
+              </div>
+            </details>
+          )}
           <button
             className="mt-2 rounded-lg bg-(--accent) px-4 py-2 text-[13px] font-medium text-(--accent-fg)"
             onClick={() => api.restartAppServer()}
@@ -525,10 +509,58 @@ function BootScreen({ status }) {
         <>
           <Spinner size={22} className="text-(--fg-tertiary)" />
           <div className="text-[13px] text-(--fg-tertiary)">
-            {status === "starting" ? "Starting Codex…" : "Connecting…"}
+            {status === "starting"
+              ? "Starting Codex…"
+              : status === "checking-account"
+                ? "Checking account…"
+                : "Connecting…"}
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function AuthScreen() {
+  const loginStatus = useStore((s) => s.loginStatus);
+  const loginError = useStore((s) => s.loginError);
+  const startLogin = useStore((s) => s.startChatgptLogin);
+  const cancelLogin = useStore((s) => s.cancelChatgptLogin);
+  const waiting = loginStatus === "starting" || loginStatus === "waiting" || loginStatus === "completing";
+
+  return (
+    <div className="app-drag flex h-full w-full items-center justify-center bg-(--surface)">
+      <div className="app-no-drag flex w-[380px] flex-col items-center text-center">
+        <div className="mb-5 flex size-12 items-center justify-center rounded-2xl border border-(--border) bg-(--surface-raised)">
+          <IconChat size={24} />
+        </div>
+        <h1 className="text-[22px] font-semibold">ChatGPT Desktop Community</h1>
+        <p className="mt-2 max-w-[340px] text-[13px] leading-5 text-(--fg-tertiary)">
+          Sign in with ChatGPT to use your account and models in the local desktop app.
+        </p>
+        <button
+          className="mt-6 flex h-10 w-full items-center justify-center rounded-xl bg-(--fg) text-[13px] font-medium text-(--surface) disabled:opacity-60"
+          disabled={waiting}
+          onClick={startLogin}
+        >
+          {loginStatus === "starting"
+            ? "Starting sign-in…"
+            : loginStatus === "waiting"
+              ? "Finish signing in in your browser"
+              : loginStatus === "completing"
+                ? "Finishing sign-in…"
+                : "Continue with ChatGPT"}
+        </button>
+        {loginStatus === "waiting" && (
+          <button className="mt-3 text-xs text-(--fg-tertiary) hover:text-(--fg)" onClick={cancelLogin}>
+            Cancel
+          </button>
+        )}
+        {loginError && <div className="mt-4 text-[12px] leading-5 text-(--danger)">{loginError}</div>}
+        <p className="mt-6 text-[11px] leading-4 text-(--fg-faint)">
+          Authentication is handled and stored locally by the bundled Codex runtime.
+        </p>
+      </div>
     </div>
   );
 }
