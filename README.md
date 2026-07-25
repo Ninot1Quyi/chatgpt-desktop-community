@@ -6,8 +6,6 @@ This project recreates the focused workspace experience of the desktop app with 
 
 > This project is not affiliated with, endorsed by, or sponsored by OpenAI.
 
-![Conversation view with a synthetic English workspace](docs/media/demo-conversation.png)
-
 ## Why this project exists
 
 The official desktop experience is useful because it keeps conversation, project context, code review, files, a terminal, and browser tools in one window. This repository makes that interaction model inspectable and hackable for the community while keeping the implementation independent.
@@ -25,23 +23,6 @@ The goal is not to clone every surface. The goal is to provide a credible deskto
 - Light, dark, and system appearance modes
 
 The interface is under active development. Protocol changes in `codex app-server` may require matching updates here.
-
-## Product preview
-
-[Watch the 13.5-second demo video](docs/media/chatgpt-desktop-community-demo.mp4)
-
-<table>
-  <tr>
-    <td><img src="docs/media/demo-workspace.png" alt="New workspace demo"></td>
-    <td><img src="docs/media/demo-review.png" alt="Code review demo"></td>
-  </tr>
-  <tr>
-    <td align="center">Start a task with local project context.</td>
-    <td align="center">Review changes without leaving the conversation.</td>
-  </tr>
-</table>
-
-All preview media uses a synthetic English workspace. It contains no personal account, company, repository, or project data.
 
 ## Getting started
 
@@ -98,8 +79,6 @@ Local images and videos are exposed through a dedicated `codex-file://` protocol
 - Treat Full Access mode as privileged: it can run commands, use the network, and modify files.
 - Review protocol and filesystem boundary changes carefully, especially Electron IPC and preload code.
 
-The screenshots and video in this repository were generated from a synthetic workspace specifically to avoid publishing real user data.
-
 ## Current limitations
 
 - macOS is the only platform regularly exercised.
@@ -112,7 +91,7 @@ The screenshots and video in this repository were generated from a synthetic wor
 
 Issues and focused pull requests are welcome. A useful report includes the expected behavior, the actual behavior, reproduction steps, the macOS and Node.js versions, and relevant logs with private data removed.
 
-Keep changes scoped and match the existing interface before adding new abstractions. UI changes should include screenshots made with synthetic data. Every pull request should pass `npm run build`; bridge changes should also include a successful smoke run.
+Keep changes scoped and match the existing interface before adding new abstractions. UI changes should include screenshots from the running app with private data removed. Every pull request should pass `npm run build`; bridge changes should also include a successful smoke run.
 
 ## Trademark notice
 
