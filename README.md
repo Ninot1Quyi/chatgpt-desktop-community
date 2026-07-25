@@ -1,71 +1,119 @@
 # ChatGPT Desktop Community
 
-> An unofficial community project. It is not affiliated with or endorsed by OpenAI.
+An unofficial community-built desktop client for ChatGPT and Codex.
 
-A clean-room implementation of the ChatGPT and Codex desktop experience. The project recreates the core desktop UI and interactions from publicly observable behavior and protocols, using original code and the official local `codex app-server` backend.
+This project recreates the focused workspace experience of the desktop app with original Electron and React code. It connects to the official local `codex app-server`, so conversations, approvals, tools, and account access use the same local backend rather than a custom proxy.
 
-## Run
+> This project is not affiliated with, endorsed by, or sponsored by OpenAI.
+
+![Conversation view with a synthetic English workspace](docs/media/demo-conversation.png)
+
+## Why this project exists
+
+The official desktop experience is useful because it keeps conversation, project context, code review, files, a terminal, and browser tools in one window. This repository makes that interaction model inspectable and hackable for the community while keeping the implementation independent.
+
+The goal is not to clone every surface. The goal is to provide a credible desktop client that is pleasant to use, easy to study, and grounded in the real local app-server protocol.
+
+## What works today
+
+- Project and thread navigation, search, pinning, archives, and settings
+- Streaming conversations with Markdown, reasoning, tool output, plans, and errors
+- Command, file-change, permission, and user-input approval flows
+- Attachments, project context, model selection, and queued messages
+- Review, Files, Terminal, Browser, and Side Chat panels
+- Pull request, scheduled task, site, and plugin navigation surfaces
+- Light, dark, and system appearance modes
+
+The interface is under active development. Protocol changes in `codex app-server` may require matching updates here.
+
+## Product preview
+
+[Watch the 13.5-second demo video](docs/media/chatgpt-desktop-community-demo.mp4)
+
+<table>
+  <tr>
+    <td><img src="docs/media/demo-workspace.png" alt="New workspace demo"></td>
+    <td><img src="docs/media/demo-review.png" alt="Code review demo"></td>
+  </tr>
+  <tr>
+    <td align="center">Start a task with local project context.</td>
+    <td align="center">Review changes without leaving the conversation.</td>
+  </tr>
+</table>
+
+All preview media uses a synthetic English workspace. It contains no personal account, company, repository, or project data.
+
+## Getting started
+
+### Requirements
+
+- macOS, which is the currently tested platform
+- Node.js 22 or newer
+- The Codex CLI available on `PATH`, or the ChatGPT desktop app with its bundled Codex executable
+- A ChatGPT account already signed in through the local Codex app-server
+
+### Install and run
 
 ```bash
-npm install        # First-time setup
-npm start          # Build the renderer and launch the app
+git clone https://github.com/Ninot1Quyi/chatgpt-desktop-community.git
+cd chatgpt-desktop-community
+npm ci
+npm start
+```
 
-# Development mode with hot reload and DevTools
+`npm start` builds the renderer and opens the desktop application. The client first checks `CODEX_CLI_PATH`, then the Codex executable bundled with the ChatGPT app, and finally `PATH`.
+
+### Development
+
+```bash
 npm run dev
 ```
 
-The app uses the ChatGPT account already signed in on the machine (`auth_mode=chatgpt`). No additional login is required.
+Development mode starts Vite on port `5175`, opens Electron with hot reload, and enables DevTools.
 
-## Architecture
+Before submitting a change, run:
 
-```text
-Electron main process (main/index.js)
-  ├─ BrowserWindow (1280×820, hiddenInset title bar, traffic lights at 16×16, vibrancy)
-  ├─ Spawns codex app-server (stdio, newline-delimited JSON-RPC)
-  │    <codex resolution: $CODEX_CLI_PATH → /Applications/ChatGPT.app/.../codex → PATH>
-  │    Arguments: -c features.code_mode_host=true app-server --analytics-default-enabled
-  │    Handshake: initialize(id="__codex_initialize__", clientInfo, capabilities.experimentalApi)
-  ├─ IPC relay for rpc:request, rpc:respond, notifications, and approval requests
-  └─ codex-file:// protocol with an allowlist for local image and video attachments
-
-Renderer (renderer/, React 19 + Vite + Tailwind CSS v4 + Zustand)
-  ├─ 46px global header with window controls, sidebar toggle, navigation,
-  │    view title, context usage, Git branch, and panel toggles
-  ├─ Resizable sidebar (240–520px) with search, navigation, pinned projects,
-  │    cwd-grouped projects, thread status, menus, profile, archives, and settings
-  ├─ Conversation view with Markdown, code blocks, reasoning, streaming output,
-  │    command and file-change cards, MCP and web-search rows, subagents,
-  │    approval forms, plan steps, turn actions, and error states
-  ├─ Composer with attachments, path mentions, permission controls, model and
-  │    reasoning selection, queued messages, project context, and drag-and-drop
-  ├─ Right panel with Review, Files, Terminal, Browser, and Side Chat tabs
-  ├─ Bottom terminal strip and floating Outputs/Sources panel
-  ├─ Command palette, settings, toast notifications, and top-level navigation
-  └─ Light, dark, and system themes based on measured desktop design tokens
+```bash
+npm run build
 ```
 
-## Protocol Notes
+For changes to the Electron bridge or app-server integration, also run:
 
-- Transport: newline-delimited JSON over child-process stdio.
-  - Request: `{id, method, params}`
-  - Response: `{id, result|error}`
-  - Notification: `{method, params}`
-- Authentication: `app-server` reads `~/.codex/auth.json` and refreshes tokens itself. The renderer does not handle credentials.
-- Key methods: `thread/list`, `thread/start`, `thread/resume`, `thread/read`, `turn/start`, `turn/interrupt`, `thread/name/set`, `thread/archive`, `model/list`, `account/read`, `command/exec`, and `fs/*`.
-- Server-to-client requests: `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `item/tool/requestUserInput`, and `mcpServer/elicitation/request`.
-- Streaming notifications: `turn/started|completed`, `item/started|completed`, `item/agentMessage/delta`, `item/reasoning/*Delta`, `item/commandExecution/outputDelta`, `turn/plan/updated`, and `thread/tokenUsage/updated`.
-- Generate the authoritative schemas with `codex app-server generate-json-schema --out <dir>`. Generated copies are available under `_analysis/schema/`.
+```bash
+node _analysis/smoke.mjs
+```
 
-## Project Layout
+## How it works
 
-- `main/` — Electron main process and preload bridge
-- `renderer/` — React renderer source; build output goes to `dist-renderer/`
-- `_analysis/` — protocol schemas, smoke tests, and CDP inspection scripts
+The Electron main process starts `codex app-server` as a child process and communicates with it through newline-delimited JSON-RPC over standard input and output. A narrow preload bridge relays approved requests and notifications to the React renderer.
 
-## Intentional Differences
+The renderer owns the desktop interface and local interaction state. Authentication remains the responsibility of `codex app-server`; the renderer does not read or store account credentials.
 
-- Some reference-app features are not implemented, including the hotkey window, full cloud-task flows, voice dictation, browser annotation, advanced worktree operations, and several aggregation shortcuts.
-- The Browser tab uses Electron `<webview>` for basic navigation rather than the reference app's complete browser integration.
-- The app uses a single main window.
-- Thread data comes from the official `app-server` and remains compatible with the official desktop app.
-- Reference measurements were taken from runtime DOM, computed styles, and screenshots through CDP. No source code from the reference app was copied.
+Local images and videos are exposed through a dedicated `codex-file://` protocol with an allowlist instead of unrestricted filesystem URLs.
+
+## Privacy and security
+
+- Never commit or share `~/.codex/auth.json`.
+- Keep local paths, account details, thread content, and private project names out of screenshots and bug reports.
+- Treat Full Access mode as privileged: it can run commands, use the network, and modify files.
+- Review protocol and filesystem boundary changes carefully, especially Electron IPC and preload code.
+
+The screenshots and video in this repository were generated from a synthetic workspace specifically to avoid publishing real user data.
+
+## Current limitations
+
+- macOS is the only platform regularly exercised.
+- There is no signed installer or automatic update channel yet.
+- The Browser panel provides practical embedded navigation, but it does not reproduce every browser-control feature of the official client.
+- Compatibility can lag behind newly released app-server methods or notification shapes.
+- This remains an independent community implementation, so visual and behavioral differences are expected.
+
+## Contributing
+
+Issues and focused pull requests are welcome. A useful report includes the expected behavior, the actual behavior, reproduction steps, the macOS and Node.js versions, and relevant logs with private data removed.
+
+Keep changes scoped and match the existing interface before adding new abstractions. UI changes should include screenshots made with synthetic data. Every pull request should pass `npm run build`; bridge changes should also include a successful smoke run.
+
+## Trademark notice
+
+OpenAI, ChatGPT, and Codex are trademarks of OpenAI. Their use here identifies compatibility and inspiration only.
