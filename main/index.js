@@ -9,6 +9,7 @@ const crypto = require("node:crypto");
 const { pathToFileURL } = require("node:url");
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
+const communityIconPath = path.join(__dirname, "..", "assets", "community-icon.png");
 
 // Keep our Electron storage separate from the official app (same productName
 // would otherwise share ~/Library/Application Support/Codex).
@@ -626,6 +627,8 @@ ipcMain.handle("save-temp-file", (_e, { dataUrl, prefix = "codex-annotate", ext 
 // App lifecycle
 // ---------------------------------------------------------------------------
 app.whenReady().then(() => {
+  if (isDev && process.platform === "darwin") app.dock.setIcon(communityIconPath);
+
   protocol.handle("codex-file", (request) => {
     try {
       const url = new URL(request.url);
