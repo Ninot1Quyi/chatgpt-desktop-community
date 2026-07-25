@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-desktop-community",
-  "productName": "Codex",
+  "productName": "ChatGPT Desktop Community",
   "version": "0.1.0",
   "private": true,
   "description": "Community desktop client for ChatGPT and Codex, powered by the local codex app-server",
@@ -8,10 +8,12 @@
   "scripts": {
     "dev": "concurrently -k \"vite dev --port 5175\" \"wait-on http://localhost:5175 && cross-env ELECTRON_RENDERER_URL=http://localhost:5175 electron .\"",
     "build": "vite build",
+    "package:mac": "npm run build && electron-packager . \"ChatGPT Desktop Community\" --platform=darwin --arch=arm64 --out=release --overwrite --prune=true --asar --app-bundle-id=com.ninotquyi.chatgpt-desktop-community --ignore=\"^/(release|\\\\.git|\\\\.omx|_analysis)($|/)\"",
     "start": "npm run build && electron .",
     "electron": "electron ."
   },
   "devDependencies": {
+    "@electron/packager": "^20.0.4",
     "@tailwindcss/vite": "^4.1.11",
     "@vitejs/plugin-react": "^4.6.0",
     "concurrently": "^9.1.2",
