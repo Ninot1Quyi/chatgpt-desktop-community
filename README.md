@@ -22,7 +22,11 @@ Many apps try to imitate ChatGPT Desktop but always fall a little short, so I se
 
 A fun example of the trend: [“oh no, i started making one of these apps” — Jarrod Watts](https://x.com/jarrodwatts/status/2077580457303302240).
 
-[![Jarrod Watts sharing a ChatGPT Desktop-inspired app sketch](assets/screenshots/jarrod-watts-chatgpt-desktop-clone.png)](https://x.com/jarrodwatts/status/2077580457303302240)
+<p align="center">
+  <a href="https://x.com/jarrodwatts/status/2077580457303302240">
+    <img src="assets/screenshots/jarrod-watts-chatgpt-desktop-clone.png" width="480" alt="Jarrod Watts sharing a ChatGPT Desktop-inspired app sketch">
+  </a>
+</p>
 
 ## What works today
 
