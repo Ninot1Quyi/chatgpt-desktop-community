@@ -12,9 +12,10 @@ This project recreates the ChatGPT Desktop experience with Electron and React, u
 
 ## Interface examples
 
-| Light appearance | Dark appearance |
-| --- | --- |
-| ![ChatGPT Desktop Community in light appearance](assets/screenshots/chatgpt-desktop-light.png) | ![ChatGPT Desktop Community in dark appearance](assets/screenshots/chatgpt-desktop-dark.png) |
+<p align="center">
+  <img src="assets/screenshots/chatgpt-desktop-light.png" width="49%" alt="ChatGPT Desktop Community in light appearance">
+  <img src="assets/screenshots/chatgpt-desktop-dark.png" width="49%" alt="ChatGPT Desktop Community in dark appearance">
+</p>
 
 ## Why this project exists
 
