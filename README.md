@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/community-icon.png" width="120" alt="ChatGPT Desktop Community icon">
+</p>
+
 # ChatGPT Desktop Community
 
 An unofficial community-built desktop client for ChatGPT and Codex.
