@@ -15,9 +15,10 @@ Our goal is to recreate ChatGPT Desktop as closely as practical while keeping it
 ## What works today
 
 - Project and thread navigation, search, pinning, archives, and settings
-- Streaming conversations with Markdown, reasoning, tool output, plans, and errors
+- Streaming conversations with Markdown, reasoning, context compaction, plans, goals, and errors
+- Live work status for commands, file reads, searches, edits, and other tool activity
 - Command, file-change, permission, and user-input approval flows
-- Attachments, project context, model selection, and queued messages
+- Clipboard image paste, attachment previews, project context, model and reasoning selection, and queued messages
 - Review, Files, Terminal, Browser, and Side Chat panels
 - Pull request, scheduled task, site, and plugin navigation surfaces
 - Light, dark, and system appearance modes
