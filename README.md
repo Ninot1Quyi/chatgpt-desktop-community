@@ -14,9 +14,7 @@ This project recreates the focused workspace experience of the desktop app with 
 
 ## Why this project exists
 
-More and more apps borrow the look of ChatGPT Desktop, but few reproduce the full experience closely enough. This project started from a simple idea: build the faithful community reimplementation we wanted to use ourselves.
-
-Our goal is to recreate ChatGPT Desktop as closely as practical while keeping it useful for everyday work. Because the implementation is open and grounded in the real local `codex app-server` protocol, we can add the features we want instead of waiting for them elsewhere.
+Many apps try to imitate ChatGPT Desktop but always fall a little short, so I set out to build a complete open-source reimplementation.
 
 ## What works today
 
