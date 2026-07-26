@@ -53,6 +53,10 @@ npm start
 
 ### Development
 
+Recommended: open this repository in ChatGPT Desktop, Claude Code, or Cursor, then ask:
+
+> Help me start this project. / 帮我启动这个项目。
+
 ```bash
 npm run dev
 ```
