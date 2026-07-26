@@ -41,28 +41,7 @@ Development requires macOS, Node.js 22 or newer, and either the Codex CLI on `PA
 
 Recommended: use ChatGPT Desktop, Claude Code, or Cursor and say:
 
-> 克隆这个仓库 [Ninot1Quyi/chatgpt-desktop-community](https://github.com/Ninot1Quyi/chatgpt-desktop-community)，然后启动它。
-
-```bash
-git clone https://github.com/Ninot1Quyi/chatgpt-desktop-community.git
-cd chatgpt-desktop-community
-npm ci
-npm run dev
-```
-
-Development mode starts Vite on port `5175`, opens Electron with hot reload, and enables DevTools.
-
-Before submitting a change, run:
-
-```bash
-npm run build
-```
-
-For changes to the Electron bridge or app-server integration, also run:
-
-```bash
-node _analysis/smoke.mjs
-```
+> Clone [Ninot1Quyi/chatgpt-desktop-community](https://github.com/Ninot1Quyi/chatgpt-desktop-community), then start it.
 
 ## Privacy and security
 
