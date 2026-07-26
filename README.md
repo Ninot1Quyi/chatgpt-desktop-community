@@ -16,6 +16,8 @@ This project recreates the focused workspace experience of the desktop app with 
 
 Many apps try to imitate ChatGPT Desktop but always fall a little short, so I set out to build a complete open-source reimplementation.
 
+A fun example of the trend: [“oh no, i started making one of these apps” — Jarrod Watts](https://x.com/jarrodwatts/status/2077580457303302240).
+
 ## What works today
 
 - Project and thread navigation, search, pinning, archives, and settings
