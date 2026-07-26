@@ -10,7 +10,7 @@ This project recreates the ChatGPT Desktop experience with Electron and React, u
 
 > This project is not affiliated with, endorsed by, or sponsored by OpenAI.
 
-## Interface examples
+## Demo
 
 <p align="center">
   <img src="assets/screenshots/chatgpt-desktop-light.png" width="49%" alt="ChatGPT Desktop Community in light appearance">
@@ -25,7 +25,7 @@ A fun example of the trend: [“oh no, i started making one of these apps” —
 
 <p align="center">
   <a href="https://x.com/jarrodwatts/status/2077580457303302240">
-    <img src="assets/screenshots/jarrod-watts-chatgpt-desktop-clone.png" width="480" alt="Jarrod Watts sharing a ChatGPT Desktop-inspired app sketch">
+    <img src="assets/screenshots/jarrod-watts-chatgpt-desktop-clone.png" width="360" alt="Jarrod Watts sharing a ChatGPT Desktop-inspired app sketch">
   </a>
 </p>
 
