@@ -33,31 +33,20 @@ The interface is under active development. Protocol changes in `codex app-server
 
 ## Getting started
 
-### Requirements
+To install and use the app, download a prebuilt version from the [latest release](https://github.com/Ninot1Quyi/chatgpt-desktop-community/releases/latest).
 
-- macOS, which is the currently tested platform
-- Node.js 22 or newer
-- The Codex CLI available on `PATH`, or the ChatGPT desktop app with its bundled Codex executable
-- A ChatGPT account already signed in through the local Codex app-server
+### Development
 
-### Install and run
+Development requires macOS, Node.js 22 or newer, and either the Codex CLI on `PATH` or the ChatGPT desktop app with its bundled Codex executable.
+
+Recommended: use ChatGPT Desktop, Claude Code, or Cursor and say:
+
+> 克隆这个仓库 [Ninot1Quyi/chatgpt-desktop-community](https://github.com/Ninot1Quyi/chatgpt-desktop-community)，然后启动它。
 
 ```bash
 git clone https://github.com/Ninot1Quyi/chatgpt-desktop-community.git
 cd chatgpt-desktop-community
 npm ci
-npm start
-```
-
-`npm start` builds the renderer and opens the desktop application. The client first checks `CODEX_CLI_PATH`, then the Codex executable bundled with the ChatGPT app, and finally `PATH`.
-
-### Development
-
-Recommended: open this repository in ChatGPT Desktop, Claude Code, or Cursor, then ask:
-
-> Help me start this project. / 帮我启动这个项目。
-
-```bash
 npm run dev
 ```
 
