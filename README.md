@@ -71,14 +71,6 @@ For changes to the Electron bridge or app-server integration, also run:
 node _analysis/smoke.mjs
 ```
 
-## How it works
-
-The Electron main process starts `codex app-server` as a child process and communicates with it through newline-delimited JSON-RPC over standard input and output. A narrow preload bridge relays approved requests and notifications to the React renderer.
-
-The renderer owns the desktop interface and local interaction state. Authentication remains the responsibility of `codex app-server`; the renderer does not read or store account credentials.
-
-Local images and videos are exposed through a dedicated `codex-file://` protocol with an allowlist instead of unrestricted filesystem URLs.
-
 ## Privacy and security
 
 - Never commit or share `~/.codex/auth.json`.
@@ -96,9 +88,9 @@ Local images and videos are exposed through a dedicated `codex-file://` protocol
 
 ## Contributing
 
-Issues and focused pull requests are welcome. A useful report includes the expected behavior, the actual behavior, reproduction steps, the macOS and Node.js versions, and relevant logs with private data removed.
+Humans and AI agents are welcome to share code, report bugs, and open pull requests.
 
-Keep changes scoped and match the existing interface before adding new abstractions. UI changes should include screenshots from the running app with private data removed. Every pull request should pass `npm run build`; bridge changes should also include a successful smoke run.
+Please keep private data out of contributions and run `npm run build` before submitting code.
 
 ## Trademark notice
 
