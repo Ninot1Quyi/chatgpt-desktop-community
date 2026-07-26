@@ -37,8 +37,6 @@ To install and use the app, download a prebuilt version from the [latest release
 
 ### Development
 
-Development requires macOS, Node.js 22 or newer, and either the Codex CLI on `PATH` or the ChatGPT desktop app with its bundled Codex executable.
-
 Recommended: use ChatGPT Desktop, Claude Code, or Cursor and say:
 
 > Clone [Ninot1Quyi/chatgpt-desktop-community](https://github.com/Ninot1Quyi/chatgpt-desktop-community), then start it.
