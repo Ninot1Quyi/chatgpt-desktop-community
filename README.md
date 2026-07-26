@@ -2,7 +2,7 @@
 
 An unofficial community-built desktop client for ChatGPT and Codex.
 
-This project recreates the focused workspace experience of the desktop app with original Electron and React code. It connects to the official local `codex app-server`, so conversations, approvals, tools, and account access use the same local backend rather than a custom proxy.
+This project recreates the ChatGPT Desktop experience with Electron and React, using the official local `codex app-server` for chats, tools, approvals, and account access.
 
 > This project is not affiliated with, endorsed by, or sponsored by OpenAI.
 
