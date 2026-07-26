@@ -20,6 +20,7 @@ export const showItemInFolder = (p) => b.showItemInFolder(p);
 export const openPath = (p) => b.openPath(p);
 export const openExternal = (url) => b.openExternal(url);
 export const getAppInfo = () => b.getAppInfo();
+export const rolloutActivity = (file) => b.rolloutActivity(file);
 export const captureWebview = (id) => b.captureWebview(id);
 export const saveTempFile = (dataUrl, prefix, ext) => b.saveTempFile(dataUrl, prefix, ext);
 export const gsRead = () => b.gsRead();

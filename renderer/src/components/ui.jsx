@@ -5,6 +5,10 @@ import { cx } from "../lib/cx.js";
 import { useStore } from "../store.js";
 import { IconX } from "./icons.jsx";
 
+export function ActivityDisclosure({ open, children }) {
+  return open ? <div>{children}</div> : null;
+}
+
 // ---------------------------------------------------------------------------
 // Menu: anchored dropdown. `anchor` = getter returning DOM rect of trigger.
 // items: [{id, label, hint?, icon?, danger?, checked?, onSelect} | {sep:true}]
@@ -20,11 +24,18 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
     const r = anchor?.();
     if (!r) return;
     const menuW = width;
-    let left = align === "end" ? r.right - menuW : r.left;
+    let left = (align === "end" ? r.right - menuW : r.left) + 1;
     left = Math.max(8, Math.min(left, window.innerWidth - menuW - 8));
-    let top = r.bottom + 6;
-    const estH = Math.min(420, items.length * 32 + 16);
-    if (top + estH > window.innerHeight - 8) top = Math.max(8, r.top - estH - 6);
+    let top = r.bottom + 1;
+    const estH = Math.min(
+      420,
+      items.reduce((height, item) => {
+        if (item.sep) return height + 9;
+        if (item.header) return height + 31;
+        return height + 28.57;
+      }, 8),
+    );
+    if (top + estH > window.innerHeight - 8) top = Math.max(8, r.top - estH - 1);
     setPos({ left, top });
   }, [open]);
 
@@ -60,8 +71,15 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
   return createPortal(
     <div
       ref={ref}
-      className="popover-in fixed z-50 overflow-hidden rounded-xl border border-(--border) bg-(--surface-raised) py-1"
-      style={{ left: pos.left, top: pos.top, width, boxShadow: "var(--shadow-menu)" }}
+      role="menu"
+      className="popover-in fixed z-50 overflow-hidden rounded-[15px] p-1 backdrop-blur-sm"
+      style={{
+        left: pos.left,
+        top: pos.top,
+        width,
+        background: "color-mix(in srgb, var(--surface-raised) 90%, transparent)",
+        boxShadow: "rgba(26, 28, 31, 0.08) 0 0 0 0.5px, rgba(26, 28, 31, 0.08) 0 0 0 0.5px, rgba(0, 0, 0, 0.12) 0 8px 16px -4px",
+      }}
     >
       {items.map((it, i) =>
         it.sep ? (
@@ -71,28 +89,29 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
         ) : it.children ? (
           <button
             key={it.id ?? i}
+            role="menuitem"
             disabled={it.disabled}
             onClick={(e) => openSub(it, e)}
             onMouseEnter={(e) => openSub(it, e)}
             onMouseLeave={closeSubSoon}
             className={cx(
-              "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] outline-none",
+              "flex h-[28.57px] w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
           >
             {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
             <span className="min-w-0 flex-1 truncate">{it.label}</span>
-            <span className="shrink-0 text-xs text-(--fg-tertiary)">›</span>
           </button>
         ) : (
           <button
             key={it.id ?? i}
+            role="menuitem"
             disabled={it.disabled}
             onClick={() => { it.onSelect?.(); if (!it.keepOpen) onClose(); }}
             onMouseEnter={closeSubSoon}
             className={cx(
-              "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] outline-none",
+              "flex h-[28.57px] w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
@@ -119,8 +138,15 @@ function SubMenu({ rect, items, onClose, onEnter, onLeave }) {
   const top = Math.max(8, Math.min(rect.top - 4, window.innerHeight - items.length * 32 - 16));
   return (
     <div
-      className="popover-in fixed z-50 overflow-hidden rounded-xl border border-(--border) bg-(--surface-raised) py-1"
-      style={{ left, top, width, boxShadow: "var(--shadow-menu)" }}
+      role="menu"
+      className="popover-in fixed z-50 overflow-hidden rounded-[15px] p-1 backdrop-blur-xl"
+      style={{
+        left,
+        top,
+        width,
+        background: "color-mix(in srgb, var(--surface-raised) 90%, transparent)",
+        boxShadow: "rgba(26, 28, 31, 0.08) 0 0 0 0.5px, rgba(26, 28, 31, 0.08) 0 0 0 0.5px, rgba(0, 0, 0, 0.12) 0 8px 16px -4px",
+      }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
@@ -130,10 +156,11 @@ function SubMenu({ rect, items, onClose, onEnter, onLeave }) {
         ) : (
           <button
             key={it.id ?? i}
+            role="menuitem"
             disabled={it.disabled}
             onClick={() => { it.onSelect?.(); onClose(); }}
             className={cx(
-              "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] outline-none",
+              "flex h-[28.57px] w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
@@ -218,9 +245,10 @@ export function Toasts() {
 // ---------------------------------------------------------------------------
 // Small shared bits
 // ---------------------------------------------------------------------------
-export function IconButton({ icon, title, onClick, active, danger, className, size = 15, disabled }) {
+export function IconButton({ icon, title, onClick, active, danger, className, size = 15, disabled, ...buttonProps }) {
   return (
     <button
+      {...buttonProps}
       title={title}
       onClick={onClick}
       disabled={disabled}

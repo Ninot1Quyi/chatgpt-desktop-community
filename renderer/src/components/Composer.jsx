@@ -1,5 +1,5 @@
 // Composer: auto-growing editor, image attachments, model+effort / permission
-// selectors, context chips (home), queued pills, full-access banner, send/stop.
+// selectors, context chips (home), queued pills, send/stop.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useStore, PERMISSIONS, normalizePermission } from "../store.js";
@@ -10,13 +10,14 @@ import { Menu } from "./ui.jsx";
 import { usePanelStore } from "./RightPanel.jsx";
 import { PluginIcon, skillName, skillDesc } from "./NavViews.jsx";
 import {
-  IconArrowUp, IconStop, IconPlus, IconFolder, IconBranch, IconChevronDown,
+  IconArrowUp, IconStop, IconFolder, IconBranch, IconChevronDown,
   IconX, IconImage, IconFile, IconList, IconCheck, IconChevronRight, IconChevronLeft,
-  IconShield, IconSparkle, IconWarnTriangle, IconMic, IconMonitor, IconPaperclip, LucideIcon,
+  IconShield, IconSparkle, IconMonitor, IconPaperclip, LucideIcon,
   IconSkillCube, IconSkillBox, IconChat,
-  IconCmdCodeReview, IconCmdFork, IconCmdFast, IconCmdFeedback, IconCmdGoal,
+  IconCmdCodeReview, IconCmdFork, IconCmdFast, IconCmdFeedback, IconCmdGoal, IconGoalClear,
   IconCmdInit, IconCmdMcp, IconCmdMemories, IconCmdModel, IconCmdPlan,
   IconCmdReasoning, IconCmdSide, IconCmdStatus,
+  IconComposerPlus, IconComposerMic, IconComposerChevronDown, IconComposerChevronRight, IconGoalChevron, IconSkillCheck, IconModelPower,
 } from "./icons.jsx";
 import { panelHook } from "../lib/panelHook.js";
 
@@ -74,7 +75,6 @@ export default function Composer({ centered = false, quick = false }) {
   const [images, setImages] = useState([]);
   const [mentions, setMentions] = useState([]);
   const [dragOver, setDragOver] = useState(false);
-  const [bannerHidden, setBannerHidden] = useState(false);
   const [menu, setMenu] = useState(null); // {kind:'slash'|'mention', query, start}
   const [menuIdx, setMenuIdx] = useState(0);
   const [mentionResults, setMentionResults] = useState([]);
@@ -109,17 +109,12 @@ export default function Composer({ centered = false, quick = false }) {
     setMenu(null);
   };
 
-  // Re-show the banner when the permission or thread changes.
-  useEffect(() => {
-    setBannerHidden(false);
-  }, [permission, activeThreadId]);
-
-  // Autosize: two rows minimum (via rows attr), capped at ~200px.
+  // Match the original editor's 44px minimum while allowing multiline growth.
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    const h = Math.min(ta.scrollHeight, 200);
+    const h = Math.max(44, Math.min(ta.scrollHeight, 200));
     ta.style.height = h + "px";
     ta.style.overflowY = ta.scrollHeight > 200 ? "auto" : "hidden";
   }, [text]);
@@ -400,6 +395,35 @@ export default function Composer({ centered = false, quick = false }) {
     if (others.length) setText((t) => (t ? t + "\n" : "") + others.map((p) => `@${p}`).join("\n"));
   };
 
+  const onPasteFiles = async (e) => {
+    const itemFiles = [...(e.clipboardData?.items || [])]
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+    const files = itemFiles.length ? itemFiles : [...(e.clipboardData?.files || [])];
+    if (!files.length) return;
+    e.preventDefault();
+    addFiles(files.map((file) => file.path).filter(Boolean));
+    try {
+      const saved = [];
+      for (const [i, file] of files.entries()) {
+        if (file.path || !file.type.startsWith("image/")) continue;
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+        const subtype = file.type.slice(6);
+        const ext = `.${subtype === "jpeg" ? "jpg" : subtype === "svg+xml" ? "svg" : subtype || "png"}`;
+        saved.push(await api.saveTempFile(dataUrl, `codex-paste-${i}`, ext));
+      }
+      addFiles(saved);
+    } catch (error) {
+      useStore.getState().toast(`Paste image failed: ${error.message}`, "error");
+    }
+  };
+
   const onPickFiles = (e) => {
     const paths = [...e.target.files].map((f) => f.path).filter(Boolean);
     addFiles(paths);
@@ -428,20 +452,17 @@ export default function Composer({ centered = false, quick = false }) {
             className="min-w-0 flex-1 resize-none bg-transparent px-1 py-1 text-[14px] leading-6 text-(--fg) outline-none placeholder:text-(--fg-faint)"
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKeyDown}
-            onPaste={(e) => {
-              const files = [...(e.clipboardData?.files || [])].map((f) => f.path).filter(Boolean);
-              if (files.length) { e.preventDefault(); addFiles(files); }
-            }}
+            onPaste={onPasteFiles}
           />
           <span className="shrink-0 px-1 text-[13px] text-(--fg-tertiary)">Instant</span>
           <VoiceButton />
-          {running ? (
+          {running && !canSend ? (
             <button
               title="Stop"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--fg) text-(--surface) hover:text-(--danger)"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--fg) font-[445] text-(--surface) hover:text-(--danger)"
               onClick={interrupt}
             >
-              <IconStop size={13} />
+              <IconStop size={16} />
             </button>
           ) : (
             <button
@@ -467,7 +488,7 @@ export default function Composer({ centered = false, quick = false }) {
 
   return (
     <div
-      className={cx("relative", centered ? "w-full" : "px-4 pb-3")}
+      className={cx("relative", centered ? "w-full" : "px-4 pb-4")}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => {
@@ -477,13 +498,9 @@ export default function Composer({ centered = false, quick = false }) {
       }}
     >
       {dragOver && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[22px] border-2 border-dashed border-(--accent) bg-(--accent-soft) text-[13px] font-medium text-(--accent)">
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[25px] border-2 border-dashed border-(--accent) bg-(--accent-soft) text-[13px] font-medium text-(--accent)">
           Drop to attach
         </div>
-      )}
-
-      {permission === "full" && !bannerHidden && (
-        <FullAccessBanner onHide={() => setBannerHidden(true)} />
       )}
 
       {queue.length > 0 && (
@@ -509,30 +526,30 @@ export default function Composer({ centered = false, quick = false }) {
       {!activeThreadId && <HomeContextBar />}
 
       <div
-        className="relative rounded-[22px] bg-(--input-bg) p-2 backdrop-blur"
-        style={{ boxShadow: "var(--shadow-menu)" }}
+        className="relative rounded-[25px] bg-(--input-bg) p-2 font-normal backdrop-blur-lg"
+        style={{ boxShadow: "var(--shadow-composer)" }}
       >
         {images.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 px-1 pt-1 pb-1.5">
+          <div className="hide-scrollbar h-[82px] w-full overflow-x-auto p-px">
+            <div className="flex min-w-max items-end gap-2">
             {images.map((p, i) => (
-              <span
+              <div
                 key={i}
-                className="flex items-center gap-1.5 rounded-lg border border-(--border-light) bg-(--surface-hover) py-1 pl-1 pr-1.5 text-xs text-(--fg-secondary)"
+                className="relative size-20 shrink-0 rounded-[17px] border border-(--border-heavy)"
               >
-                <img
-                  src={api.localFileUrl(p)}
-                  alt=""
-                  className="h-6 w-6 shrink-0 rounded object-cover"
-                />
-                <span className="max-w-[140px] truncate">{basename(p)}</span>
+                <span className="absolute inset-0 overflow-hidden rounded-[17px]">
+                  <img src={api.localFileUrl(p)} alt="" className="size-full object-cover" />
+                </span>
                 <button
-                  className="shrink-0 text-(--fg-tertiary) hover:text-(--danger)"
+                  aria-label={`Remove ${basename(p)}`}
+                  className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-(--fg) text-(--surface) shadow-sm"
                   onClick={() => setImages((s) => s.filter((_, j) => j !== i))}
                 >
-                  <IconX size={11} />
+                  <IconX size={10} />
                 </button>
-              </span>
+              </div>
             ))}
+            </div>
           </div>
         )}
 
@@ -712,17 +729,14 @@ export default function Composer({ centered = false, quick = false }) {
 
         <textarea
           ref={taRef}
-          rows={2}
+          rows={1}
           value={text}
           placeholder={useStore((s) => s.mode) === "chatgpt" ? "Message ChatGPT" : "Do anything"}
-          className="block w-full resize-none bg-transparent px-1 py-1 text-[14px] leading-6 text-(--fg) outline-none placeholder:text-(--fg-faint)"
+          className="mx-1 mt-1.5 mb-1 block min-h-11 w-[calc(100%-8px)] resize-none bg-transparent p-0 text-[14px] leading-5 font-[445] text-(--fg) outline-none placeholder:text-(--fg-faint)"
           onChange={(e) => { setText(e.target.value); detectMenu(e.target.value, e.target.selectionStart); }}
           onKeyDown={onKeyDown}
           onClick={(e) => detectMenu(e.target.value, e.target.selectionStart)}
-          onPaste={(e) => {
-            const files = [...(e.clipboardData?.files || [])].map((f) => f.path).filter(Boolean);
-            if (files.length) { e.preventDefault(); addFiles(files); }
-          }}
+          onPaste={onPasteFiles}
         />
 
         <div className="flex items-center gap-[5px]">
@@ -733,67 +747,42 @@ export default function Composer({ centered = false, quick = false }) {
             browserTab={browserTab}
           />
           <PermissionChip />
+          <div className="h-4 w-px bg-(--border-light)" />
           <PlanChip />
-          <div className="ms-auto flex items-center gap-[5px]">
+          <div className="ms-auto flex min-w-0 items-center justify-end">
             <ModelChip />
-            <VoiceButton />
-            {running ? (
-              <button
-                title="Stop"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--fg) text-(--surface) hover:text-(--danger)"
-                onClick={interrupt}
-              >
-                <IconStop size={13} />
-              </button>
-            ) : (
-              <button
-                title="Send (Enter)"
-                disabled={!canSend}
-                onClick={() => doSend()}
-                className={cx(
-                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-opacity",
-                  canSend
-                    ? "bg-(--fg) text-(--surface) hover:opacity-85"
-                    : "bg-(--fg-tertiary) text-(--input-bg)"
-                )}
-              >
-                <IconArrowUp size={16} />
-              </button>
-            )}
+            <div className="flex shrink-0 items-center gap-2">
+              <VoiceButton />
+              {running && !canSend ? (
+                <button
+                  title="Stop"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--fg) font-[445] text-(--surface) hover:text-(--danger)"
+                  onClick={interrupt}
+                >
+                  <IconStop size={16} />
+                </button>
+              ) : (
+                <button
+                  title="Send (Enter)"
+                  disabled={!canSend}
+                  onClick={() => doSend()}
+                  className={cx(
+                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-opacity",
+                    canSend
+                      ? "bg-(--fg) text-(--surface) hover:opacity-85"
+                      : "bg-(--fg-tertiary) text-(--input-bg)"
+                  )}
+                >
+                  <IconArrowUp size={16} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       <input ref={imageFileRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickFiles} />
       <input ref={anyFileRef} type="file" multiple className="hidden" onChange={onPickFiles} />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Full-access warning banner, tucked behind the composer's top edge.
-// ---------------------------------------------------------------------------
-function FullAccessBanner({ onHide }) {
-  return (
-    <div className="relative z-0 mx-3.5 -mb-8 rounded-t-[22px] bg-(--danger-soft) px-6 pt-4 pb-10">
-      <button
-        onClick={onHide}
-        className="absolute top-2.5 right-3 z-10 h-6 shrink-0 rounded-full border border-(--border) bg-(--surface-active) px-2.5 text-[11px] text-(--danger) hover:opacity-85"
-      >
-        Hide from this session
-      </button>
-      <div className="flex items-start gap-3 text-xs leading-[1.5] text-(--danger)">
-        <IconWarnTriangle size={16} className="mt-0.5 shrink-0" />
-        <div className="min-w-0 flex-1">
-          {/* title line reserves space for the Hide button; body flows full width */}
-          <div className="pr-36 font-semibold">Full access is on</div>
-          <div>
-            ChatGPT will be able to run commands, use the internet, and create, modify, upload,
-            or delete files anywhere on this computer without your permission. This comes with
-            risks like data loss and prompt injection.
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -828,13 +817,10 @@ function HomeContextBar() {
     return () => { alive = false; };
   }, [cwd]);
 
-  const chipCls = "flex h-6 items-center gap-1.5 rounded-md px-1.5 text-xs text-(--fg)";
+  const chipCls = "flex h-7 items-center gap-1.5 rounded-md px-2 text-xs text-(--fg)";
   const iconCls = "opacity-70";
   return (
-    <div
-      className="relative z-0 mx-3.5 -mb-2.5 flex items-center gap-3 rounded-t-[22px] px-3 pt-1.5 pb-5"
-      style={{ background: "color-mix(in srgb, var(--fg) 3%, transparent)" }}
-    >
+    <div className="relative z-0 mx-[13px] -mb-[18px] flex items-center gap-2 rounded-t-[20px] bg-(--surface-under) px-1.5 pt-1.5 pb-[27px] dark:bg-(--surface-fog)">
       <button title={cwd} onClick={pickCwd} className={cx(chipCls, "hover:bg-(--surface-hover)")}>
         <IconFolder size={13} className={iconCls} />
         <span className="max-w-[220px] truncate">{basename(cwd) || "Choose folder"}</span>
@@ -911,7 +897,7 @@ function AttachButton({ onPickImages, onPickFiles, onInsertText, browserTab }) {
           onSelect: () => onInsertText(`Browser tab: ${browserTab.title || browserTab.url} (${browserTab.url})`),
         }]
       : []),
-    { id: "goal", label: "Goal", icon: <LucideIcon name="Goal" size={14} />, hint: "Set a goal to keep pursuing", onSelect: () => useStore.getState().setUi({ goalDialogOpen: true }) },
+    { id: "goal", label: "Goal", icon: <IconCmdGoal size={14} />, hint: "Set a goal to keep pursuing", onSelect: () => useStore.getState().setUi({ goalDialogOpen: true }) },
     { id: "plan", label: "Plan mode", icon: <IconList size={14} />, hint: useStore.getState().planMode ? "Turn plan mode off" : "Turn plan mode on", onSelect: () => useStore.getState().setPlanMode(!useStore.getState().planMode) },
     ...(plugins.length ? [{ header: "Plugins" }] : []),
     ...plugins.map((p) => ({
@@ -960,9 +946,9 @@ function AttachButton({ onPickImages, onPickFiles, onInsertText, browserTab }) {
         ref={ref}
         title="Add files and more"
         onClick={() => setOpen(true)}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-(--border) text-(--fg) hover:bg-(--surface-hover)"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-transparent text-[13px] leading-[18px] font-[445] text-(--fg) hover:bg-(--surface-hover)"
       >
-        <IconPlus size={16} />
+        <IconComposerPlus className="size-4" />
       </button>
       <Menu
         open={open}
@@ -989,7 +975,7 @@ function PermissionChip() {
   const OPTIONS = [
     { id: "ask", label: "Ask for approval", desc: "Always ask to edit external files and use the internet", icon: <IconHand size={14} /> },
     { id: "approve", label: "Approve for me", desc: "Only ask for actions detected as potentially unsafe", icon: <IconShield size={14} /> },
-    { id: "full", label: "Full access", desc: "Unrestricted access to the internet and any file on your computer", icon: <IconWarnTriangle size={14} />, warn: true },
+    { id: "full", label: "Full access", desc: "Unrestricted access to the internet and any file on your computer", icon: <FullAccessIcon size={14} />, warn: true },
     { id: "custom", label: "Custom (config.toml)", desc: "Uses permissions defined in config.toml", icon: <IconGear size={14} /> },
   ];
   return (
@@ -998,12 +984,13 @@ function PermissionChip() {
         ref={ref}
         onClick={() => setOpen(true)}
         className={cx(
-          "flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-1.5 text-xs hover:bg-(--surface-hover)",
-          full ? "text-(--warning)" : "text-(--fg-secondary)"
+          "flex h-7 shrink-0 items-center gap-1 rounded-full border border-transparent px-1.5 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary) hover:bg-(--surface-hover)"
         )}
       >
-        <IconWarnTriangle size={13} className={full ? "text-(--warning)" : "text-(--fg-tertiary)"} />
-        {PERMISSIONS[permission]?.label || "Permissions"}
+        <FullAccessIcon size={16} className={full ? "text-(--warning)" : "text-(--fg-tertiary)"} />
+        <span className={cx("font-normal", full && "text-(--warning)")}>
+          {PERMISSIONS[permission]?.label || "Permissions"}
+        </span>
       </button>
       {open && (
         <RichPopover anchor={() => ref.current?.getBoundingClientRect()} onClose={() => setOpen(false)} width={400}>
@@ -1033,6 +1020,16 @@ function PermissionChip() {
         </RichPopover>
       )}
     </>
+  );
+}
+
+function FullAccessIcon({ size = 16, className }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
+      <path fillRule="evenodd" clipRule="evenodd" d="M9.06543 1.95123C9.66107 1.69076 10.3389 1.69071 10.9346 1.95123L15.9346 4.13873C16.7832 4.51008 17.3311 5.34917 17.3311 6.27545V10.5528C17.3309 14.6017 14.0489 17.8847 10 17.8848C5.95108 17.8846 2.66813 14.6017 2.66797 10.5528V6.27545C2.66797 5.34924 3.21695 4.51012 4.06543 4.13873L9.06543 1.95123ZM10.4014 3.16998C10.1456 3.05814 9.85444 3.05819 9.59863 3.16998L4.59863 5.35748C4.23427 5.51708 3.99805 5.87764 3.99805 6.27545V10.5528C3.99821 13.8671 6.68563 16.5546 10 16.5547C13.3144 16.5546 16.0008 13.8671 16.001 10.5528V6.27545C16.001 5.87756 15.7658 5.51703 15.4014 5.35748L10.4014 3.16998Z" fill="currentColor" />
+      <path d="M10.8883 13.1116C10.8883 13.6025 10.4903 14.0005 9.99936 14.0005C9.50844 14.0005 9.11047 13.6025 9.11047 13.1116C9.11047 12.6207 9.50844 12.2227 9.99936 12.2227C10.4903 12.2227 10.8883 12.6207 10.8883 13.1116Z" fill="currentColor" />
+      <path d="M10.5169 10.8949L11.1135 7.31519C11.2283 6.62672 10.6974 6 9.99941 6C9.30145 6 8.77053 6.62672 8.88528 7.31519L9.4819 10.8949C9.52406 11.1479 9.74294 11.3333 9.99941 11.3333C10.2559 11.3333 10.4748 11.1479 10.5169 10.8949Z" fill="currentColor" />
+    </svg>
   );
 }
 
@@ -1082,7 +1079,27 @@ const IconGear = (p) => <LucideIcon name="Settings" size={p.size || 16} classNam
 function PlanChip() {
   const planMode = useStore((s) => s.planMode);
   const setPlanMode = useStore((s) => s.setPlanMode);
-  if (!planMode) return null;
+  const setUi = useStore((s) => s.setUi);
+  const activeThreadId = useStore((s) => s.activeThreadId);
+  const goal = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId]?.goal : null));
+  const clearGoal = async () => {
+    try { await api.rpc("thread/goal/clear", { threadId: activeThreadId }); } catch {}
+    useStore.getState()._mutateConv(activeThreadId, (c) => ({ ...c, goal: null }));
+  };
+  if (!planMode) {
+    return (
+      <button
+        type="button"
+        aria-label={goal?.objective ? "Clear goal" : "Set a goal"}
+        className="composer-goal-button group flex h-7 items-center gap-1 rounded-full border border-transparent px-2 py-0 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary)"
+        onClick={goal?.objective ? clearGoal : () => setUi({ goalDialogOpen: true })}
+      >
+        <IconCmdGoal size={16} className={goal?.objective ? "shrink-0 group-hover:hidden" : "shrink-0"} />
+        {goal?.objective && <IconGoalClear size={16} className="hidden shrink-0 group-hover:block" />}
+        <span className="max-w-28 truncate">Goal</span>
+      </button>
+    );
+  }
   return (
     <button
       title="Plan mode is on — click to turn off"
@@ -1121,6 +1138,8 @@ function ModelChip() {
   const setServiceTier = useStore((s) => s.setServiceTier);
   const ref = useRef(null);
   const [open, setOpen] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
+  const [closedWidth, setClosedWidth] = useState(null);
 
   // "/model" and "/reasoning" slash commands open this menu.
   useEffect(() => {
@@ -1133,15 +1152,33 @@ function ModelChip() {
   const effLabel = effortLabel(effort || current?.defaultReasoningEffort || null);
   const modelName = shortModelName(current?.displayName || model) || "Model";
 
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const width = el.style.width;
+    el.style.width = "max-content";
+    setClosedWidth(el.getBoundingClientRect().width);
+    el.style.width = width;
+  }, [modelName, effLabel]);
+
   return (
     <>
       <button
         ref={ref}
         onClick={() => setOpen(true)}
         title="Model, effort, and speed"
-        className="flex h-7 w-7 items-center justify-center rounded-full text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        data-state={open ? "open" : "closed"}
+        className="composer-model-button flex h-7 min-w-0 items-center justify-center gap-1 rounded-full border border-transparent py-0 pl-2 pr-2.5 text-[13px] leading-[18px] font-[445]"
+        style={{
+          width: open ? 225.15625 : closedWidth ?? undefined,
+          transition: "width 320ms cubic-bezier(.23,1,.32,1)",
+        }}
       >
-        <LucideIcon name="Flower2" size={16} />
+        <span className="tabular-nums font-normal text-(--fg)">{modelName}</span>
+        {effLabel && <span className="font-normal text-(--fg-tertiary)">{effLabel}</span>}
+        <IconComposerChevronDown className="me-0.5 size-3.5 shrink-0 text-(--fg-tertiary)" />
       </button>
       {open && (
         <ModelMenu
@@ -1157,6 +1194,8 @@ function ModelChip() {
           setModel={setModel}
           setEffort={setEffort}
           setServiceTier={setServiceTier}
+          advanced={advanced}
+          setAdvanced={setAdvanced}
         />
       )}
     </>
@@ -1165,22 +1204,20 @@ function ModelChip() {
 
 // The reasoning menu: Model / Effort / Speed rows whose submenus fly out on
 // hover (like the reference client).
-function ModelMenu({ anchor, onClose, models, current, model, modelName, effLabel, effort, serviceTier, setModel, setEffort, setServiceTier }) {
+function ModelMenu({ anchor, onClose, models, current, model, modelName, effLabel, effort, serviceTier, setModel, setEffort, setServiceTier, advanced, setAdvanced }) {
   const ref = useRef(null);
-  const [pos, setPos] = useState(null);
   const [fly, setFly] = useState(null); // {kind, topViewport}
-  const [advanced, setAdvanced] = useState(false);
   const closeTimer = useRef(null);
   const W = 224;
-  const FW = 300;
-
-  React.useLayoutEffect(() => {
+  const position = () => {
     const r = anchor?.();
-    if (!r) return;
-    const left = Math.max(8, Math.min(r.left, window.innerWidth - W - FW - 16));
-    const h = ref.current?.offsetHeight || 150;
-    setPos({ left, top: Math.max(8, r.top - 8 - h) });
-  }, []);
+    if (!r) return null;
+    return {
+      left: Math.max(8, Math.min(r.right - W - 0.5, window.innerWidth - W - 8)),
+      bottom: Math.max(8, window.innerHeight - r.top + 9),
+    };
+  };
+  const [pos] = useState(position);
 
   React.useEffect(() => {
     const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
@@ -1192,7 +1229,7 @@ function ModelMenu({ anchor, onClose, models, current, model, modelName, effLabe
 
   const openFly = (kind) => (e) => {
     clearTimeout(closeTimer.current);
-    setFly({ kind, top: e.currentTarget.getBoundingClientRect().top - 6 });
+    setFly({ kind, top: e.currentTarget.getBoundingClientRect().top - 3.140625 });
   };
   const scheduleHide = () => {
     clearTimeout(closeTimer.current);
@@ -1203,56 +1240,73 @@ function ModelMenu({ anchor, onClose, models, current, model, modelName, effLabe
   const efforts = current?.supportedReasoningEfforts || [];
   const fastTier = (current?.serviceTiers || []).find((t) => t.id === "priority");
   const hasFast = !!fastTier || (current?.additionalSpeedTiers || []).includes("fast");
-  const fastDesc = fastTier?.description || "1.5x speed, more usage";
   const pick = (fn) => () => { fn(); onClose(); };
   const fast = serviceTier === "priority";
 
   return createPortal(
-    <div ref={ref} className="fixed z-50" style={{ left: pos?.left ?? -9999, top: pos?.top ?? -9999, width: W, visibility: pos ? "visible" : "hidden" }}>
-      <div className="popover-in overflow-hidden rounded-xl border border-(--border) bg-(--dropdown-bg) py-1" style={{ boxShadow: "var(--shadow-menu)" }}>
-        {advanced && (
-          <>
+    <div ref={ref} className="fixed z-50" style={{ left: pos?.left ?? -9999, bottom: pos?.bottom ?? -9999, width: W, visibility: pos ? "visible" : "hidden" }}>
+      <div
+        role="menu"
+        className="model-menu-in relative z-50 overflow-hidden rounded-[15px] p-1"
+        style={{
+          height: advanced ? 134 : 84,
+          transition: "height 300ms cubic-bezier(.23,1,.32,1)",
+        }}
+      >
+        <div
+          className="absolute inset-x-1 top-1"
+          style={{
+            transform: advanced ? "none" : "translateY(-90px)",
+            transition: "transform 300ms cubic-bezier(.23,1,.32,1)",
+          }}
+        >
             <MenuRow label="Model" value={modelName} onEnter={openFly("model")} onLeave={scheduleHide} />
             <MenuRow label="Effort" value={effLabel || "Default"} onEnter={openFly("effort")} onLeave={scheduleHide} />
             <MenuRow label="Speed" value={fast ? "Fast" : "Standard"} onEnter={openFly("speed")} onLeave={scheduleHide} />
-          </>
-        )}
-        {/* Advanced row with the Fast-mode bolt toggle (reference layout) */}
-        <div className="flex items-center justify-between pl-3 pr-2">
+        </div>
+        <div
+          className={cx("absolute left-1 flex items-center", advanced && "before:absolute before:-top-1 before:left-2 before:right-2 before:h-px before:bg-(--border-light)")}
+          style={{
+            top: 97.7109375,
+            transform: advanced ? "none" : "translateY(-94px)",
+            transition: "transform 300ms cubic-bezier(.23,1,.32,1)",
+          }}
+        >
           <button
-            className="flex flex-1 items-center gap-1 py-1.5 text-left text-[13px] text-(--fg-tertiary) hover:text-(--fg)"
+            role="menuitem"
+            data-model-picker-view-toggle="true"
+            className="flex h-8 flex-col rounded-lg p-1 text-left text-[13px] leading-[18.5714px] font-[445] text-(--fg-tertiary) hover:bg-(--sidebar-row-active)"
             onClick={() => setAdvanced(!advanced)}
             aria-expanded={advanced}
           >
-            Advanced
-            {advanced ? <IconChevronDown size={11} /> : <IconChevronRight size={11} />}
+            <span className="inline-flex items-center gap-1 px-1 py-0.5">
+              Advanced
+              <IconComposerChevronRight
+                className="size-3 shrink-0"
+                style={{
+                  rotate: advanced ? "-90deg" : "0deg",
+                  transition: "rotate 300ms cubic-bezier(.23,1,.32,1)",
+                }}
+              />
+            </span>
           </button>
-          {hasFast && (
-            <button
-              title={fast ? "Fast mode on — consumes usage limits faster" : "Turn on Fast mode"}
-              className="p-1"
-              onClick={() => setServiceTier(fast ? null : "priority")}
-            >
-              <LucideIcon name="Zap" size={15} className={fast ? "text-(--accent)" : "text-(--fg-tertiary)"} />
-            </button>
-          )}
         </div>
-        <EffortSlider efforts={efforts} effLabel={effLabel} onPick={(e) => setEffort(e)} />
+        {!advanced && <IconModelPower className="model-power-icon absolute top-[11.7109375px] right-3 size-4 text-(--fg-tertiary)" />}
+        {!advanced && <EffortSlider efforts={efforts} effLabel={effLabel} onPick={(e) => setEffort(e)} />}
       </div>
       {fly && (
         <FlyPanel
           kind={fly.kind}
           anchorTop={fly.top}
-          containerTop={pos?.top ?? 0}
+          containerTop={ref.current?.getBoundingClientRect().top ?? 0}
           containerLeft={pos?.left ?? 0}
           containerWidth={W}
-          width={FW}
+          width={fly.kind === "model" ? 280 : fly.kind === "effort" ? 204.0234375 : 233}
           onEnter={stay}
           onLeave={scheduleHide}
         >
           {fly.kind === "model" && (
             <>
-              <div className="px-3 pt-2 pb-1.5 text-xs font-medium text-(--fg-tertiary)">Model</div>
               {models.filter((m) => !m.hidden).map((m) => (
                 <FlyOption
                   key={m.model}
@@ -1265,16 +1319,15 @@ function ModelMenu({ anchor, onClose, models, current, model, modelName, effLabe
           )}
           {fly.kind === "effort" && (
             <>
-              <div className="px-3 pt-2 pb-1.5 text-xs font-medium text-(--fg-tertiary)">Effort</div>
+              <div className="px-2 py-1 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary)">Effort</div>
               {efforts.map((e) => {
                 const ultra = e.reasoningEffort === "ultra";
                 return (
                   <FlyOption
                     key={e.reasoningEffort}
                     label={effortLabel(e.reasoningEffort)}
-                    desc={ultra ? "Consumes usage limits faster" : e.description}
+                    desc={ultra ? "Consumes usage limits faster" : null}
                     checked={effortLabel(e.reasoningEffort) === effLabel}
-                    dimmed={ultra}
                     onClick={pick(() => setEffort(e.reasoningEffort))}
                   />
                 );
@@ -1283,10 +1336,10 @@ function ModelMenu({ anchor, onClose, models, current, model, modelName, effLabe
           )}
           {fly.kind === "speed" && (
             <>
-              <div className="px-3 pt-2 pb-1.5 text-xs font-medium text-(--fg-tertiary)">Speed</div>
+              <div className="px-2 py-1 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary)">Speed</div>
               <FlyOption label="Standard" desc="Default speed" checked={!serviceTier} onClick={pick(() => setServiceTier(null))} />
               {hasFast && (
-                <FlyOption label="Fast" desc={fastDesc} checked={serviceTier === "priority"} onClick={pick(() => setServiceTier("priority"))} />
+                <FlyOption label="Fast" desc="1.5x speed, more usage" checked={serviceTier === "priority"} onClick={pick(() => setServiceTier("priority"))} />
               )}
             </>
           )}
@@ -1306,16 +1359,17 @@ function FlyPanel({ kind, anchorTop, containerTop, containerLeft, containerWidth
     setH(ref.current?.offsetHeight || 0);
   }, [kind]);
   // place to the right unless it would overflow the window's right edge
-  const rightFits = containerLeft + containerWidth + 4 + width <= window.innerWidth - 8;
-  const left = rightFits ? containerWidth + 4 : -width - 4;
+  const rightFits = containerLeft + containerWidth + 1 + width <= window.innerWidth - 8;
+  const left = rightFits ? containerWidth + 1 : -width - 1;
   // clamp vertically inside the window
-  const topViewport = Math.max(8, Math.min(anchorTop, window.innerHeight - h - 8));
+  const topViewport = Math.max(8, Math.min(anchorTop, window.innerHeight - h - 7));
   const top = topViewport - containerTop;
   return (
     <div
       ref={ref}
-      className="popover-in absolute overflow-hidden rounded-xl border border-(--border) bg-(--dropdown-bg) py-1"
-      style={{ left, top, width, boxShadow: "var(--shadow-menu)" }}
+      role="menu"
+      className="model-flyout absolute z-50 overflow-hidden rounded-[15px] p-1"
+      style={{ left, top, width }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
@@ -1330,13 +1384,14 @@ function EffortSlider({ efforts, effLabel, onPick }) {
   const trackRef = useRef(null);
   const levels = efforts.map((e) => e.reasoningEffort).filter((e) => e !== "ultra");
   const idx = Math.max(0, levels.findIndex((e) => effortLabel(e) === effLabel));
-  const frac = levels.length > 1 ? idx / (levels.length - 1) : 0;
+  const powerIdx = Math.min(levels.length - 1, idx + 1);
+  const frac = levels.length > 1 ? powerIdx / (levels.length - 1) : 0;
 
   const pickFromClientX = (clientX) => {
     const r = trackRef.current?.getBoundingClientRect();
     if (!r || levels.length < 2) return;
     const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
-    const i = Math.round(f * (levels.length - 1));
+    const i = Math.max(0, Math.round(f * (levels.length - 1)) - 1);
     if (i !== idx) onPick(levels[i]);
   };
   const startDrag = (e) => {
@@ -1357,32 +1412,38 @@ function EffortSlider({ efforts, effLabel, onPick }) {
 
   if (!levels.length) return null;
   return (
-    <div className="px-3.5 pt-1 pb-2.5" tabIndex={0} onKeyDown={onKey}>
+    <div
+      data-model-picker-power-slider=""
+      className="absolute top-[39.7109375px] right-[6px] left-[6px] flex h-8 items-center px-1.5"
+      tabIndex={0}
+      onKeyDown={onKey}
+    >
       <div
         ref={trackRef}
-        className="relative flex h-[38px] cursor-pointer items-center rounded-full bg-(--surface-active)"
+        className="relative flex h-7 flex-1 cursor-pointer items-center"
         onMouseDown={startDrag}
       >
-        <div
-          className="absolute inset-y-0 left-0 rounded-full bg-(--accent)"
-          style={{ width: `calc(${frac * 100}% + ${(0.5 - frac) * 38}px)` }}
-        />
-        {/* sparkle tick dots inside the track */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-[19px]">
+        <div className="absolute inset-x-0 top-0.5 h-6 overflow-hidden rounded-full bg-(--surface-active) shadow-[inset_0_0_0_.5px_color-mix(in_srgb,var(--fg)_8%,transparent)]">
+          <div
+            className="absolute inset-y-0 left-0 rounded-l-full bg-[#0169cc]"
+            style={{ width: `calc(${frac * 100}% + ${(0.5 - frac) * 26}px)` }}
+          />
+        </div>
+        <div className="pointer-events-none absolute inset-0">
           {levels.map((lv, i) => (
             <span
               key={lv}
-              className={cx(
-                "block h-[5px] w-[5px] rotate-45 rounded-[1px] transition-colors",
-                i < idx ? "bg-white/80" : i === idx ? "bg-transparent" : "bg-white/40"
-              )}
+              className="absolute top-1/2 block size-1 -translate-x-1/2 -translate-y-1/2 rounded-full"
+              style={{
+                left: `calc(${levels.length > 1 ? i * 100 / (levels.length - 1) : 0}% + ${(0.5 - (levels.length > 1 ? i / (levels.length - 1) : 0)) * 26}px)`,
+                background: i <= powerIdx ? "rgb(255 255 255 / .3)" : "color-mix(in srgb, var(--fg) 25%, transparent)",
+              }}
             />
           ))}
         </div>
-        {/* big white thumb */}
         <div
-          className="pointer-events-none absolute top-1/2 h-[30px] w-[30px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md"
-          style={{ left: `calc(${frac * 100}% + ${(0.5 - frac) * 38}px)` }}
+          className="pointer-events-none absolute top-1/2 size-8 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_2px_rgba(0,0,0,.1)]"
+          style={{ left: `calc(${frac * 100}% + ${(0.5 - frac) * 26}px)` }}
         />
       </div>
     </div>
@@ -1391,28 +1452,30 @@ function EffortSlider({ efforts, effLabel, onPick }) {
 
 function MenuRow({ label, value, onEnter, onLeave }) {  return (
     <button
-      className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-(--surface-hover)"
+      role="menuitem"
+      data-model-menu-row={label.toLowerCase()}
+      className="flex w-full items-center justify-between rounded-[12.5px] px-2 py-[5px] text-left text-[13px] leading-[18.5714px] font-[445] hover:bg-(--sidebar-row-active)"
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
       onClick={onEnter}
     >
-      <span className="text-[13px] text-(--fg)">{label}</span>
-      <span className="flex items-center gap-1 text-xs text-(--fg-tertiary)">
+      <span className="text-(--fg)">{label}</span>
+      <span className="flex items-center gap-3 tabular-nums text-(--fg-tertiary)">
         {value}
-        <IconChevronRight size={12} />
+        <IconGoalChevron size={16} />
       </span>
     </button>
   );
 }
 
-function FlyOption({ label, desc, checked, dimmed, onClick }) {
+function FlyOption({ label, desc, checked, onClick }) {
   return (
-    <button className={cx("flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-(--surface-hover)", dimmed && "opacity-60")} onClick={onClick}>
+    <button role="menuitem" data-model-fly-option={label} data-checked={checked || undefined} className="flex w-full items-center gap-2 rounded-[12.5px] px-2 py-[5px] text-left text-[13px] leading-[18.5714px] font-[445] hover:bg-(--sidebar-row-active)" onClick={onClick}>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] text-(--fg)">{label}</span>
-        {desc && <span className="block truncate text-xs text-(--fg-tertiary)">{desc}</span>}
+        <span className="block truncate text-(--fg)">{label}</span>
+        {desc && <span className="block truncate text-(--fg-tertiary)">{desc}</span>}
       </span>
-      {checked && <IconCheck size={14} className="shrink-0 text-(--fg)" />}
+      {checked && <IconSkillCheck size={16} className="shrink-0 text-(--fg) opacity-75" />}
     </button>
   );
 }
@@ -1519,11 +1582,11 @@ function VoiceButton() {
       title={state === "active" ? "Stop voice" : "Start voice"}
       onClick={start}
       className={cx(
-        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-        state === "active" ? "animate-pulse text-(--danger)" : "text-(--fg-secondary) hover:bg-(--surface-hover)"
+        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] leading-[18px] font-[445]",
+        state === "active" ? "animate-pulse text-(--danger)" : "text-(--fg-tertiary) hover:bg-(--surface-hover)"
       )}
     >
-      <IconMic size={16} />
+      <IconComposerMic className={cx("size-4", state === "active" ? undefined : "text-(--fg)")} />
     </button>
   );
 }

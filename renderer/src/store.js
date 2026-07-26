@@ -49,6 +49,7 @@ const stored = (k, fallback) => {
 const persist = (k, v) => {
   try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
 };
+const threadPlanKey = (threadId) => `thread.plan.${threadId}`;
 
 let toastSeq = 0;
 
@@ -96,14 +97,14 @@ export const useStore = create((set, get) => ({
   // ---- ui ----
   ui: {
     sidebarOpen: stored("ui.sidebarOpen", true),
-    sidebarWidth: stored("ui.sidebarWidth", 275),
+    sidebarWidth: stored("ui.sidebarWidth", 240),
     rightOpen: stored("ui.rightOpen", false),
     rightTab: stored("ui.rightTab", "review"),
     rightWidth: stored("ui.rightWidth", Math.round((globalThis.innerWidth || 1440) * 0.52)),
     rightExpanded: stored("ui.rightExpanded", false),
     terminalLocation: stored("ui.terminalLocation", "bottom"),
     suggestedPrompts: stored("ui.suggestedPrompts", true),
-    theme: stored("ui.theme", "dark"),
+    theme: stored("ui.theme", "system"),
     commandMenuOpen: false,
     settingsOpen: false,
     settingsSection: null, // deep-link target section consumed on open
@@ -361,7 +362,7 @@ export const useStore = create((set, get) => ({
           thread: s.threads.find((t) => t.id === threadId) || null,
           turns: [],
           activeTurnId: null,
-          plan: null,
+          plan: stored(threadPlanKey(threadId), null),
           tokenUsage: null,
           diff: null,
           loaded: false,
@@ -371,10 +372,10 @@ export const useStore = create((set, get) => ({
       },
     }));
     try {
-      // Resume attaches this client to the thread; read fetches full history.
-      await api.rpc("thread/resume", { threadId }).catch(() => null);
       const res = await api.rpc("thread/read", { threadId, includeTurns: true });
       const thread = res?.thread;
+      const turns = normalizeTurns(thread?.turns);
+      const resumedTurnId = [...turns].reverse().find((turn) => turn.status === "inProgress")?.id ?? null;
       // Existing goal, if any.
       api.rpc("thread/goal/get", { threadId })
         .then((g) => {
@@ -388,7 +389,8 @@ export const useStore = create((set, get) => ({
           [threadId]: {
             ...(s.conversations[threadId] || {}),
             thread: thread || s.conversations[threadId]?.thread,
-            turns: normalizeTurns(thread?.turns),
+            turns,
+            activeTurnId: s.conversations[threadId]?.activeTurnId || resumedTurnId,
             loaded: true,
             loading: false,
           },
@@ -782,7 +784,6 @@ export const useStore = create((set, get) => ({
           return {
             ...c,
             activeTurnId: c.activeTurnId === params.turn?.id ? null : c.activeTurnId,
-            plan: null,
             turns: upsertTurn(c.turns, turn),
           };
         });
@@ -794,9 +795,12 @@ export const useStore = create((set, get) => ({
         s.flushQueue(params.threadId);
         break;
       }
-      case "turn/plan/updated":
-        s._mutateConv(params.threadId, (c) => ({ ...c, plan: { steps: params.plan || [], explanation: params.explanation } }));
+      case "turn/plan/updated": {
+        const plan = { steps: params.plan || [], explanation: params.explanation };
+        persist(threadPlanKey(params.threadId), plan);
+        s._mutateConv(params.threadId, (c) => ({ ...c, plan }));
         break;
+      }
       case "turn/diff/updated":
         s._mutateConv(params.threadId, (c) => ({ ...c, diff: params.diff }));
         break;
@@ -807,7 +811,8 @@ export const useStore = create((set, get) => ({
         s._mutateConv(params.threadId, (c) => ({ ...c, goal: params.goal ?? { objective: params.objective, status: params.status, tokenBudget: params.tokenBudget } }));
         break;
       case "thread/goal/cleared":
-        s._mutateConv(params.threadId, (c) => ({ ...c, goal: null }));
+        persist(threadPlanKey(params.threadId), null);
+        s._mutateConv(params.threadId, (c) => ({ ...c, goal: null, plan: null }));
         break;
       case "item/started":
         s._upsertItem(params.threadId, params.turnId, params.item);

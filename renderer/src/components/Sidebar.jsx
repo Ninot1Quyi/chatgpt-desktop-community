@@ -10,7 +10,7 @@ import {
   IconTrash, IconUndo, IconChevronDown, IconChevronRight, IconFolder, IconFolderFilled, IconClock,
   IconUsage, IconPet, IconInvite, IconLogout, IconBranch, IconX,
   IconHelpCircle, IconNavNewChat, IconNavPullRequests, IconNavSites, IconNavScheduled, IconNavPlugins,
-  IconCircleAlert, IconPin, IconFolderBadge, IconQuickChat,
+  IconCircleAlert, IconPin, IconPinFilled, IconFolderBadge, IconFolderRemote, IconQuickChat, IconHeaderChevronDown,
 } from "./icons.jsx";
 
 const NAV_ITEMS = [
@@ -65,7 +65,7 @@ export default function Sidebar() {
   const empty = model.projects.length === 0 && model.chats.length === 0 && model.pinned.length === 0;
 
   return (
-    <div className="app-sidebar flex h-full w-full flex-col bg-(--surface-under)">
+    <div className="app-sidebar flex h-full w-full flex-col">
       {/* 46px spacer: the floating global header occupies the top strip */}
       <div className="h-[46px] shrink-0" />
       {/* wordmark row + search (global header sits above the sidebar) */}
@@ -99,11 +99,12 @@ export default function Sidebar() {
       )}
 
       {/* primary nav */}
-      <div className="flex shrink-0 flex-col gap-px px-2 pb-1">
+      <div className="mt-2 flex shrink-0 flex-col gap-px px-2 pb-1">
         <div className="group/nav relative">
           <NavRow
             icon={<IconNavNewChat size={16} />}
             label="New chat"
+            compact
             onClick={() => {
               const s = useStore.getState();
               s.setUi({ navView: "chats" });
@@ -195,12 +196,13 @@ export default function Sidebar() {
 }
 
 // ---------------------------------------------------------------------------
-function NavRow({ icon, label, active, onClick }) {
+function NavRow({ icon, label, active, compact = false, onClick }) {
   return (
     <button
       className={cx(
-        "flex h-[30px] w-full items-center gap-2 rounded-lg px-2 text-left text-[13px]",
-        active ? "bg-(--surface-active)" : "hover:bg-(--surface-hover)"
+        "flex w-full items-center gap-2 rounded-[12.5px] pl-2 text-left text-[14px]",
+        compact ? "h-[29px] pr-1" : "h-[30px] pr-2",
+        active ? "bg-(--sidebar-row-active) text-(--fg)" : "hover:bg-(--surface-hover)"
       )}
       onClick={onClick}
     >
@@ -279,14 +281,18 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
     <div>
       <div
         ref={rowRef}
-        className="group/proj relative mx-2 flex h-[30px] cursor-pointer select-none items-center gap-2 rounded-full px-2 hover:bg-(--surface-hover)"
+        className="group/proj relative mx-2 flex h-[30px] cursor-pointer select-none items-center gap-2 rounded-[12.5px] px-2 hover:bg-(--surface-hover)"
         onClick={onToggle}
         onMouseEnter={() => { clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHoverCard(true), 550); }}
         onMouseLeave={() => { clearTimeout(hoverTimer.current); setHoverCard(false); }}
       >
         <span className="flex h-4 w-4 shrink-0 items-center justify-center text-(--fg-secondary)">
           <span className="group-hover/proj:hidden">
-            {project.branch ? <IconFolderBadge size={16} /> : <IconFolderFilled size={15} />}
+            {project.kind === "remote"
+              ? <IconFolderRemote size={16} />
+              : project.branch
+                ? <IconFolderBadge size={16} />
+                : <IconFolderFilled size={16} />}
           </span>
           <span className="hidden group-hover/proj:block">
             <IconChevronRight
@@ -295,7 +301,7 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
             />
           </span>
         </span>
-        <span className="min-w-0 flex-1 truncate text-[13px]">
+        <span className="min-w-0 flex-1 truncate text-[14px]">
           {project.name}
           {project.hostName && (
             <span className="ml-2 text-(--fg-tertiary)">{project.hostName}</span>
@@ -346,7 +352,7 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
             className="pointer-events-none fixed z-50 w-60 rounded-xl border border-(--border) bg-(--dropdown-bg) px-3 py-2.5"
             style={{ left: Math.round((rowRef.current?.getBoundingClientRect().right ?? 0) - 8), top: Math.round((rowRef.current?.getBoundingClientRect().top ?? 0) - 6), boxShadow: "var(--shadow-menu)" }}
           >
-            <div className="min-w-0 truncate text-[13px] font-medium">{project.name}</div>
+            <div className="min-w-0 truncate text-[14px] font-medium">{project.name}</div>
             <div className="mt-0.5 text-xs text-(--fg-tertiary)">
               {project.threads.length} {project.threads.length === 1 ? "thread" : "threads"}
             </div>
@@ -398,8 +404,8 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
 // The in-project "New chat" draft row (active when the draft view is open).
 function DraftRow() {
   return (
-    <div className="mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-lg bg-(--surface-active) pl-8 pr-2">
-      <span className="min-w-0 flex-1 truncate text-[13px]">New chat</span>
+    <div className="mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] bg-(--sidebar-row-active) pl-8 pr-1 text-(--fg)">
+      <span className="min-w-0 flex-1 truncate text-[14px]">New chat</span>
     </div>
   );
 }
@@ -445,12 +451,12 @@ function WordmarkMenu() {
     <>
       <button
         ref={btnRef}
-        className="flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[17px] font-medium hover:bg-(--surface-hover)"
+        className="-ml-2 flex h-8 items-center gap-1 rounded-xl border border-transparent px-2 py-0.5 text-[17px] leading-6 hover:bg-(--surface-hover)"
         title="Switch product"
         onClick={() => setOpen(true)}
       >
-        {label}
-        <IconChevronDown size={12} className="text-(--fg-tertiary)" />
+        <span className="truncate font-openai-sans font-semibold">{label}</span>
+        <IconHeaderChevronDown size={14} className="shrink-0 text-(--fg-tertiary)" />
       </button>
       <Menu
         open={open}
@@ -523,18 +529,21 @@ function ThreadRow({ thread, active, archived, onRename }) {  const needsInput =
     <div
       ref={rowRef}
       className={cx(
-        "group/thr relative mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-lg pl-8 pr-2",
-        active ? "bg-(--surface-active)" : "hover:bg-(--surface-hover)"
+        "group/thr relative mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] pl-8 pr-1",
+        active ? "bg-(--sidebar-row-active) text-(--fg)" : "hover:bg-(--surface-hover)"
       )}
       onClick={open}
       onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true); }}
       onMouseEnter={() => { clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHoverCard(true), 550); }}
       onMouseLeave={() => { clearTimeout(hoverTimer.current); setHoverCard(false); }}
     >
-      <span className="min-w-0 flex-1 truncate text-[13px]">{title}</span>
-      {pinned && <IconPin size={12} className="shrink-0 text-(--fg-tertiary)" />}
+      <span className="min-w-0 flex-1 truncate text-[14px] leading-5">{title}</span>
+      {pinned && <IconPinFilled size={12} className="shrink-0 text-(--fg-tertiary)" />}
       {needsInput && <IconCircleAlert size={13} className="shrink-0 text-(--danger)" />}
-      {running && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-(--accent)" />}
+      {running && (active
+        ? <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />
+        : <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-(--accent)" />
+      )}
       {/* hover actions: pin + archive directly (like the reference client) */}
       <button
         className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover/thr:flex"
@@ -714,11 +723,11 @@ function Footer() {
               {(displayName || "?")[0].toUpperCase()}
             </span>
           )}
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{displayName}</span>
+          <span className="min-w-0 flex-1 truncate text-[14px] text-(--fg)">{displayName}</span>
         </button>
         <IconButton
           icon={<IconHelpCircle />}
-          size={15}
+        size={18}
           title="Help"
           onClick={() => openExternal(HELP_URL)}
         />

@@ -1,7 +1,8 @@
 // CDP driver: run a JS expression in the page, print result.
 const expr = process.argv[2];
 const waitMs = Number(process.argv[3] || 0);
-const targets = await fetch("http://localhost:9222/json").then((r) => r.json());
+const port = Number(process.argv[4] || 9222);
+const targets = await fetch(`http://localhost:${port}/json`).then((r) => r.json());
 const page = targets.find((t) => t.type === "page" && t.url.endsWith("index.html"))
   || targets.find((t) => t.type === "page");
 const ws = new WebSocket(page.webSocketDebuggerUrl);
@@ -19,6 +20,11 @@ const call = (method, params) => new Promise((resolve, reject) => {
   const id = ++seq; pending.set(id, { resolve, reject });
   ws.send(JSON.stringify({ id, method, params }));
 });
+if (process.env.CDP_COLOR_SCHEME) {
+  await call("Emulation.setEmulatedMedia", {
+    features: [{ name: "prefers-color-scheme", value: process.env.CDP_COLOR_SCHEME }],
+  });
+}
 if (waitMs) await new Promise((r) => setTimeout(r, waitMs));
 const r = await call("Runtime.evaluate", { expression: expr, returnByValue: true, awaitPromise: true });
 if (r.exceptionDetails) {

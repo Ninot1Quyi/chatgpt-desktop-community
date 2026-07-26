@@ -5,16 +5,16 @@ import { useStore } from "../store.js";
 import { cx } from "../lib/cx.js";
 import * as api from "../api.js";
 import { basename, formatDuration } from "../lib/time.js";
+import { commandActivity } from "../lib/commandActivity.mjs";
+import vscodeIcon from "../assets/vscode.png";
 import Composer from "./Composer.jsx";
 import OutputsPanel from "./OutputsPanel.jsx";
 import { ItemView, PlanWidget, ApprovalCard, TurnActionRow } from "./items.jsx";
-import { Menu, Dialog, IconButton, Spinner } from "./ui.jsx";
-import { IconBranch, IconFolder, IconMore, IconPanelRight, IconChevronRight, IconChevronDown, IconX, IconFile, IconTerminal, IconGlobe, IconWrench, IconSparkle, IconFolderFilled, LucideIcon } from "./icons.jsx";
+import { ActivityDisclosure, Menu, Dialog, IconButton, Spinner } from "./ui.jsx";
+import { IconBranch, IconFolder, IconMore, IconChevronRight, IconChevronDown, IconX, IconFile, IconTerminal, IconGlobe, IconSparkle, IconFolderFilled, IconDots21, IconHeaderOutputs, IconHeaderPanelBottom, IconHeaderPanelSide, IconHeaderChevronDown, IconCmdGoal, IconBookOpen, IconCodeSearching, IconEditFiles, IconGoalEdit, IconGoalPause, IconGoalResume, IconGoalTrash, IconGoalChevron, IconListFiles, IconMcpSource, IconRunCommand, IconWebSearch, LucideIcon } from "./icons.jsx";
 import { panelHook } from "../lib/panelHook.js";
 import { usePanelStore } from "./RightPanel.jsx";
 
-const IconOutputs = (p) => <LucideIcon name="SlidersHorizontal" size={p.size || 16} className={p.className} style={p.style} />;
-const IconPanelBottom = (p) => <LucideIcon name="PanelBottom" size={p.size || 16} className={p.className} style={p.style} />;
 const IconArrowDown = (p) => <LucideIcon name="ArrowDown" size={p.size || 16} className={p.className} style={p.style} />;
 
 // Codex mark (home logo) — extracted verbatim from the reference app bundle.
@@ -30,6 +30,7 @@ export function CodexMark({ size = 56, className, style }) {
 export default function Conversation() {
   const activeThreadId = useStore((s) => s.activeThreadId);
   const conv = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId] : null));
+  const hasTurns = (conv?.turns || []).length > 0;
 
   if (!activeThreadId) {
     return (
@@ -45,7 +46,7 @@ export default function Conversation() {
         <div className="flex flex-1 items-center justify-center text-(--fg-tertiary)"><Spinner size={18} /></div>
       ) : conv?.error ? (
         <div className="flex flex-1 items-center justify-center px-8 text-center text-[13px] text-(--danger)">{conv.error}</div>
-      ) : (conv?.turns || []).length === 0 ? (
+      ) : !hasTurns ? (
         // Empty thread: home-like centered prompt with the composer below.
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="my-auto flex flex-col items-center px-4 py-6">
@@ -58,7 +59,7 @@ export default function Conversation() {
       ) : (
         <MessageList key={activeThreadId} conv={conv} />
       )}
-      <BottomArea conv={conv} />
+      {!hasTurns && <BottomArea conv={conv} />}
     </div>
   );
 }
@@ -86,8 +87,15 @@ function ThreadHeaderContent() {
   return (
     <div className="flex items-center gap-2">
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <IconFolderFilled size={15} className="app-no-drag shrink-0 text-(--fg-secondary)" />
-        <div className="max-w-[320px] truncate text-[14px] font-medium">{thread?.name || "New chat"}</div>
+        <div className="flex min-w-0 items-center gap-0.5">
+          <button
+            className="app-no-drag flex h-7 w-7 shrink-0 items-center justify-center"
+            aria-label={`Project: ${basename(thread?.cwd || conv?.thread?.cwd || "")}`}
+          >
+            <IconFolderFilled size={16} className="text-(--fg-secondary)" />
+          </button>
+          <div className="max-w-[320px] truncate text-[14px] font-medium">{thread?.name || "New chat"}</div>
+        </div>
         <ThreadMenu thread={thread} />
       </div>
     </div>
@@ -98,13 +106,15 @@ function ThreadHeaderContent() {
 // shortcut and the Context toggle live here in the reference app — NOT in
 // the side panel's tab strip.
 export function HeaderContextButtons() {
+  const activeThreadId = useStore((s) => s.activeThreadId);
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
   return (
-    <div className="flex shrink-0 items-center gap-1.5">
-      <OpenInEditorButton />
+    <div className="flex shrink-0 translate-x-0.5 items-center gap-1.5">
+      {activeThreadId && <OpenInEditorButton />}
       <IconButton
-        icon={<IconOutputs />}
+        icon={<IconHeaderOutputs />}
+        size={16}
         title="Toggle pinned summary"
         active={!!ui.outputsOpen}
         onClick={() => setUi({ outputsOpen: !ui.outputsOpen })}
@@ -118,15 +128,17 @@ export function HeaderPanelButtons() {
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
   return (
-    <div className="flex shrink-0 items-center gap-1.5">
+    <div className="flex shrink-0 translate-x-1 items-center gap-1.5">
       <IconButton
-        icon={<IconPanelBottom />}
+        icon={<IconHeaderPanelBottom />}
+        size={16}
         title="Toggle bottom panel"
         active={!!ui.bottomOpen}
         onClick={() => setUi({ bottomOpen: !ui.bottomOpen })}
       />
       <IconButton
-        icon={<IconPanelRight />}
+        icon={<IconHeaderPanelSide />}
+        size={16}
         title="Toggle side panel"
         active={!!ui.rightOpen}
         onClick={() => setUi({ rightOpen: !ui.rightOpen })}
@@ -149,21 +161,21 @@ function OpenInEditorButton() {
     api.openExternal(`vscode://file${cwd}`);
   };
   return (
-    <div className="flex h-7 items-stretch overflow-hidden rounded-lg border border-(--border)">
+    <div className="flex h-7 w-[52px] items-stretch overflow-hidden rounded-[12.5px]">
       <button
-        className="flex items-center gap-1.5 px-2 text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)"
+        className="flex h-7 w-[29px] items-center rounded-l-[12.5px] border border-r-0 border-(--border) bg-black/[0.03] pl-2 pr-1 text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg) dark:bg-white/[0.03]"
         title="Open in"
         onClick={openVSCode}
       >
-        <IconVSCode size={14} />
+        <img src={vscodeIcon} alt="VS Code" className="size-4" />
       </button>
       <button
         ref={chevRef}
-        className="px-1 text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
+        className="flex h-7 w-[23px] items-center rounded-r-[12.5px] border border-l-0 border-(--border) bg-black/[0.03] pl-0.5 pr-1.5 text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg) dark:bg-white/[0.03]"
         title="Open options"
         onClick={() => setMenuOpen(true)}
       >
-        <IconChevronDown size={11} />
+        <IconHeaderChevronDown size={12} className="opacity-50" />
       </button>
       <Menu
         open={menuOpen}
@@ -177,14 +189,6 @@ function OpenInEditorButton() {
         ]}
       />
     </div>
-  );
-}
-
-function IconVSCode({ size = 14 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M17 3.5 8.5 10 5 6.5 3.5 7.5v9L5 17.5l3.5-3.5 8.5 6.5 3-1.5v-14zM17 8v8l-5-4z" />
-    </svg>
   );
 }
 
@@ -238,11 +242,14 @@ function ThreadMenu({ thread }) {
     <>
       <button
         ref={btnRef}
-        title="Chat actions"
+        aria-label="Chat actions"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        data-state={menuOpen ? "open" : "closed"}
         className="app-no-drag flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
-        onClick={() => setMenuOpen(true)}
+        onClick={() => setMenuOpen((open) => !open)}
       >
-        <IconMore size={15} />
+        <IconDots21 size={18} />
       </button>
       <Menu
         open={menuOpen}
@@ -258,13 +265,14 @@ function ThreadMenu({ thread }) {
           {
             id: "rename",
             label: "Rename chat",
-            hint: "⌃R",
+            hint: "⌥⌘R",
             onSelect: () => {
               setName(thread?.name || "");
               setRenameOpen(true);
             },
           },
           { id: "archive", label: "Archive chat", hint: "⇧⌘A", onSelect: () => setArchiveOpen(true) },
+          { sep: true },
           {
             id: "sidechat",
             label: "Open side chat",
@@ -306,12 +314,12 @@ function ThreadMenu({ thread }) {
               },
             ],
           },
-          { sep: true },
           {
             id: "schedule",
             label: "Add scheduled task…",
             onSelect: () => useStore.getState().setUi({ navView: "scheduled" }),
           },
+          { sep: true },
           {
             id: "new-window",
             label: "Open in new window",
@@ -545,11 +553,18 @@ function itemText(item) {
 
 function MessageList({ conv }) {
   const ref = useRef(null);
+  const contentRef = useRef(null);
   const [stickBottom, setStickBottom] = useState(true);
+  const [externalActivity, setExternalActivity] = useState(null);
   const turns = conv?.turns || [];
   const activeTurnId = conv?.activeTurnId;
+  const activeItems = turns.find((turn) => turn.id === activeTurnId)?.items || [];
+  const nativeLiveActivity = [...activeItems].reverse().find((item) => item.status === "inProgress");
+  const showExternalActivity = externalActivity
+    && !(nativeLiveActivity?.type === "commandExecution"
+      && nativeLiveActivity.command === externalActivity.command);
 
-  const itemCount = turns.reduce((n, t) => n + (t.items?.length || 0), 0);
+  const itemCount = turns.reduce((n, t) => n + (t.items?.length || 0), 0) + (showExternalActivity ? 1 : 0);
 
   // The active TurnView renders its own "Working for Xs" header once the turn
   // has work items; until then the standalone WorkingRow fills in.
@@ -558,10 +573,37 @@ function MessageList({ conv }) {
   );
 
   useEffect(() => {
+    const file = conv?.thread?.path;
+    if (!file) {
+      setExternalActivity(null);
+      return;
+    }
+    let live = true;
+    const refresh = () => api.rolloutActivity(file)
+      .then((item) => live && setExternalActivity(item))
+      .catch(() => live && setExternalActivity(null));
+    refresh();
+    const timer = setInterval(refresh, 400);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [conv?.thread?.path]);
+
+  useEffect(() => {
     if (stickBottom && ref.current) {
       ref.current.scrollTop = ref.current.scrollHeight;
     }
   }, [itemCount, turns, stickBottom]);
+
+  useEffect(() => {
+    if (!contentRef.current) return;
+    const observer = new ResizeObserver(() => {
+      if (stickBottom && ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+    });
+    observer.observe(contentRef.current);
+    return () => observer.disconnect();
+  }, [stickBottom]);
 
   const onScroll = () => {
     const el = ref.current;
@@ -577,12 +619,16 @@ function MessageList({ conv }) {
   return (
     <div className="relative min-h-0 flex-1">
       <div ref={ref} onScroll={onScroll} className="h-full overflow-x-hidden overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-(--thread-content-max-width) flex-col gap-(--conversation-item-gap) px-4 pt-4 pb-6">
-          {conv?.thread?.forkedFromId && <ForkedFromCard forkedFromId={conv.thread.forkedFromId} />}
-          {turns.map((turn) => (
-            <TurnView key={turn.id} turn={turn} streaming={turn.id === activeTurnId} />
-          ))}
-          {activeTurnId && !hasActiveWork && <WorkingRow conv={conv} />}
+        <div ref={contentRef} className="flex min-h-full shrink-0 flex-col justify-start">
+          <div className="mx-auto flex w-full max-w-(--thread-content-max-width) flex-col gap-(--conversation-item-gap) px-4 pt-4 pb-6">
+            {conv?.thread?.forkedFromId && <ForkedFromCard forkedFromId={conv.thread.forkedFromId} />}
+            {turns.map((turn) => (
+              <TurnView key={turn.id} turn={turn} streaming={turn.id === activeTurnId} />
+            ))}
+            {activeTurnId && !hasActiveWork && <WorkingRow conv={conv} />}
+            {showExternalActivity && <WorklogActionRow item={externalActivity} live />}
+          </div>
+          <BottomArea conv={conv} />
         </div>
       </div>
       {useStore((s) => s.ui.findOpen) && <FindBar conv={conv} />}
@@ -607,77 +653,62 @@ function TurnView({ turn, streaming }) {
   const items = turn.items || [];
   const lastAgent = items.reduce((acc, it, i) => (it.type === "agentMessage" ? i : acc), -1);
   const showActions = !streaming && turn.status === "completed" && lastAgent >= 0;
-  const [open, setOpen] = useState(false);
-
-  // Reference layout: user message → "Worked for Xm XXs ›" row → only the
-  // final agent message (+trailing cards). Everything in between (reasoning,
-  // tool calls, earlier commentary messages) hides inside the Worked fold.
-  let headEnd = 0;
-  items.forEach((it, i) => { if (it.type === "userMessage") headEnd = i + 1; });
-  const tailStart = lastAgent >= 0 ? lastAgent : items.length;
-  const head = items.slice(0, headEnd);
-  const fold = items.slice(headEnd, tailStart).filter((it) => it.type !== "reasoning");
-  const tail = items.slice(tailStart);
-  const hasFold = fold.length > 0;
 
   // A localhost web-preview card follows the final message (reference renders
   // one when the reply points at a local preview server).
-  const tailText = tail.filter((it) => it.type === "agentMessage").map((it) => it.text || "").join("\n");
-  const previewUrl = (tailText.match(/https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/[^\s)\]>"']*)?/) || [])[0];
+  const agentText = items.filter((it) => it.type === "agentMessage").map((it) => it.text || "").join("\n");
+  const previewUrl = (agentText.match(/https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/[^\s)\]>"']*)?/) || [])[0];
 
-  // Fold content: consecutive work items collapse into a WorklogGroup row.
-  const foldSegments = [];
+  // Commentary remains visible. Only consecutive work items collapse into
+  // the reference activity summary row.
+  const segments = [];
   {
     let buf = [];
+    let firstIndex = 0;
     const flush = () => {
-      if (buf.length >= 2) foldSegments.push({ kind: "work", items: buf });
-      else foldSegments.push(...buf.map((item) => ({ kind: "item", item })));
+      if (buf.length) segments.push({ kind: "work", items: buf, index: firstIndex });
       buf = [];
     };
-    for (const item of fold) {
-      if (WORK_ITEM_TYPES.has(item.type)) buf.push(item);
-      else { flush(); foldSegments.push({ kind: "item", item }); }
-    }
+    items.forEach((item, index) => {
+      const emptyReasoning = item.type === "reasoning"
+        && !(item.summary?.length || item.content?.length);
+      if (emptyReasoning && !(streaming && index === items.length - 1)) return;
+      if (WORK_ITEM_TYPES.has(item.type)) {
+        if (buf.length === 0) firstIndex = index;
+        buf.push(item);
+      } else {
+        flush();
+        segments.push({ kind: "item", item, index });
+      }
+    });
     flush();
   }
 
-  const renderItem = (item, i, streamLast) => {
+  const renderItem = (item, index, streamLast) => {
     const body = (
-      <React.Fragment key={item.id ?? `i${i}`}>
+      <React.Fragment key={item.id ?? `i${index}`}>
         <ItemView item={item} streaming={streamLast} turnId={turn.id} />
-        {showActions && item === tail[0] && item.type === "agentMessage" && <TurnActionRow turn={turn} />}
+        {showActions && index === lastAgent && <TurnActionRow turn={turn} />}
       </React.Fragment>
     );
     return item.type === "userMessage"
-      ? <div key={item.id ?? `i${i}`} id={`um-${item.id}`} className="scroll-mt-24">{body}</div>
+      ? <div key={item.id ?? `i${index}`} id={`um-${item.id}`} className="scroll-mt-24">{body}</div>
       : body;
   };
 
   return (
     <div className="group/turn flex flex-col gap-(--conversation-item-gap)">
-      {head.map((it, i) => renderItem(it, i, false))}
-      {hasFold && (
-        streaming ? (
-          <WorkedTimer turn={turn} />
+      {segments.map((seg, segmentIndex) =>
+        seg.kind === "work" ? (
+          <WorklogGroup
+            key={`w${seg.index}`}
+            items={seg.items}
+            live={streaming && segmentIndex === segments.length - 1}
+          />
         ) : (
-          <button
-            className="flex items-center gap-1 text-[14px] text-(--fg-secondary) hover:text-(--fg)"
-            onClick={() => setOpen(!open)}
-          >
-            Worked{turn.durationMs ? ` for ${formatDuration(turn.durationMs)}` : ""}
-            <IconChevronDown size={13} className={cx("text-(--fg-tertiary) transition-transform", !open && "-rotate-90")} />
-          </button>
+          renderItem(seg.item, seg.index, streaming && segmentIndex === segments.length - 1)
         )
       )}
-      {(streaming || open) &&
-        foldSegments.map((seg, si) =>
-          seg.kind === "work" ? (
-            <WorklogGroup key={`w${si}`} items={seg.items} live={streaming && si === foldSegments.length - 1} />
-          ) : (
-            <ItemView key={seg.item.id ?? `f${si}`} item={seg.item} streaming={false} turnId={turn.id} />
-          )
-        )}
-      {tail.map((it, i) => renderItem(it, headEnd + tailStart + i, streaming && headEnd + tailStart + i === items.length - 1))}
       {!streaming && previewUrl && <WebPreviewCard url={previewUrl} />}
       {turn.status === "failed" && turn.error && (
         <div className="rounded-[12.5px] border border-(--danger) bg-(--danger-soft) px-3 py-2 text-[13px] text-(--danger)">
@@ -694,22 +725,6 @@ function TurnView({ turn, streaming }) {
         </div>
       )}
     </div>
-  );
-}
-
-// Live "Working for Xs" shimmer header for the active turn (reference keeps
-// one such header while a turn runs).
-function WorkedTimer({ turn }) {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    const startedMs = turn?.startedAt ? turn.startedAt * 1000 : Date.now();
-    const tick = () => setElapsed(Math.max(0, Date.now() - startedMs));
-    tick();
-    const t = setInterval(tick, 1000);
-    return () => clearInterval(t);
-  }, [turn?.startedAt]);
-  return (
-    <div className="shimmer-text text-[14px]">Working{elapsed > 1500 ? ` for ${formatDuration(elapsed)}` : ""}</div>
   );
 }
 
@@ -771,31 +786,82 @@ const WORK_ITEM_TYPES = new Set([
 function MessageRail({ turns, scrollRef }) {
   const userMsgs = [];
   for (const turn of turns || []) {
+    const reply = [...(turn.items || [])]
+      .reverse()
+      .find((item) => item.type === "agentMessage" && item.text?.trim());
     for (const item of turn.items || []) {
       if (item.type === "userMessage") {
-        const text = (item.content || []).filter((c) => c.type === "text").map((c) => c.text).join(" ");
-        userMsgs.push({ id: item.id, preview: text.slice(0, 90) });
+        const title = itemText(item).replace(/\s+/g, " ").trim();
+        userMsgs.push({
+          id: item.id,
+          title,
+          preview: (reply?.text || "").replace(/`/g, "").replace(/\s+/g, " ").trim(),
+        });
       }
     }
   }
+  const [hovered, setHovered] = useState(null);
+  const [selected, setSelected] = useState(null);
   if (userMsgs.length < 2) return null;
+  const current = selected;
+  const scales = [1, 0.76924, 0.53848, 0.38464, 0.2308];
   return (
-    <nav className="absolute top-1/2 left-3 z-20 flex max-h-[70vh] -translate-y-1/2 flex-col items-start gap-1.5 overflow-y-auto py-2">
-      {userMsgs.map((m, i) => (
-        <button
-          key={m.id ?? i}
-          className="group flex items-center gap-2"
-          onClick={() => {
-            const el = document.getElementById(`um-${m.id}`);
-            el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    <nav className="absolute top-1/2 left-4 z-20 -translate-y-1/2">
+      <div className="flex max-h-[70vh] w-9 flex-col overflow-y-auto">
+        {userMsgs.map((m, i) => (
+          <button
+            key={m.id ?? i}
+            aria-current={i === current ? "true" : undefined}
+            aria-label={`Jump to user message ${i + 1}`}
+            className="group/navigation-row flex h-2.5 w-9 shrink-0 items-center"
+            onMouseEnter={() => setHovered(i)}
+            onMouseLeave={() => setHovered(null)}
+            onClick={() => {
+              setSelected(i);
+              const el = document.getElementById(`um-${m.id}`);
+              el?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          >
+            <span className="flex h-0.5 w-[30px] items-center">
+              <span
+                className={cx(
+                  "h-0.5 w-[26px] origin-left transition-[transform,background-color,opacity]",
+                  i === hovered
+                    ? "bg-(--fg) opacity-100"
+                    : i === current
+                      ? "bg-(--fg) opacity-60"
+                      : "bg-(--fg-tertiary) opacity-40",
+                )}
+                style={{
+                  transform: `scaleX(${hovered == null
+                    ? scales.at(-1)
+                    : scales[Math.min(Math.abs(i - hovered), scales.length - 1)]})`,
+                }}
+              />
+            </span>
+          </button>
+        ))}
+      </div>
+      {hovered != null && (
+        <div
+          className="pointer-events-none absolute left-9 w-80 -translate-y-1/2 select-none rounded-[15px] p-2 text-left backdrop-blur-[2px]"
+          style={{
+            top: hovered * 10 + 5,
+            background: "color-mix(in srgb, var(--surface-raised) 95%, transparent)",
+            boxShadow: "0 0 0 0.5px rgb(26 28 31 / 0.08), 0 8px 16px -4px rgb(0 0 0 / 0.12)",
           }}
         >
-          <span className="block h-[3px] w-3.5 rounded-full bg-(--border-heavy) transition-all group-hover:w-5 group-hover:bg-(--accent)" />
-          <span className="pointer-events-none hidden max-w-[220px] truncate rounded-md border border-(--border) bg-(--surface-raised) px-2 py-1 text-xs text-(--fg-secondary) group-hover:block" style={{ boxShadow: "var(--shadow-menu)" }}>
-            {m.preview || "Message"}
-          </span>
-        </button>
-      ))}
+          <div className="h-5 truncate text-[13px] leading-5 font-medium">
+            {userMsgs[hovered].title || "Message"}
+          </div>
+          <div
+            className="mt-1 h-[60px] overflow-hidden text-[13px] leading-[21px] text-(--fg-tertiary)"
+            style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 3 }}
+          >
+            {userMsgs[hovered].preview}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
@@ -805,60 +871,118 @@ function MessageRail({ turns, scrollRef }) {
 // their rows directly under the turn's "Working for Xs" header.
 function WorklogGroup({ items, live }) {
   const [open, setOpen] = useState(false);
-  if (live) {
-    return (
-      <div className="flex flex-col gap-1">
-        {items.map((item, i) => (
-          <WorklogActionRow key={item.id ?? i} item={item} live={i === items.length - 1} />
-        ))}
-      </div>
-    );
+  const activityKind = worklogActivityKind(items);
+  if (items.length === 1 && items[0].type !== "fileChange") {
+    return <WorklogActionRow item={items[0]} live={live} />;
   }
   return (
-    <div className="flex flex-col gap-1">
+    <div className={cx("flex flex-col", open && "gap-1")}>
       <button
-        className="flex items-center gap-1.5 text-[13px] text-(--fg-tertiary) hover:text-(--fg)"
+        type="button"
+        aria-expanded={open}
+        data-activity-icon={activityKind}
+        className={cx(
+          "group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[14px] leading-[21px] font-[445]",
+          live ? "text-(--fg)" : "text-(--conversation-body)",
+        )}
         onClick={() => setOpen(!open)}
       >
-        <LucideIcon name="BookOpen" size={13} />
-        {worklogLabel(items)}
-        {open && <IconChevronDown size={12} />}
+        <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+          <WorklogActivityIcon kind={activityKind} item={items[0]} live={live} />
+          <span className="min-w-0 truncate">{worklogLabel(items)}</span>
+          {live && <Spinner size={11} className="shrink-0" />}
+        </span>
+        <IconGoalChevron
+          size={14}
+          className={cx(
+            "activity-chevron shrink-0 opacity-0 transition-transform duration-[300ms] group-hover/activity-header:opacity-100 group-focus-visible/activity-header:opacity-100",
+            open && "rotate-90 opacity-100",
+          )}
+        />
       </button>
-      {open && (
+      <ActivityDisclosure open={open}>
         <div className="flex flex-col gap-1">
           {items.map((item, i) => (
             <WorklogActionRow key={item.id ?? i} item={item} live={false} />
           ))}
         </div>
-      )}
+      </ActivityDisclosure>
     </div>
   );
 }
 
+function worklogActivityKind(items) {
+  if (items.some((item) => item.type === "mcpToolCall" || item.type === "dynamicToolCall")
+    && !items.some(isCommandAction)
+    && !items.some(isReadAction)) return "mcp-source";
+  if (items.some((item) => item.type === "fileChange")) return "edit-files";
+  const firstCommand = items.find((item) => item.type === "commandExecution");
+  if (firstCommand) return commandActivity(firstCommand).kind;
+  if (items.some(isReadAction)) return "read-files";
+  if (items.some(isCommandAction) || items.some(isReadAction)) return "run-command";
+  if (items.some((item) => item.type === "webSearch")) return "web-search";
+  return "run-command";
+}
+
+function WorklogActivityIcon({ kind, item, live }) {
+  const tone = live ? "text-(--fg)" : "text-(--conversation-body)";
+  if (kind === "web-search") return <IconWebSearch size={16} className={cx("activity-web-search shrink-0", tone)} />;
+  if (kind === "read-files") return <IconBookOpen size={16} className={cx("activity-read-files shrink-0", tone)} />;
+  if (kind === "code-searching") return <IconCodeSearching size={16} className={cx("activity-code-searching shrink-0", tone)} />;
+  if (kind === "list-files") return <IconListFiles size={16} className={cx("activity-list-files shrink-0", tone)} />;
+  if (kind === "edit-files") return <IconEditFiles size={16} className={cx("activity-edit-files shrink-0", tone)} />;
+  if (kind === "mcp-source") {
+    const logo = item?.source?.logoUrl || item?.source?.logoUrlDark || item?.logoUrl || item?.toolIcons?.[0];
+    return logo
+      ? <img src={logo} alt="" className="size-4 shrink-0 rounded-[2px] object-contain" />
+      : <IconMcpSource size={16} className={cx("activity-mcp-source shrink-0", tone)} />;
+  }
+  return <IconRunCommand size={16} className={cx("activity-run-command shrink-0", tone)} />;
+}
+
 // Aggregated group label, e.g. "Read files, ran commands".
 function worklogLabel(items) {
+  if (items.length === 1 && (items[0].type === "mcpToolCall" || items[0].type === "dynamicToolCall")) {
+    return toolActivityLabel(items[0]);
+  }
   let reads = 0, cmds = 0, edits = 0, webs = 0, tools = 0;
   for (const it of items) {
     if (isReadAction(it)) reads++;
-    else if (it.type === "commandExecution") cmds++;
+    else if (it.type === "commandExecution" && commandActivity(it).category === "exploration") reads++;
+    else if (isCommandAction(it)) cmds++;
     else if (it.type === "fileChange") edits++;
     else if (it.type === "webSearch") webs++;
     else tools++;
   }
   const parts = [];
+  if (edits) parts.push(edits === 1 ? "Edited a file" : "Edited files");
   if (reads) parts.push("Read files");
-  if (cmds) parts.push("ran commands");
-  if (edits) parts.push(`edited ${edits} file${edits > 1 ? "s" : ""}`);
+  if (cmds) parts.push(cmds === 1 ? "Ran a command" : "Ran commands");
   if (webs) parts.push("searched the web");
   if (tools) parts.push(`called ${tools} tool${tools > 1 ? "s" : ""}`);
-  const s = parts.join(", ") || "Worked";
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  return parts.map((part, index) => index === 0 ? part : part.charAt(0).toLowerCase() + part.slice(1)).join(", ") || "Worked";
+}
+
+function toolActivityLabel(item) {
+  const raw = item.server || item.tool || "tool";
+  const name = raw
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  return `Used ${name}`;
 }
 
 // Tool calls that present as "Read <file>" rows.
 function isReadAction(it) {
   if (it.type !== "mcpToolCall" && it.type !== "dynamicToolCall") return false;
   return /read/i.test(it.tool || it.name || "");
+}
+
+function isCommandAction(it) {
+  return it.type === "commandExecution"
+    || ((it.type === "mcpToolCall" || it.type === "dynamicToolCall")
+      && /node.?repl/i.test(`${it.server || ""} ${it.tool || ""}`));
 }
 
 function readActionPath(it) {
@@ -870,11 +994,20 @@ function readActionPath(it) {
 // One worklog action row: "Read SKILL.md" / "Ran <cmd> ›" / fallback item.
 function WorklogActionRow({ item, live }) {
   const [open, setOpen] = useState(false);
+  if (item.type === "fileChange") {
+    return (
+      <div data-activity-icon="edit-files" className={cx("inline-flex items-center gap-1.5 text-[13px] leading-[21px]", live ? "text-(--fg)" : "text-(--fg-tertiary)")}>
+        <IconEditFiles size={16} className="activity-edit-files shrink-0" />
+        <span>{worklogLabel([item])}</span>
+        {live && <Spinner size={11} className="shrink-0" />}
+      </div>
+    );
+  }
   if (isReadAction(item)) {
     const name = readActionPath(item) || item.title || "file";
     return (
-      <div className="flex items-center gap-1.5 text-[13px] text-(--fg-tertiary)">
-        <LucideIcon name="BookOpen" size={13} className="shrink-0" />
+      <div data-activity-icon="read-files" className={cx("flex items-center gap-1.5 text-[13px]", live ? "text-(--fg)" : "text-(--fg-tertiary)")}>
+        <IconBookOpen size={16} className="activity-read-files shrink-0" />
         <span className="min-w-0 truncate">Read <span className="underline">{name}</span></span>
         {live && <Spinner size={11} className="shrink-0" />}
       </div>
@@ -882,22 +1015,44 @@ function WorklogActionRow({ item, live }) {
   }
   if (item.type === "commandExecution") {
     const running = item.status === "inProgress";
+    const activity = commandActivity(item);
     return (
-      <div className="flex flex-col gap-1">
+      <div className={cx("flex flex-col", open && "gap-1")}>
         <button
-          className="flex min-w-0 items-center gap-1.5 text-left text-[13px] text-(--fg-tertiary) hover:text-(--fg)"
+          type="button"
+          aria-expanded={open}
+          data-activity-icon={activity.kind}
+          className={cx(
+            "group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[14px] leading-[21px] font-[445]",
+            live ? "text-(--fg)" : "text-(--conversation-body)",
+          )}
           onClick={() => setOpen(!open)}
         >
-          <IconTerminal size={13} className="shrink-0" />
-          <span className="min-w-0 truncate">Ran <span className="font-mono text-(--fg-secondary)">{item.command}</span></span>
-          {running && <Spinner size={11} className="shrink-0" />}
-          <IconChevronRight size={12} className={cx("ml-auto shrink-0 transition-transform", open && "rotate-90")} />
+          <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+            <WorklogActivityIcon kind={activity.kind} item={item} live={live} />
+            <span className="min-w-0 truncate">{activity.label}</span>
+          </span>
+          <IconGoalChevron
+            size={14}
+            className={cx(
+              "activity-chevron shrink-0 opacity-0 transition-transform duration-[300ms] group-hover/activity-header:opacity-100 group-focus-visible/activity-header:opacity-100",
+              open && "rotate-90 opacity-100",
+            )}
+          />
         </button>
-        {open && (
+        <ActivityDisclosure open={open}>
           <pre className="max-h-60 overflow-auto rounded-lg border border-(--border-light) bg-(--surface-under) px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-(--fg-secondary)">
             {(item.aggregatedOutput || "").slice(-4000) || (running ? "Running…" : "No output")}
           </pre>
-        )}
+        </ActivityDisclosure>
+      </div>
+    );
+  }
+  if (item.type === "mcpToolCall" || item.type === "dynamicToolCall") {
+    return (
+      <div data-activity-icon="mcp-source" className={cx("inline-flex items-center gap-1.5 text-[14px] leading-[21px] font-[445]", live ? "text-(--fg)" : "text-(--conversation-body)")}>
+        <WorklogActivityIcon kind="mcp-source" item={item} live={live} />
+        <span>{toolActivityLabel(item)}</span>
       </div>
     );
   }
@@ -943,7 +1098,12 @@ function WorkingRow({ conv }) {
     return () => clearInterval(t);
   }, [turn?.startedAt]);
   if (conv.plan) return null;
-  return <div className="shimmer-text text-[14px]">Working{elapsed > 1500 ? ` for ${formatDuration(elapsed)}` : ""}</div>;
+  return (
+    <div className="flex flex-col items-start gap-2 text-[14px] leading-[21px]">
+      <span className="text-(--conversation-body)">Working{elapsed > 1500 ? ` for ${formatDuration(elapsed)}` : ""}</span>
+      <div className="w-full border-t border-(--border)" />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -956,10 +1116,9 @@ function BottomArea({ conv }) {
   const goalDialogOpen = useStore((s) => s.ui.goalDialogOpen);
   const approvals = approvalsAll.filter((a) => !a.threadId || a.threadId === activeThreadId);
   return (
-    <div className="shrink-0">
-      <div className="pointer-events-none h-8 bg-gradient-to-t from-(--surface) via-(--surface)/60 to-transparent" />
+    <div className="sticky bottom-0 z-10 mt-auto w-full shrink-0">
+      <div className="pointer-events-none h-8" />
       <div className="mx-auto flex w-full max-w-(--thread-content-max-width) flex-col gap-2 px-4">
-        {conv?.goal?.objective && <GoalChip goal={conv.goal} />}
         {conv?.plan && <PlanWidget plan={conv.plan} />}
         {approvals.map((a) => (
           <ApprovalCard key={a.reqId} approval={a} />
@@ -969,12 +1128,10 @@ function BottomArea({ conv }) {
             <Spinner size={13} /> Starting chat…
           </div>
         )}
+        {conv?.goal?.objective && <GoalChip goal={conv.goal} />}
       </div>
-      <div className="mx-auto w-full max-w-(--thread-content-max-width)">
+      <div className="mx-auto w-full max-w-[768px]">
         <Composer />
-      </div>
-      <div className="pb-2 pt-1 text-center text-[11px] text-(--fg-faint)">
-        Codex can make mistakes. Check important info.
       </div>
       <GoalDialog open={goalDialogOpen} goal={conv?.goal} />
     </div>
@@ -985,24 +1142,67 @@ function BottomArea({ conv }) {
 function GoalChip({ goal }) {
   const activeThreadId = useStore((s) => s.activeThreadId);
   const setUi = useStore((s) => s.setUi);
+  const objectiveRef = useRef(null);
+  const [expanded, setExpanded] = useState(false);
+  const [truncated, setTruncated] = useState(false);
+  React.useLayoutEffect(() => {
+    const element = objectiveRef.current;
+    if (!element || expanded) return undefined;
+    const measure = () => setTruncated(element.scrollWidth > element.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [expanded, goal.objective]);
   const clear = async () => {
     try { await api.rpc("thread/goal/clear", { threadId: activeThreadId }); } catch {}
     useStore.getState()._mutateConv(activeThreadId, (c) => ({ ...c, goal: null }));
   };
+  const togglePaused = async () => {
+    const status = goal.status === "paused" ? "active" : "paused";
+    try {
+      const res = await api.rpc("thread/goal/set", { threadId: activeThreadId, status });
+      const next = res?.goal ?? { ...goal, status };
+      useStore.getState()._mutateConv(activeThreadId, (c) => ({ ...c, goal: next }));
+    } catch {}
+  };
   return (
-    <div className="flex items-center gap-2 rounded-[12.5px] border border-(--accent)/40 bg-(--accent-soft) px-3 py-2">
-      <span className="shrink-0 text-(--accent)">◎</span>
-      <button
-        className="min-w-0 flex-1 truncate text-left text-[13px] text-(--fg)"
-        title={goal.objective}
-        onClick={() => setUi({ goalDialogOpen: true })}
-      >
-        {goal.objective}
-      </button>
-      {goal.status && <span className="shrink-0 rounded-md bg-(--surface-active) px-1.5 py-0.5 text-[11px] capitalize text-(--fg-secondary)">{goal.status}</span>}
-      <button className="shrink-0 text-(--fg-tertiary) hover:text-(--danger)" title="Clear goal" onClick={clear}>
-        <IconX size={12} />
-      </button>
+    <div
+      className="active-goal-bar mx-[13px] overflow-clip rounded-t-2xl border-x border-t bg-[rgb(255_255_255/0.67)] backdrop-blur-sm dark:bg-[rgb(38_38_38/0.672)]"
+      style={{ borderColor: "color-mix(in srgb, var(--border) 80%, transparent)" }}
+    >
+      <div className="flex h-[34px] items-center gap-2 px-3 py-[5px] text-[14px] leading-4 font-[445]">
+        <IconCmdGoal size={14} className="shrink-0 text-(--fg-tertiary) opacity-70" />
+        <span className="shrink-0">Pursuing goal</span>
+        <span ref={objectiveRef} className="-ml-1 min-w-0 flex-1 truncate text-(--fg-tertiary)">
+          {expanded ? null : goal.objective}
+        </span>
+        {goal.timeUsedSeconds != null && (
+          <span className="-ml-0.5 shrink-0 text-(--fg-tertiary)">{formatDuration(goal.timeUsedSeconds * 1000)}</span>
+        )}
+        <IconButton icon={<IconGoalEdit />} size={14} title="Edit goal" onClick={() => setUi({ goalDialogOpen: true })} />
+        <IconButton
+          icon={goal.status === "paused" ? <IconGoalResume /> : <IconGoalPause />}
+          size={14}
+          title={goal.status === "paused" ? "Resume goal" : "Pause goal"}
+          onClick={togglePaused}
+        />
+        <IconButton icon={<IconGoalTrash />} size={14} title="Clear goal" onClick={clear} />
+        {(truncated || expanded) && (
+          <IconButton
+            icon={<IconGoalChevron className={cx("transition-transform", expanded && "rotate-90")} />}
+            size={14}
+            title={expanded ? "Hide full goal" : "Show full goal"}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+          />
+        )}
+      </div>
+      {expanded && (
+        <div className="max-h-[120px] overflow-y-auto px-3 pb-2 text-[14px] leading-5 break-words whitespace-pre-wrap text-(--fg-tertiary)">
+          {goal.objective}
+        </div>
+      )}
     </div>
   );
 }
@@ -1102,7 +1302,7 @@ function Home() {
           <HomeSuggestions />
         </div>
       </div>
-      <div className="w-full max-w-[736px] shrink-0 px-4 pb-4">
+      <div className="w-full max-w-[768px] shrink-0 px-4 pb-4">
         <Composer centered />
       </div>
     </div>

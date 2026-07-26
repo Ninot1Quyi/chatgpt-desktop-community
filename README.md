@@ -24,6 +24,16 @@ Our goal is to recreate ChatGPT Desktop as closely as practical while keeping it
 
 The interface is under active development. Protocol changes in `codex app-server` may require matching updates here.
 
+## Interface examples
+
+### Light appearance
+
+![ChatGPT Desktop Community in light appearance](assets/screenshots/chatgpt-desktop-light.png)
+
+### Dark appearance
+
+![ChatGPT Desktop Community in dark appearance](assets/screenshots/chatgpt-desktop-dark.png)
+
 ## Getting started
 
 ### Requirements

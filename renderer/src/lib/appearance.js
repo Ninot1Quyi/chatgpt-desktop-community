@@ -52,9 +52,16 @@ export const CODE_FONTS = [
 
 export function readAppearance() {
   try {
-    return { accent: "default", background: "default", foreground: "default", uiFont: "default", codeFont: "default", translucentSidebar: false, contrast: 60, ...(JSON.parse(localStorage.getItem(KEY) || "{}")) };
+    const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+    if (saved.contrast === 60
+      && ["accent", "background", "foreground", "uiFont", "codeFont"].every((key) => !saved[key] || saved[key] === "default")
+      && !saved.translucentSidebar) {
+      saved.contrast = 50;
+      localStorage.setItem(KEY, JSON.stringify(saved));
+    }
+    return { accent: "default", background: "default", foreground: "default", uiFont: "default", codeFont: "default", translucentSidebar: false, contrast: 50, ...saved };
   } catch {
-    return { accent: "default", background: "default", foreground: "default", uiFont: "default", codeFont: "default", translucentSidebar: false, contrast: 60 };
+    return { accent: "default", background: "default", foreground: "default", uiFont: "default", codeFont: "default", translucentSidebar: false, contrast: 50 };
   }
 }
 

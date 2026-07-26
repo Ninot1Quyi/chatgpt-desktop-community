@@ -12,7 +12,7 @@ import RightPanel, { RightPanelHeader } from "./components/RightPanel.jsx";
 import TerminalTab from "./components/panel/TerminalTab.jsx";
 import Settings from "./components/Settings.jsx";
 import { Toasts, Spinner, IconButton, Menu } from "./components/ui.jsx";
-import { IconSearch, IconChat, IconSidebar, IconChevronLeft, IconChevronRight, IconX, IconGear, IconPlus, IconChevronDown, LucideIcon } from "./components/icons.jsx";
+import { IconSearch, IconChat, IconHeaderSidebar, IconHeaderArrow, IconX, IconGear, IconPlus, IconChevronDown, LucideIcon } from "./components/icons.jsx";
 
 export default function App() {
   const init = useStore((s) => s.init);
@@ -102,14 +102,14 @@ export default function App() {
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-(--surface)">
+    <div className="app-shell-root relative h-full w-full overflow-hidden">
       <>
       {/* full-height regions; the 46px header floats transparently on top,
           so vertical separators run from y=0 exactly like the reference app */}
       <div className="flex h-full w-full">
         {ui.sidebarOpen && (
           <>
-            <div className="slide-in-left shrink-0 border-r border-(--border-light)" style={{ width: ui.sidebarWidth }}>
+            <div className="slide-in-left shrink-0" style={{ width: ui.sidebarWidth }}>
               <Sidebar />
             </div>
             <DragHandle
@@ -122,7 +122,7 @@ export default function App() {
             />
           </>
         )}
-        <div className={cx("flex min-w-0 flex-1 flex-col pt-[46px]", ui.rightOpen && ui.rightExpanded && "hidden")}>
+        <div className={cx("flex min-w-0 flex-1 flex-col bg-(--surface) pt-[46px]", ui.rightOpen && ui.rightExpanded && "hidden")}>
           {ui.navView === "chats" ? <Conversation /> : <NavViews />}
           {ui.bottomOpen && (
             <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
@@ -192,21 +192,23 @@ function GlobalHeader() {
   const navFwd = useStore((s) => s.navFwd);
   const { goBack, goForward } = useStore();
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1.5 pl-[84px]">
+    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pl-[88px]">
       <IconButton
-        icon={<IconSidebar />}
+        icon={<IconHeaderSidebar />}
+        size={16}
         title="Toggle sidebar (⌘B)"
-        active={ui.sidebarOpen}
         onClick={() => setUi({ sidebarOpen: !ui.sidebarOpen })}
       />
       <IconButton
-        icon={<IconChevronLeft />}
+        icon={<IconHeaderArrow />}
+        size={16}
         title="Back"
         disabled={!navBack.length}
         onClick={goBack}
       />
       <IconButton
-        icon={<IconChevronRight />}
+        icon={<IconHeaderArrow className="-scale-x-100" />}
+        size={16}
         title="Forward"
         disabled={!navFwd.length}
         onClick={goForward}
@@ -224,7 +226,7 @@ function GlobalHeader() {
         />
       )}
       {/* the title area starts at the sidebar's right edge (reference layout) */}
-      {ui.sidebarOpen && <div className="shrink-0" style={{ width: Math.max(0, ui.sidebarWidth + 8 - 180) }} />}
+      {ui.sidebarOpen && <div className="shrink-0" style={{ width: Math.max(0, ui.sidebarWidth - 180) }} />}
       {ui.navView === "chats" ? (
         <>
           <div className={cx("min-w-0", ui.rightOpen && ui.rightExpanded ? "w-0" : "flex-1")}>
@@ -279,18 +281,21 @@ function PeekHeader() {
   return (
     <div className="app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-[84px]">
       <IconButton
-        icon={<IconSidebar />}
+        icon={<IconHeaderSidebar />}
+        size={16}
         title="Show sidebar (⌘B)"
         onClick={() => setUi({ sidebarOpen: true, sidebarPeek: false })}
       />
       <IconButton
-        icon={<IconChevronLeft />}
+        icon={<IconHeaderArrow />}
+        size={16}
         title="Back"
         disabled={!navBack.length}
         onClick={goBack}
       />
       <IconButton
-        icon={<IconChevronRight />}
+        icon={<IconHeaderArrow className="-scale-x-100" />}
+        size={16}
         title="Forward"
         disabled={!navFwd.length}
         onClick={goForward}
@@ -451,7 +456,7 @@ function FloatingSidebarToggle() {
 function DragHandle({ onDrag }) {
   return (
     <div
-      className="group relative z-20 w-[5px] shrink-0 cursor-col-resize bg-transparent"
+      className="group relative z-20 w-0 shrink-0 cursor-col-resize bg-transparent"
       onMouseDown={(e) => {
         e.preventDefault();
         const startX = e.clientX;
@@ -466,9 +471,9 @@ function DragHandle({ onDrag }) {
     >
       {/* wide invisible hit area + the reference's gradient hairline that
           fades in on hover (transparent → fg/25 → transparent) */}
-      <div className="absolute inset-y-0 -left-[6px] w-[17px]" />
+      <div className="absolute inset-y-0 -left-2 w-[17px]" />
       <div
-        className="absolute inset-y-0 left-[2px] w-px opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+        className="absolute inset-y-0 left-0 w-px opacity-0 transition-opacity duration-150 group-hover:opacity-100"
         style={{ background: "linear-gradient(to bottom, transparent, color-mix(in oklab, var(--fg) 25%, transparent), transparent)" }}
       />
     </div>

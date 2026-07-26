@@ -8,6 +8,7 @@ const fs = require("node:fs");
 const crypto = require("node:crypto");
 const { pathToFileURL } = require("node:url");
 const { resolveCodexBinary } = require("./codex-runtime");
+const { readRolloutActivity } = require("./rollout-activity");
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 const communityIconPath = path.join(__dirname, "..", "assets", "community-icon.png");
@@ -392,7 +393,8 @@ function createMainWindow(query) {
     minHeight: 600,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 16, y: 16 },
-    backgroundColor: dark ? "#181818" : "#ffffff",
+    transparent: true,
+    backgroundColor: "#00000000",
     vibrancy: "menu",
     show: false,
     webPreferences: {
@@ -531,6 +533,13 @@ ipcMain.handle("app:info", () => ({
   home: app.getPath("home"),
   theme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
 }));
+ipcMain.handle("rollout:activity", (_e, { file }) => {
+  try {
+    return readRolloutActivity(file, path.join(app.getPath("home"), ".codex", "sessions"));
+  } catch {
+    return null;
+  }
+});
 
 // Capture a <webview> guest page (for the browser annotate mode).
 ipcMain.handle("webview:capture", async (_e, { webContentsId }) => {

@@ -4,20 +4,21 @@ import React, { useState } from "react";
 import { cx } from "../lib/cx.js";
 import * as api from "../api.js";
 import { localFileUrl, showItemInFolder } from "../api.js";
-import { countDiff } from "../lib/diff.js";
+import { countDiff, parseUnifiedDiff } from "../lib/diff.js";
 import { basename, formatDuration } from "../lib/time.js";
+import { commandActivity } from "../lib/commandActivity.mjs";
 import { useStore } from "../store.js";
 import { openFileInPanel } from "./RightPanel.jsx";
 import Markdown from "./Markdown.jsx";
-import { Spinner, Menu, Dialog } from "./ui.jsx";
+import { ActivityDisclosure, Spinner, Menu, Dialog } from "./ui.jsx";
 import {
-  IconChevronRight, IconChevronDown, IconTerminal, IconFile, IconGlobe, IconWrench,
+  IconChevronRight, IconChevronDown, IconTerminal, IconFile,
   IconImage, IconCheck, IconClock, IconShield, IconCopy, IconPencil,
   IconCpu, IconChat, IconUndo, IconSparkle, LucideIcon,
+  IconBookOpen, IconCodeSearching, IconContextCompaction, IconEditFiles, IconGoalChevron,
+  IconListFiles, IconMcpSource, IconRunCommand, IconWebSearch,
 } from "./icons.jsx";
 
-// File-with-pencil tile icon for the edited-files header (Lucide FilePen).
-const IconFileEdit = (p) => <LucideIcon name="FilePen" size={p.size || 16} className={p.className} />;
 const IconThumbUp = (p) => <LucideIcon name="ThumbsUp" size={p.size || 16} className={p.className} style={p.style} />;
 const IconThumbDown = (p) => <LucideIcon name="ThumbsDown" size={p.size || 16} className={p.className} style={p.style} />;
 const IconRetry = (p) => <LucideIcon name="RotateCcw" size={p.size || 16} className={p.className} style={p.style} />;
@@ -27,6 +28,9 @@ const IconRetry = (p) => <LucideIcon name="RotateCcw" size={p.size || 16} classN
 // `streaming` is true only for the item(s) of the currently-active turn.
 // ---------------------------------------------------------------------------
 export function ItemView({ item, streaming, turnId }) {
+  if (item.type === "reasoning"
+    && !(item.summary?.length || item.content?.length)
+    && !streaming) return null;
   const body = (() => {
     switch (item.type) {
       case "userMessage": return <UserMessage item={item} />;
@@ -42,7 +46,7 @@ export function ItemView({ item, streaming, turnId }) {
       case "imageGeneration": return <ImageGeneration item={item} />;
       case "collabAgentToolCall": return <CollabRow item={item} />;
       case "subAgentActivity": return <SubAgentActivityRow item={item} />;
-      case "contextCompaction": return <Divider label="Context compacted" />;
+      case "contextCompaction": return <Divider label="Context automatically compacted" />;
       case "enteredReviewMode": return <Subtle icon={<IconShield size={13} />} text="Entered review mode" />;
       case "exitedReviewMode": return <Subtle icon={<IconShield size={13} />} text="Exited review mode" />;
       case "hookPrompt": return null;
@@ -141,29 +145,38 @@ function UserMessage({ item }) {
   }
 
   return (
-    <div className="group/msg flex flex-col items-end">
-      <div className="max-w-[77%] rounded-[20px] bg-(--bubble-user) px-3.5 py-2.5">
-        {images.map((c, i) => (
-          <img
-            key={i}
-            src={c.type === "localImage" ? localFileUrl(c.path) : c.url}
-            className="mb-1.5 max-h-56 rounded-lg"
-            alt=""
-          />
-        ))}
-        {mentions.length === 1 ? (
-          <span className="mr-1 inline-block rounded-md bg-(--accent-soft) px-1.5 py-0.5 text-xs text-(--accent)">
-            @{mentions[0].name}
-          </span>
-        ) : mentions.length > 1 ? (
-          <MentionSummary mentions={mentions} />
-        ) : null}
-        {full && <div className="text-[14px] leading-6 whitespace-pre-wrap break-words">{full}</div>}
-      </div>
-      <div className="mt-1 hidden items-center gap-0.5 group-hover/msg:flex">
-        <HoverAction title="Copy" onClick={copy} icon={copied ? <IconCheck size={13} /> : <IconCopy size={13} />} />
-        <HoverAction title="Edit" onClick={() => { setDraft(full); setEditing(true); }} icon={<IconPencil size={13} />} />
-      </div>
+    <div className="group/msg flex flex-col items-end gap-2">
+      {images.length > 0 && (
+        <div className="hide-scrollbar flex max-w-full flex-row-reverse self-end overflow-x-auto">
+          <div className="flex min-w-max items-end gap-2">
+            {images.map((c, i) => (
+              <div key={i} className="flex size-20 items-center justify-center rounded-[12.5px] border border-(--border-heavy)">
+                <img
+                  src={c.type === "localImage" ? localFileUrl(c.path) : c.url}
+                  className="h-full w-full rounded-[10px] object-cover"
+                  alt=""
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {(full || mentions.length > 0) && <div className="flex w-full flex-col items-end justify-end gap-1">
+        <div className="max-w-[77%] rounded-[20px] bg-(--bubble-user) px-3 py-2">
+          {mentions.length === 1 ? (
+            <span className="mr-1 inline-block rounded-md bg-(--accent-soft) px-1.5 py-0.5 text-xs text-(--accent)">
+              @{mentions[0].name}
+            </span>
+          ) : mentions.length > 1 ? (
+            <MentionSummary mentions={mentions} />
+          ) : null}
+          {full && <div className="text-[14px] leading-[22px] whitespace-pre-wrap break-words">{full}</div>}
+        </div>
+        <div className="flex h-[26px] items-center gap-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100">
+          <HoverAction title="Copy" onClick={copy} icon={copied ? <IconCheck size={13} /> : <IconCopy size={13} />} />
+          <HoverAction title="Edit" onClick={() => { setDraft(full); setEditing(true); }} icon={<IconPencil size={13} />} />
+        </div>
+      </div>}
     </div>
   );
 }
@@ -181,7 +194,7 @@ function HoverAction({ icon, title, onClick }) {
 }
 
 // ---------------------------------------------------------------------------
-// agentMessage — markdown; shimmer while empty, block cursor while streaming.
+// agentMessage — markdown; shimmer while empty.
 // ---------------------------------------------------------------------------
 function AgentMessage({ item, streaming }) {
   if (!item.text) {
@@ -190,7 +203,6 @@ function AgentMessage({ item, streaming }) {
   return (
     <div className="min-w-0">
       <Markdown>{item.text}</Markdown>
-      {streaming && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-(--fg-tertiary) align-[-3px]" />}
       {item.memoryCitation && <MemoryCitation citation={item.memoryCitation} />}
     </div>
   );
@@ -348,50 +360,59 @@ function PlanText({ item }) {
 }
 
 // ---------------------------------------------------------------------------
-// commandExecution — terminal card with expandable output.
+// commandExecution — compact activity row with expandable output.
 // ---------------------------------------------------------------------------
 function CommandCard({ item, streaming }) {
   const [open, setOpen] = useState(false);
   const running = item.status === "inProgress";
   const failed = item.status === "failed" || item.status === "declined" || (item.exitCode != null && item.exitCode !== 0);
   const output = item.aggregatedOutput || "";
+  const activity = commandActivity(item);
   return (
-    <div className="overflow-hidden rounded-[12.5px] border border-(--border-light) bg-(--surface-under)">
+    <div className={cx("flex flex-col", open && "gap-1")}>
       <button
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-(--surface-hover)"
+        type="button"
+        aria-expanded={open}
+        data-activity-icon={activity.kind}
+        className="group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[14px] leading-[21px] font-[445] text-(--conversation-body) hover:text-(--fg)"
         onClick={() => setOpen(!open)}
       >
-        <IconChevronRight size={13} className={cx("shrink-0 text-(--fg-tertiary) transition-transform", open && "rotate-90")} />
-        <IconTerminal size={14} className="shrink-0 text-(--fg-tertiary)" />
-        <span className="min-w-0 flex-1 truncate font-mono text-xs text-(--fg-secondary)">{item.command}</span>
-        {running ? (
-          <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />
-        ) : failed ? (
-          <span className="shrink-0 rounded-md bg-(--danger-soft) px-1.5 py-0.5 text-[11px] text-(--danger)">
-            {item.status === "declined" ? "declined" : `exit ${item.exitCode ?? "!"}`}
-          </span>
-        ) : (
-          <IconCheck size={13} className="shrink-0 text-(--success-fg)" />
-        )}
-        {item.durationMs != null && (
-          <span className="shrink-0 text-[11px] text-(--fg-faint)">{formatDuration(item.durationMs)}</span>
-        )}
+        <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+          {activity.kind === "read-files"
+            ? <IconBookOpen size={16} className="activity-read-files shrink-0" />
+            : activity.kind === "code-searching"
+            ? <IconCodeSearching size={16} className="activity-code-searching shrink-0" />
+            : activity.kind === "list-files"
+              ? <IconListFiles size={16} className="activity-list-files shrink-0" />
+              : <IconRunCommand size={16} className="activity-run-command shrink-0" />}
+          <span className="min-w-0 truncate">{activity.label}</span>
+          {running ? <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />
+            : failed && <span className="shrink-0 text-[11px] text-(--danger)">
+              {item.status === "declined" ? "declined" : `exit ${item.exitCode ?? "!"}`}
+            </span>}
+          {item.durationMs != null && (
+            <span className="shrink-0 text-[11px] text-(--fg-faint)">{formatDuration(item.durationMs)}</span>
+          )}
+        </span>
+        <IconGoalChevron
+          size={14}
+          className={cx(
+            "activity-chevron shrink-0 opacity-0 transition-transform duration-[300ms] group-hover/activity-header:opacity-100 group-focus-visible/activity-header:opacity-100",
+            open && "rotate-90 opacity-100",
+          )}
+        />
       </button>
-      {open && (
-        <div className="border-t border-(--border-light)">
-          <div className="border-b border-(--border-light) px-3 py-1.5 font-mono text-xs text-(--fg-secondary)">
-            <span className="text-(--fg-faint)">$ </span>{item.command}
-          </div>
+      <ActivityDisclosure open={open}>
+        <div className="ml-4 border-l border-(--border-light) py-1 pl-3">
           {output ? (
-            <pre className="max-h-72 overflow-auto px-3 py-2 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-(--fg-secondary)">
+            <pre className="max-h-72 overflow-auto font-mono text-xs leading-5 whitespace-pre-wrap break-all text-(--fg-secondary)">
               {output}
-              {running && <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-(--fg-tertiary)" />}
             </pre>
           ) : (
-            <div className="px-3 py-2 text-xs text-(--fg-faint)">{running ? "Running…" : "No output"}</div>
+            <div className="text-xs text-(--fg-faint)">{running ? "Running…" : "No output"}</div>
           )}
         </div>
-      )}
+      </ActivityDisclosure>
     </div>
   );
 }
@@ -401,6 +422,15 @@ function CommandCard({ item, streaming }) {
 // Matches the reference: icon tile, counts under title, open file list.
 // ---------------------------------------------------------------------------
 const FILE_ROWS_COLLAPSED = 3;
+
+function EditedFilesIcon({ size = 24, className }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M12.084 12.668a.666.666 0 0 1 0 1.33H7.917a.665.665 0 1 1 0-1.33h4.167ZM10 5.585c.367 0 .665.298.665.665v1.418h1.419a.666.666 0 0 1 0 1.33h-1.419v1.419a.666.666 0 0 1-1.33 0V8.998H7.917a.665.665 0 0 1 0-1.33h1.418V6.25c0-.367.298-.665.665-.665Z" />
+      <path fillRule="evenodd" d="M12.667 2.668c.689 0 1.246 0 1.696.036.458.038.865.117 1.242.309a3.163 3.163 0 0 1 1.382 1.383c.192.377.272.783.309 1.24.037.45.036 1.008.036 1.697v5.333c0 .689 0 1.246-.036 1.696-.037.458-.117.865-.309 1.242a3.166 3.166 0 0 1-1.382 1.382c-.377.192-.784.271-1.242.309-.45.037-1.007.036-1.696.036H7.334c-.689 0-1.246 0-1.696-.036-.458-.038-.864-.117-1.24-.309a3.166 3.166 0 0 1-1.384-1.383c-.192-.376-.271-.783-.309-1.24-.037-.45-.036-1.008-.036-1.697V7.333c0-.689 0-1.246.036-1.696.038-.458.117-.864.309-1.24a3.17 3.17 0 0 1 1.383-1.384c.377-.192.783-.272 1.24-.309.45-.037 1.008-.036 1.697-.036h5.333Zm-5.333 1.33c-.71 0-1.204.001-1.588.032-.375.03-.587.088-.745.168A1.836 1.836 0 0 0 4.199 5c-.08.158-.137.37-.168.745C4 6.13 4 6.622 4 7.333v5.333c0 .71.001 1.204.032 1.588.03.375.088.587.168.745.176.345.457.627.802.803.158.08.37.137.745.168.384.031.877.031 1.588.031h5.333c.71 0 1.204 0 1.588-.031.375-.031.587-.088.745-.168a1.84 1.84 0 0 0 .803-.803c.08-.158.137-.37.168-.745.031-.383.031-.877.031-1.588V7.333c0-.71 0-1.204-.031-1.588-.031-.375-.088-.587-.168-.745A1.838 1.838 0 0 0 15 4.198c-.158-.08-.37-.137-.745-.168-.384-.031-.877-.032-1.588-.032H7.334Z" clipRule="evenodd" />
+    </svg>
+  );
+}
 
 function FileChangeCard({ item }) {
   const changes = item.changes || [];
@@ -466,6 +496,7 @@ function EditedGroupCard({ item, changes }) {
   const undoBtnRef = React.useRef(null);
   const setUi = useStore((s) => s.setUi);
   const toast = useStore((s) => s.toast);
+  const cwd = useStore((s) => s.activeConversation()?.thread?.cwd || "");
   const totals = changes.reduce(
     (acc, c) => {
       const { add, del } = countDiff(c.diff);
@@ -501,33 +532,58 @@ function EditedGroupCard({ item, changes }) {
     setUi({ rightOpen: true, rightTab: "review" });
   };
 
+  if (changes.length === 1) {
+    const change = changes[0];
+    return (
+      <div className="group/edit flex min-w-0 items-center gap-1.5 text-[14px] leading-[21px] [color:color-mix(in_srgb,var(--fg)_60%,transparent)]">
+        <IconEditFiles size={16} className="shrink-0" />
+        <span className="min-w-0 truncate">
+          {running ? "Editing" : "Edited"}{" "}
+          <button
+            className="underline decoration-dotted decoration-[0.5px] underline-offset-2 hover:text-(--fg)"
+            onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
+          >
+            {basename(change.path)}
+          </button>
+        </span>
+        {(totals.add > 0 || totals.del > 0) && (
+          <span className="flex shrink-0 gap-1 text-[13px] leading-[19.5px]">
+            {totals.add > 0 && <span className="group-hover/edit:text-(--diff-add-fg)">+{totals.add}</span>}
+            {totals.del > 0 && <span className="group-hover/edit:text-(--diff-del-fg)">-{totals.del}</span>}
+          </span>
+        )}
+        {running && <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />}
+      </div>
+    );
+  }
+
   return (
-    <div>
+    <div className="overflow-hidden rounded-[12.5px] bg-[rgb(255_255_255/0.5)] dark:bg-[rgb(38_38_38/0.5)]">
       {/* header */}
-      <div className="flex items-start gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--surface-active) text-(--fg-secondary)">
-          <IconFileEdit size={16} />
+      <div className="flex min-h-[64.5px] items-center gap-2.5 px-3 py-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-[12.5px] bg-[color-mix(in_srgb,var(--surface-under)_92%,transparent)] text-(--fg-secondary)">
+          <EditedFilesIcon size={24} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] leading-6">{title}</div>
+          <div className="truncate text-[14px] leading-[21px] font-medium">{title}</div>
           {(totals.add > 0 || totals.del > 0) && (
-            <div className="font-mono text-xs leading-5">
+            <div className="flex gap-1 font-mono text-[13px] leading-[19.5px]">
               <span className="text-(--diff-add-fg)">+{totals.add}</span>{" "}
               <span className="text-(--diff-del-fg)">-{totals.del}</span>
             </div>
           )}
         </div>
         {!running && changes.length > 0 && (
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               ref={undoBtnRef}
-              className="flex h-7 items-center gap-1 rounded-full px-2 text-xs text-(--fg-secondary) hover:bg-(--surface-hover)"
+              className="flex h-7 items-center gap-1 rounded-[12.5px] px-2 text-[14px] leading-[18px] text-(--fg-secondary) hover:bg-(--surface-hover)"
               onClick={() => setUndoOpen(true)}
             >
-              Undo <IconUndo size={12} />
+              Undo <IconUndo size={14} />
             </button>
             <button
-              className="flex h-7 items-center rounded-full border border-(--border) px-3 text-xs hover:bg-(--surface-hover)"
+              className="flex h-7 items-center rounded-[12.5px] border border-(--border) bg-[rgb(255_255_255/0.96)] px-2 text-[14px] leading-[18px] hover:bg-(--surface-hover)"
               onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
             >
               Review
@@ -539,18 +595,24 @@ function EditedGroupCard({ item, changes }) {
 
       {/* file rows */}
       {changes.length > 0 && (
-        <div className="mt-1.5">
+        <div>
           {visible.map((c, i) => {
             const { add, del } = countDiff(c.diff);
+            const name = basename(c.path);
+            const path = cwd && c.path?.startsWith(`${cwd}/`) ? c.path.slice(cwd.length + 1) : c.path || "";
+            const dir = path.slice(0, -name.length);
             return (
               <button
                 key={i}
-                className="flex w-full items-center gap-2 rounded-md py-1 pr-1 text-left hover:bg-(--surface-hover)"
+                className="flex h-9 w-full items-center gap-0 px-3 py-1 text-left text-[14px] leading-[21px] hover:bg-(--surface-hover)"
                 title={c.path}
                 onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
               >
-                <span className="min-w-0 flex-1 truncate text-[13px] text-(--fg-secondary)">{basename(c.path)}</span>
-                <span className="shrink-0 font-mono text-xs">
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="inline-flex h-[21px] items-center text-(--fg-secondary)">{dir}</span>
+                  <span className="inline-flex h-[21px] items-center">{name}</span>
+                </span>
+                <span className="flex shrink-0 gap-1 font-mono">
                   {add > 0 && <span className="text-(--diff-add-fg)">+{add} </span>}
                   {del > 0 && <span className="text-(--diff-del-fg)">-{del}</span>}
                 </span>
@@ -559,7 +621,7 @@ function EditedGroupCard({ item, changes }) {
           })}
           {changes.length > FILE_ROWS_COLLAPSED && (
             <button
-              className="flex items-center gap-1 py-1 text-xs text-(--fg-tertiary) hover:text-(--fg)"
+              className="flex h-9 w-full items-center gap-1 px-3 py-1 text-[14px] leading-[21px] hover:bg-(--surface-hover)"
               onClick={() => setShowAll(!showAll)}
             >
               {showAll ? "Show less" : `Show ${changes.length - FILE_ROWS_COLLAPSED} more file${changes.length - FILE_ROWS_COLLAPSED === 1 ? "" : "s"}`}
@@ -622,26 +684,48 @@ function mcpToolLabel(item) {
 // ---------------------------------------------------------------------------
 function ToolCallRow({ item }) {
   const [open, setOpen] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
   const name = item.type === "mcpToolCall" ? mcpToolLabel(item) : item.tool;
   const running = item.status === "inProgress";
   const failed = item.status === "failed";
+  const nodeRepl = /node.?repl/i.test(`${item.server || ""} ${item.tool || ""}`);
+  const sourceLogo = item.source?.logoUrl
+    || item.source?.logoUrlDark
+    || item.logoUrl
+    || item.toolIcons?.[0]
+    || null;
   let detail = "";
   try { detail = JSON.stringify(item.arguments, null, 2); } catch {}
   return (
-    <div className="overflow-hidden rounded-[12.5px] border border-(--border-light) bg-(--surface-under)">
+    <div className={cx("flex flex-col", open && "gap-1")}>
       <button
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-(--surface-hover)"
+        type="button"
+        aria-expanded={open}
+        data-activity-icon={nodeRepl ? "run-command" : "tool"}
+        className="group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[14px] leading-[21px] font-[445] text-(--conversation-body) hover:text-(--fg)"
         onClick={() => setOpen(!open)}
       >
-        <IconChevronRight size={13} className={cx("shrink-0 text-(--fg-tertiary) transition-transform", open && "rotate-90")} />
-        <IconWrench size={13} className="shrink-0 text-(--fg-tertiary)" />
-        <span className="min-w-0 flex-1 truncate text-[13px] text-(--fg-secondary)">{name}</span>
-        {running ? <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />
-          : failed ? <span className="shrink-0 text-[11px] text-(--danger)">failed</span>
-          : item.durationMs != null && <span className="shrink-0 text-[11px] text-(--fg-faint)">{formatDuration(item.durationMs)}</span>}
+        <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
+          {nodeRepl
+            ? <IconRunCommand size={16} className="activity-run-command shrink-0" />
+            : sourceLogo && !logoFailed
+              ? <img src={sourceLogo} alt="" className="size-4 shrink-0 rounded-[2px] object-contain" onError={() => setLogoFailed(true)} />
+              : <IconMcpSource size={16} className="activity-mcp-source shrink-0" />}
+          <span className="min-w-0 truncate">{name}</span>
+          {running ? <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />
+            : failed ? <span className="shrink-0 text-[11px] text-(--danger)">failed</span>
+            : item.durationMs != null && <span className="shrink-0 text-[11px] text-(--fg-faint)">{formatDuration(item.durationMs)}</span>}
+        </span>
+        <IconGoalChevron
+          size={14}
+          className={cx(
+            "activity-chevron shrink-0 text-(--fg-tertiary) opacity-0 transition-transform duration-[300ms] group-hover/activity-header:opacity-100 group-focus-visible/activity-header:opacity-100",
+            open && "rotate-90 opacity-100",
+          )}
+        />
       </button>
-      {open && (
-        <div className="border-t border-(--border-light) px-3 py-2">
+      <ActivityDisclosure open={open}>
+        <div className="ml-[34px] min-w-0 py-1">
           {detail && detail !== "{}" && (
             <pre className="max-h-48 overflow-auto font-mono text-xs whitespace-pre-wrap break-all text-(--fg-secondary)">{detail}</pre>
           )}
@@ -652,7 +736,7 @@ function ToolCallRow({ item }) {
             </pre>
           )}
         </div>
-      )}
+      </ActivityDisclosure>
     </div>
   );
 }
@@ -663,7 +747,7 @@ function ToolCallRow({ item }) {
 function WebSearchRow({ item }) {
   return (
     <div className="flex items-center gap-2 text-[13px] text-(--fg-tertiary)">
-      <IconGlobe size={13} />
+      <IconWebSearch size={16} className="activity-web-search shrink-0" />
       <span className="truncate">Searched the web for <span className="text-(--fg-secondary)">{item.query}</span></span>
     </div>
   );
@@ -755,10 +839,9 @@ function Subtle({ icon, text }) {
 
 function Divider({ label }) {
   return (
-    <div className="flex items-center gap-3 py-1">
-      <div className="h-px flex-1 bg-(--border-light)" />
-      <span className="text-xs text-(--fg-faint)">{label}</span>
-      <div className="h-px flex-1 bg-(--border-light)" />
+    <div className="inline-flex h-[21px] min-w-0 max-w-full self-start items-center gap-1.5 text-[14px] leading-[21px] text-(--conversation-body)">
+      <IconContextCompaction size={16} className="activity-context-compaction shrink-0" />
+      <span className="min-w-0 truncate">{label}</span>
     </div>
   );
 }
@@ -768,43 +851,76 @@ function Divider({ label }) {
 // ---------------------------------------------------------------------------
 export function PlanWidget({ plan }) {
   const [open, setOpen] = useState(false);
+  const diff = useStore((s) => s.activeConversation()?.diff || "");
+  const setUi = useStore((s) => s.setUi);
   if (!plan?.steps?.length) return null;
-  const done = plan.steps.filter((s) => s.status === "completed").length;
-  const current = plan.steps.find((s) => s.status === "inProgress");
+  const activeIndex = plan.steps.findIndex((s) => s.status === "inProgress");
+  const nextIndex = plan.steps.findIndex((s) => s.status !== "completed");
+  const currentIndex = activeIndex >= 0 ? activeIndex : nextIndex >= 0 ? nextIndex : plan.steps.length - 1;
+  const current = plan.steps[currentIndex];
+  const diffFiles = parseUnifiedDiff(diff);
+  const added = diffFiles.reduce((sum, file) => sum + file.added, 0);
+  const deleted = diffFiles.reduce((sum, file) => sum + file.deleted, 0);
   return (
-    <div className="overflow-hidden rounded-[12.5px] border border-(--border-light) bg-(--surface-under)">
-      <button
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-(--surface-hover)"
-        onClick={() => setOpen(!open)}
-      >
-        <IconChevronRight size={13} className={cx("shrink-0 text-(--fg-tertiary) transition-transform", open && "rotate-90")} />
-        <span className="shrink-0 rounded-md bg-(--accent-soft) px-1.5 py-0.5 text-[11px] font-medium text-(--accent)">
-          Step {done + (current ? 1 : 0)} / {plan.steps.length}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-[13px] text-(--fg-secondary)">{current?.step || "Plan complete"}</span>
-      </button>
+    <div
+      className="relative z-20 flex h-[38px] w-full justify-center self-center"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       {open && (
-        <ol className="border-t border-(--border-light) px-3 py-2">
-          {plan.steps.map((s, i) => (
-            <li key={i} className="flex items-start gap-2 py-1 text-[13px]">
-              <span className={cx(
-                "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px]",
-                s.status === "completed" && "border-(--success) bg-(--success) text-white",
-                s.status === "inProgress" && "border-(--accent) text-(--accent)",
-                s.status !== "completed" && s.status !== "inProgress" && "border-(--border-heavy) text-(--fg-faint)"
-              )}>
-                {s.status === "completed" ? <IconCheck size={10} /> : i + 1}
-              </span>
-              <span className={cx(
-                s.status === "completed" && "text-(--fg-tertiary) line-through",
-                s.status !== "completed" && s.status !== "inProgress" && "text-(--fg-tertiary)"
-              )}>
-                {s.step}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <div className="absolute bottom-full left-1/2 z-30 -translate-x-1/2 pb-2">
+          <ol
+            role="tooltip"
+            className="flex max-h-[min(360px,50vh)] w-max max-w-[min(24rem,calc(100vw-16px))] flex-col gap-2 overflow-y-auto rounded-xl border border-(--border-light) bg-(--dropdown-bg) px-4 py-4"
+            style={{ boxShadow: "var(--shadow-menu)" }}
+          >
+            {plan.steps.map((s, i) => (
+              <li key={i} className="flex max-w-80 items-start gap-2 text-[14px] leading-4">
+                <span className={cx(
+                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px]",
+                  s.status === "completed" && "border-(--success) bg-(--success) text-white",
+                  s.status === "inProgress" && "border-(--accent) text-(--accent)",
+                  s.status !== "completed" && s.status !== "inProgress" && "border-(--border-heavy) text-(--fg-faint)"
+                )}>
+                  {s.status === "completed" ? <IconCheck size={10} /> : i + 1}
+                </span>
+                <span className={cx(
+                  s.status === "completed" && "text-(--fg-tertiary) line-through",
+                  s.status !== "completed" && s.status !== "inProgress" && "text-(--fg-tertiary)"
+                )}>
+                  {s.step}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
+      <div
+        className="h-9 w-max max-w-full overflow-hidden rounded-[25px] border border-(--border-light) bg-[rgb(255_255_255/0.7)] backdrop-blur-sm dark:bg-[rgb(38_38_38/0.672)]"
+      >
+        <div className="flex min-h-[36px] max-w-full items-center gap-2 px-3 py-1.5 text-left">
+          {activeIndex >= 0
+            ? <Spinner size={13} className="shrink-0 text-(--accent)" />
+            : <IconCheck size={13} className="shrink-0 text-(--success)" />
+          }
+          <span className="shrink-0 text-[14px] leading-[21px]">Step {currentIndex + 1} / {plan.steps.length}</span>
+          <span className="text-(--fg-tertiary)">·</span>
+          {diffFiles.length > 0 ? (
+            <button
+              className="flex min-w-0 items-center gap-1 text-[14px] leading-[21px] text-(--fg-tertiary) hover:text-(--fg)"
+              onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
+            >
+              <span className="min-w-0 truncate">{diffFiles.length} file{diffFiles.length === 1 ? "" : "s"} changed</span>
+              {added > 0 && <span className="shrink-0 text-(--diff-add-fg)">+{added}</span>}
+              {deleted > 0 && <span className="shrink-0 text-(--diff-del-fg)">-{deleted}</span>}
+            </button>
+          ) : (
+            <span className="min-w-0 truncate text-[14px] leading-[21px] text-(--fg-tertiary)">
+              {current?.step || "Plan complete"}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

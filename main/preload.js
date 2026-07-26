@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld("codexBridge", {
   openPath: (p) => ipcRenderer.invoke("shell:open-path", p),
   openExternal: (url) => ipcRenderer.invoke("shell:open-external", url),
   getAppInfo: () => ipcRenderer.invoke("app:info"),
+  rolloutActivity: (file) => ipcRenderer.invoke("rollout:activity", { file }),
   captureWebview: (webContentsId) => ipcRenderer.invoke("webview:capture", { webContentsId }),
   saveTempFile: (dataUrl, prefix, ext) => ipcRenderer.invoke("save-temp-file", { dataUrl, prefix, ext }),
 

@@ -1,9 +1,34 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "OpenAI Sans";
+  src: url("./assets/fonts/OpenAISans-Regular-DFZxHTKM.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OpenAI Sans";
+  src: url("./assets/fonts/OpenAISans-Medium-B7nJY_kG.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Codex Sidebar CJK";
+  src: local("PingFangSC-Medium"), local("PingFang SC Medium");
+  font-style: normal;
+  font-weight: 445;
+  unicode-range: U+2E80-2EFF, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-openai-sans: "OpenAI Sans", var(--font-sans);
   --font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --text-xs: 12px;
   --text-sm: 13px;
@@ -16,13 +41,15 @@
 :root {
   --fg: #1a1c1f;
   --fg-secondary: color-mix(in srgb, #1a1c1f 65%, transparent);
-  --fg-tertiary: rgb(26 28 31 / 0.498);
+  --fg-tertiary: rgb(26 28 31 / 0.495);
   --fg-faint: rgb(26 28 31 / 0.3);
+  --conversation-body: rgb(26 28 31 / 0.6);
   --surface: #ffffff;
-  --surface-under: #f9f9f9;
+  --surface-under: #f6f6f6;
   --surface-raised: #ffffff;
   --surface-hover: rgb(0 0 0 / 0.06);
   --surface-active: rgb(0 0 0 / 0.1);
+  --sidebar-row-active: rgb(26 28 31 / 0.055);
   --surface-fog: rgb(0 0 0 / 0.03);
   --tab-active-bg: rgb(0 0 0 / 0.07);
   --border: rgb(0 0 0 / 0.084);
@@ -41,15 +68,16 @@
   --warning-deep: #e25507;
   --purple: #924ff7;
   --bubble-user: rgb(0 0 0 / 0.06);
-  --input-bg: rgb(255 255 255 / 0.96);
+  --input-bg: rgb(255 255 255 / 0.865);
   --dropdown-bg: #ffffff;
   --diff-add-bg: rgb(0 162 64 / 0.14);
-  --diff-add-fg: #0a7d37;
+  --diff-add-fg: #00a240;
   --diff-del-bg: rgb(224 46 42 / 0.14);
-  --diff-del-fg: #c62828;
+  --diff-del-fg: #ba2623;
   --diff-surface: color-mix(in srgb, #ffffff 94%, #1a1c1f);
   --code-bg: rgb(0 0 0 / 0.05);
-  --shadow-menu: 0 0 0 0.5px rgb(0 0 0 / 0.1), 0 3px 7.5px #0000000a, 0 0 20px #0000000d;
+  --shadow-menu: 0 0 0 0.5px var(--border-heavy), 0 3px 7.5px #0000000a, 0 0 20px #0000000d;
+  --shadow-composer: 0 0 0 0.5px rgb(26 28 31 / 0.118), 0 3px 7.5px rgb(0 0 0 / 0.04), 0 0 20px rgb(0 0 0 / 0.05);
   --elevation-sidebar: 0 0 0 0.5px rgb(0 0 0 / 0.08), 0 3px 7.5px #00000008, 0 0 16px #00000005;
 }
 
@@ -58,13 +86,15 @@
 .dark {
   --fg: #fcfcfc;
   --fg-secondary: color-mix(in srgb, #fcfcfc 65%, transparent);
-  --fg-tertiary: rgb(252 252 252 / 0.498);
+  --fg-tertiary: rgb(252 252 252 / 0.495);
   --fg-faint: rgb(252 252 252 / 0.3);
-  --surface: #111111;
-  --surface-under: #0d0d0d;
-  --surface-raised: rgb(38 38 38);
+  --conversation-body: rgb(252 252 252 / 0.6);
+  --surface: #171717;
+  --surface-under: #131313;
+  --surface-raised: rgb(43 43 43);
   --surface-hover: rgb(252 252 252 / 0.06);
   --surface-active: rgb(252 252 252 / 0.1);
+  --sidebar-row-active: rgb(252 252 252 / 0.084);
   --surface-fog: rgb(252 252 252 / 0.04);
   --tab-active-bg: #1d1d1d;
   --border: rgb(252 252 252 / 0.084);
@@ -83,24 +113,40 @@
   --warning-deep: #e25507;
   --purple: #ad7bf9;
   --bubble-user: rgb(252 252 252 / 0.084);
-  --input-bg: rgb(38 38 38 / 0.96);
-  --dropdown-bg: rgb(38 38 38);
+  --input-bg: rgb(38 38 38);
+  --dropdown-bg: rgb(43 43 43);
   --diff-add-bg: rgb(0 162 64 / 0.23);
   --diff-add-fg: #40c977;
   --diff-del-bg: rgb(224 46 42 / 0.23);
   --diff-del-fg: #ff6764;
   --diff-surface: color-mix(in srgb, #111111 94%, #fcfcfc);
   --code-bg: rgb(252 252 252 / 0.06);
-  --shadow-menu: 0 0 0 0.5px rgb(252 252 252 / 0.156), 0 3px 7.5px #0000000a, 0 0 20px #0000000d;
+  --shadow-menu: 0 0 0 0.5px var(--border-heavy), 0 3px 7.5px #0000000a, 0 0 20px #0000000d;
+  --shadow-composer: var(--shadow-menu);
   --elevation-sidebar: 0 0 0 0.5px rgb(252 252 252 / 0.156), 0 3px 7.5px #00000008, 0 0 16px #00000005;
 }
 
 
 /* ---- translucent sidebar (Appearance settings) ---- */
+.app-shell-root {
+  background: transparent;
+}
+
 .translucent-sidebar .app-sidebar {
   background: color-mix(in srgb, var(--surface-under) 72%, transparent);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
+}
+
+.app-sidebar {
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: color-mix(in srgb, var(--fg) 85%, transparent);
+  font-family: "Codex Sidebar CJK", var(--font-sans);
+  font-weight: 445;
+}
+
+.dark .app-sidebar {
+  background: rgb(33 33 33 / 0.7);
 }
 
 /* ---- shared metrics ---- */
@@ -109,8 +155,8 @@
   --thread-content-max-width: 48rem;
   --padding-toolbar: 16px;
   --sidebar-width-target: 275px;
-  --radius-composer: 22px;
-  --conversation-item-gap: 12px;
+  --radius-composer: 25px;
+  --conversation-item-gap: 16px;
 }
 
 html,
@@ -118,10 +164,11 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  background: var(--surface);
+  background: var(--surface-under);
   color: var(--fg);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -194,6 +241,32 @@ body,
   transform-origin: top left;
 }
 
+.composer-model-button:hover,
+.composer-model-button[data-state="open"] {
+  background: var(--sidebar-row-active);
+}
+.composer-model-button:active {
+  background: color-mix(in srgb, var(--fg) 15%, transparent);
+}
+
+@keyframes model-menu-in-kf {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.model-menu-in,
+.model-flyout {
+  background: color-mix(in srgb, var(--dropdown-bg) 90%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--fg) 8%, transparent),
+    0 0 0 0.5px color-mix(in srgb, var(--fg) 8%, transparent),
+    0 8px 16px -4px rgb(0 0 0 / 0.12);
+}
+.model-menu-in {
+  animation: model-menu-in-kf 320ms 30ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-origin: bottom right;
+}
+
 /* panel slide-ins (side panel / bottom panel / floating panels) */
 @keyframes slide-in-right-kf {
   from { opacity: 0.4; transform: translateX(14px); }
@@ -215,12 +288,15 @@ body,
 .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 
-/* press feedback for buttons */
-button {
-  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease, opacity 120ms ease, transform 80ms ease;
+.composer-goal-button {
+  transition: none;
 }
-button:active {
-  transform: scale(0.98);
+.composer-goal-button:hover {
+  background: color-mix(in srgb, var(--fg) 5.5%, transparent);
+}
+.composer-goal-button:active {
+  background: color-mix(in srgb, var(--fg) 15%, transparent);
+  transform: none;
 }
 
 .text-fade-truncate {
@@ -230,10 +306,24 @@ button:active {
   -webkit-mask-image: linear-gradient(to right, black 78%, transparent 100%);
 }
 
+.active-goal-bar > div:first-child > button {
+  width: 24px;
+  height: 24px;
+  border-radius: 10px;
+  border-color: transparent;
+  color: var(--fg-tertiary);
+  transition: all 0s ease;
+}
+
+.active-goal-bar > div:first-child > button:hover {
+  color: var(--fg-tertiary);
+  background: color-mix(in srgb, var(--fg) 5.5%, transparent);
+}
+
 /* markdown */
 .md {
   font-size: 14px;
-  line-height: 1.65;
+  line-height: 22px;
   overflow-wrap: break-word;
 }
 .md > *:first-child { margin-top: 0; }
