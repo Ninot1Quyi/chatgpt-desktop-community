@@ -6,6 +6,12 @@ This project recreates the focused workspace experience of the desktop app with 
 
 > This project is not affiliated with, endorsed by, or sponsored by OpenAI.
 
+## Interface examples
+
+| Light appearance | Dark appearance |
+| --- | --- |
+| ![ChatGPT Desktop Community in light appearance](assets/screenshots/chatgpt-desktop-light.png) | ![ChatGPT Desktop Community in dark appearance](assets/screenshots/chatgpt-desktop-dark.png) |
+
 ## Why this project exists
 
 More and more apps borrow the look of ChatGPT Desktop, but few reproduce the full experience closely enough. This project started from a simple idea: build the faithful community reimplementation we wanted to use ourselves.
@@ -24,12 +30,6 @@ Our goal is to recreate ChatGPT Desktop as closely as practical while keeping it
 - Light, dark, and system appearance modes
 
 The interface is under active development. Protocol changes in `codex app-server` may require matching updates here.
-
-## Interface examples
-
-| Light appearance | Dark appearance |
-| --- | --- |
-| ![ChatGPT Desktop Community in light appearance](assets/screenshots/chatgpt-desktop-light.png) | ![ChatGPT Desktop Community in dark appearance](assets/screenshots/chatgpt-desktop-dark.png) |
 
 ## Getting started
 
