@@ -26,13 +26,9 @@ The interface is under active development. Protocol changes in `codex app-server
 
 ## Interface examples
 
-### Light appearance
-
-![ChatGPT Desktop Community in light appearance](assets/screenshots/chatgpt-desktop-light.png)
-
-### Dark appearance
-
-![ChatGPT Desktop Community in dark appearance](assets/screenshots/chatgpt-desktop-dark.png)
+| Light appearance | Dark appearance |
+| --- | --- |
+| ![ChatGPT Desktop Community in light appearance](assets/screenshots/chatgpt-desktop-light.png) | ![ChatGPT Desktop Community in dark appearance](assets/screenshots/chatgpt-desktop-dark.png) |
 
 ## Getting started
 
