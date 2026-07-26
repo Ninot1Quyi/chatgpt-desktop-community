@@ -56,7 +56,7 @@ Recommended: use ChatGPT Desktop, Claude Code, or Cursor and say:
 - There is no signed installer or automatic update channel yet.
 - The Browser panel provides practical embedded navigation, but it does not reproduce every browser-control feature of the official client.
 - Compatibility can lag behind newly released app-server methods or notification shapes.
-- This remains an independent community implementation, so visual and behavioral differences are expected.
+- This remains an independent community implementation, so visual and behavioral differences are expected for now; the goal is complete visual and behavioral parity.
 
 ## Contributing
 
