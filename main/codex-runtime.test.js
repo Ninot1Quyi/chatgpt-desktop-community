@@ -48,6 +48,22 @@ test("finds the documented standalone Windows install location", () => {
   assert.equal(result.binary, installed);
 });
 
+test("finds the npm global install location on Windows", () => {
+  const npmGlobal = String.raw`C:\Users\Test\AppData\Roaming\npm\node_modules\@openai\codex\node_modules\@openai\codex-win32-x64\vendor\x86_64-pc-windows-msvc\bin\codex.exe`;
+  const result = resolveCodexBinary({
+    platform: "win32",
+    arch: "x64",
+    resourcesPath: String.raw`C:\Missing\resources`,
+    env: {
+      APPDATA: String.raw`C:\Users\Test\AppData\Roaming`,
+    },
+    homePath: String.raw`C:\Users\Test`,
+    existsSync: (candidate) => candidate === npmGlobal,
+  });
+
+  assert.equal(result.binary, npmGlobal);
+});
+
 test("falls back to PATH only after checking OS-specific locations", () => {
   const result = resolveCodexBinary({
     platform: "darwin",

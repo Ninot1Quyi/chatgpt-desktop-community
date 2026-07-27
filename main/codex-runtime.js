@@ -7,6 +7,73 @@ const BUNDLED_TARGETS = {
   "win32-x64": "win32-x64",
 };
 
+// --- Windows-only install locations ---------------------------------------
+// Everything Windows-specific lives in this block so the shared resolution
+// flow (and the macOS behavior) stays untouched.
+function windowsInstallCandidates({ arch, env, executable, paths }) {
+  const candidates = [];
+  if (env.CODEX_INSTALL_DIR) {
+    candidates.push(paths.join(env.CODEX_INSTALL_DIR, executable));
+  }
+  if (env.LOCALAPPDATA) {
+    candidates.push(paths.join(
+      env.LOCALAPPDATA,
+      "Programs",
+      "OpenAI",
+      "Codex",
+      "bin",
+      executable,
+    ));
+  }
+  if (arch === "x64" && env.APPDATA) {
+    // npm global install: `npm i -g @openai/codex` puts the native binary
+    // inside the platform package under the global node_modules tree.
+    candidates.push(paths.join(
+      env.APPDATA,
+      "npm",
+      "node_modules",
+      "@openai",
+      "codex",
+      "node_modules",
+      "@openai",
+      "codex-win32-x64",
+      "vendor",
+      "x86_64-pc-windows-msvc",
+      "bin",
+      executable,
+    ));
+  }
+  return candidates;
+}
+
+// --- macOS-only install locations -----------------------------------------
+function darwinInstallCandidates({ homePath, executable, paths }) {
+  return [
+    "/Applications/ChatGPT.app/Contents/Resources/codex",
+    paths.join(
+      homePath,
+      "Applications",
+      "ChatGPT.app",
+      "Contents",
+      "Resources",
+      "codex",
+    ),
+  ];
+}
+
+// POSIX fallback shared by every non-Windows platform.
+function posixInstallCandidates({ homePath, executable, paths }) {
+  return [paths.join(homePath, ".local", "bin", executable)];
+}
+
+// Platform-specific install locations; each platform owns its entry, and
+// unknown platforms fall back to the POSIX default. Adding support for a new
+// platform means adding one entry here, never touching the resolver below.
+const INSTALL_CANDIDATES = {
+  win32: windowsInstallCandidates,
+  darwin: (ctx) => [...posixInstallCandidates(ctx), ...darwinInstallCandidates(ctx)],
+};
+
 function resolveCodexBinary({
   platform = process.platform,
   arch = process.arch,
@@ -42,35 +109,8 @@ function resolveCodexBinary({
     executable,
   ));
 
-  if (platform === "win32") {
-    if (env.CODEX_INSTALL_DIR) {
-      candidates.push(paths.join(env.CODEX_INSTALL_DIR, executable));
-    }
-    if (env.LOCALAPPDATA) {
-      candidates.push(paths.join(
-        env.LOCALAPPDATA,
-        "Programs",
-        "OpenAI",
-        "Codex",
-        "bin",
-        executable,
-      ));
-    }
-  } else {
-    candidates.push(paths.join(homePath, ".local", "bin", executable));
-  }
-
-  if (platform === "darwin") {
-    candidates.push("/Applications/ChatGPT.app/Contents/Resources/codex");
-    candidates.push(paths.join(
-      homePath,
-      "Applications",
-      "ChatGPT.app",
-      "Contents",
-      "Resources",
-      "codex",
-    ));
-  }
+  const installCandidates = INSTALL_CANDIDATES[platform] || posixInstallCandidates;
+  candidates.push(...installCandidates({ arch, env, homePath, executable, paths }));
 
   const binary = candidates.find((candidate) => existsSync(candidate)) || "codex";
   return { binary, candidates: [...candidates, "PATH: codex"] };
