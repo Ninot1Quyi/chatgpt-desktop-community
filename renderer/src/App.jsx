@@ -147,7 +147,9 @@ export default function App() {
                 </>
               )}
             </div>
-            {ui.navView === "chats" ? <Conversation /> : <NavViews />}
+            <div className="flex min-h-0 flex-1 flex-col">
+              {ui.navView === "chats" ? <Conversation /> : <NavViews />}
+            </div>
             {ui.bottomOpen && (
               <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
                 <BottomPanel />
