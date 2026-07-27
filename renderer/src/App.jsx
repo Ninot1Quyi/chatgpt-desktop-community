@@ -9,6 +9,7 @@ import { panelHook } from "./lib/panelHook.js";
 import Sidebar from "./components/Sidebar.jsx";
 import Conversation, { ConversationHeaderContent, HeaderPanelButtons, HeaderContextButtons } from "./components/Conversation.jsx";import NavViews from "./components/NavViews.jsx";
 import RightPanel, { RightPanelHeader } from "./components/RightPanel.jsx";
+import WinMenuBar from "./components/WinMenuBar.jsx";
 import TerminalTab from "./components/panel/TerminalTab.jsx";
 import Settings from "./components/Settings.jsx";
 import { Toasts, Spinner, IconButton, Menu } from "./components/ui.jsx";
@@ -191,8 +192,10 @@ function GlobalHeader() {
   const navBack = useStore((s) => s.navBack);
   const navFwd = useStore((s) => s.navFwd);
   const { goBack, goForward } = useStore();
+  // macOS needs the traffic-light inset; Windows has no left-side controls.
+  const isWin = useStore((s) => s.appInfo?.platform === "win32");
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pl-[88px]">
+    <div className={cx("app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1", isWin ? "pl-3" : "pl-[88px]")}>
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
@@ -213,6 +216,8 @@ function GlobalHeader() {
         disabled={!navFwd.length}
         onClick={goForward}
       />
+      {/* Windows only: File/Edit/View/Help share this row (official layout) */}
+      <WinMenuBar />
       {/* collapsed sidebar exposes a quick new-chat button (reference header) */}
       {!ui.sidebarOpen && (
         <IconButton
@@ -278,8 +283,9 @@ function PeekHeader() {
   const navBack = useStore((s) => s.navBack);
   const navFwd = useStore((s) => s.navFwd);
   const { goBack, goForward } = useStore();
+  const isWin = useStore((s) => s.appInfo?.platform === "win32");
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-[84px]">
+    <div className={cx("app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5", isWin ? "pl-3" : "pl-[84px]")}>
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}

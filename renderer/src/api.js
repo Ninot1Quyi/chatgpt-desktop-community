@@ -34,3 +34,10 @@ export const iconFetch = (url) => b.iconFetch(url);
 export const localFileUrl = (absPath) =>
   `codex-file://local/${encodeURIComponent(absPath)}`;
 export const logout = () => b.logout();
+
+// Windows in-window menu bar actions
+export const editRole = (role) => b.editRole(role);
+export const viewZoom = (direction) => b.viewZoom(direction);
+export const viewReload = () => b.viewReload();
+export const viewToggleDevtools = () => b.viewToggleDevtools();
+export const windowClose = () => b.windowClose();

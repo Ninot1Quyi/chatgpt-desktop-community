@@ -54,4 +54,11 @@ contextBridge.exposeInMainWorld("codexBridge", {
 
   // Sign out (backs up auth.json then restarts into the connect screen)
   logout: () => ipcRenderer.invoke("account:logout"),
+
+  // Windows in-window menu bar actions
+  editRole: (role) => ipcRenderer.invoke("edit:role", role),
+  viewZoom: (direction) => ipcRenderer.invoke("view:zoom", direction),
+  viewReload: () => ipcRenderer.invoke("view:reload"),
+  viewToggleDevtools: () => ipcRenderer.invoke("view:toggle-devtools"),
+  windowClose: () => ipcRenderer.invoke("window:close"),
 });

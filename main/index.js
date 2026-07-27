@@ -377,6 +377,28 @@ ipcMain.handle("power:prevent-sleep", (_e, on) => {
 });
 
 // ---------------------------------------------------------------------------
+// Windows in-window menu bar (WinMenuBar) support. Edit roles are forwarded
+// to the sender's webContents; zoom/reload/devtools act on the sender window.
+// ---------------------------------------------------------------------------
+const EDIT_ROLES = new Set(["undo", "redo", "cut", "copy", "paste", "pasteAndMatchStyle", "selectAll"]);
+ipcMain.handle("edit:role", (e, role) => {
+  if (!EDIT_ROLES.has(role)) return false;
+  e.sender[role]();
+  return true;
+});
+
+ipcMain.handle("view:zoom", (e, direction) => {
+  const wc = e.sender;
+  if (direction === "reset") wc.setZoomFactor(1);
+  else wc.setZoomFactor(Math.min(3, Math.max(0.5, wc.getZoomFactor() + (direction === "in" ? 0.1 : -0.1))));
+  return true;
+});
+
+ipcMain.handle("view:reload", (e) => { e.sender.reload(); return true; });
+ipcMain.handle("view:toggle-devtools", (e) => { e.sender.toggleDevTools(); return true; });
+ipcMain.handle("window:close", (e) => { BrowserWindow.fromWebContents(e.sender)?.close(); return true; });
+
+// ---------------------------------------------------------------------------
 // Window
 // ---------------------------------------------------------------------------
 let mainWindow = null;
@@ -393,6 +415,8 @@ function createMainWindow(query) {
     minHeight: 600,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 16, y: 16 },
+    // Windows draws its own in-window menu bar (WinMenuBar) instead.
+    autoHideMenuBar: true,
     transparent: true,
     backgroundColor: "#00000000",
     vibrancy: "menu",
