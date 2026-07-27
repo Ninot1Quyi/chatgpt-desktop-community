@@ -72,7 +72,7 @@ export default function EnvironmentsSection() {
         </div>
         <button
           className="flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-(--border) px-3 text-sm hover:bg-(--surface-hover)"
-          onClick={() => api.pickDirectory()}
+          onClick={async () => useStore.getState().addLocalProject(await api.pickDirectory())}
         >
           <IconPlus size={12} />
           Add project

@@ -731,9 +731,32 @@ export const useStore = create((set, get) => ({
     set({ cwd });
     persist("composer.cwd", cwd);
   },
+  // Register a folder as a local project in the shared global-state file,
+  // like the official client does — otherwise no picker can match the cwd
+  // and the chip keeps reading "Select project".
+  addLocalProject(dir) {
+    if (!dir) return;
+    const norm = (p) => (p || "").replace(/\\/g, "/");
+    const dirN = norm(dir);
+    const local = { ...(get().gs?.["local-projects"] || {}) };
+    const known = Object.values(local).some((p) =>
+      (p.rootPaths || []).some((rp) => {
+        const r = norm(rp);
+        return r && (dirN === r || dirN.startsWith(r + "/"));
+      })
+    );
+    if (known) return;
+    const now = Date.now();
+    const id = `local-${crypto.randomUUID().replaceAll("-", "")}`;
+    local[id] = { id, name: dirN.split("/").pop() || dirN, rootPaths: [dir], createdAt: now, updatedAt: now };
+    set((s) => ({ gs: { ...s.gs, "local-projects": local } }));
+    api.gsPatch({ "local-projects": local });
+  },
   async pickCwd() {
     const dir = await api.pickDirectory(get().cwd);
-    if (dir) get().setCwd(dir);
+    if (!dir) return;
+    get().addLocalProject(dir);
+    get().setCwd(dir);
   },
 
   // =======================================================================
