@@ -903,15 +903,29 @@ function HomeContextBar() {
   const iconCls = "opacity-70";
   return (
     <div className="relative z-0 mx-[13px] -mb-[18px] flex items-center gap-2 rounded-t-[20px] bg-(--surface-under) px-1.5 pt-1.5 pb-[27px] dark:bg-(--surface-fog)">
-      <div ref={wrapRef} className="relative">
+      <div ref={wrapRef} className="group/projchip relative">
         <button
           title={project ? (project.rootPaths || [])[0] : "Select project"}
           onClick={() => { setOpen(!open); setQuery(""); }}
-          className={cx(chipCls, "hover:bg-(--surface-hover)")}
+          className={cx(chipCls, "hover:bg-(--surface-hover)", project && "pr-6")}
         >
           <IconFolder size={13} className={iconCls} />
           <span className="max-w-[220px] truncate">{project ? project.name : "Select project"}</span>
         </button>
+        {project && (
+          <button
+            title="Clear project"
+            className="absolute top-1/2 right-1 flex h-4.5 w-4.5 -translate-y-1/2 items-center justify-center rounded text-(--fg-tertiary) opacity-0 group-hover/projchip:opacity-100 hover:bg-(--surface-active) hover:text-(--fg)"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+              // back to the unselected state ("Select project")
+              useStore.getState().setCwd(useStore.getState().appInfo?.home || "");
+            }}
+          >
+            <IconX size={11} />
+          </button>
+        )}
         {open && (
           <div
             className="absolute bottom-full left-0 z-40 mb-2 w-64 overflow-hidden rounded-xl border border-(--border) bg-(--dropdown-bg)"
