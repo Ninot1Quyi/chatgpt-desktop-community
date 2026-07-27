@@ -1305,15 +1305,13 @@ function Home() {
       .catch(() => {});
     return () => { live = false; };
   }, [cwd]);
-  // reference rules: build-in for git projects (name ≤ 15), work-on otherwise
-  // (name too long drops the project name entirely)
+  // reference rules: a matched project always puts its name in the heading;
+  // git projects say "build in", anything else "work on"
   const title = !project
     ? "What should we build?"
-    : project.length > 15
-      ? "What should we work on?"
-      : hasGit
-        ? <>What should we build in <span className="underline decoration-dotted decoration-2 underline-offset-8">{project}</span>?</>
-        : <>What should we work on in <span className="underline decoration-dotted decoration-2 underline-offset-8">{project}</span>?</>;
+    : hasGit
+      ? <>What should we build in <span className="underline decoration-dotted decoration-2 underline-offset-8">{project}</span>?</>
+      : <>What should we work on in <span className="underline decoration-dotted decoration-2 underline-offset-8">{project}</span>?</>;
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center">
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto">
