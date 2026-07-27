@@ -349,7 +349,7 @@ export default function RightPanel() {
     return hasGit ? <EnvironmentPanel cwd={cwd} hasGit={hasGit} /> : <PanelEmptyState />;
   }
   return (
-    <div className="flex h-full w-full flex-col bg-(--surface-under)">
+    <div className="flex h-full w-full flex-col bg-(--surface)">
       <div className="min-h-0 flex-1">
         {tabs.map((t) => {
           const C = TAB_KINDS[t.kind].component;
@@ -429,7 +429,7 @@ function useSuggestedFiles() {
 // ---------------------------------------------------------------------------
 function PanelEmptyState() {
   return (
-    <div className="flex h-full w-full flex-col bg-(--surface-under)">
+    <div className="flex h-full w-full flex-col bg-(--surface)">
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="m-auto flex w-full max-w-xl flex-col gap-1 px-4 py-6">
           {MENU_ORDER.map((k) => {
@@ -438,7 +438,7 @@ function PanelEmptyState() {
             return (
               <button
                 key={k}
-                className="flex min-h-10 w-full items-center gap-2 rounded-md bg-(--surface-fog) px-2.5 py-2 text-left transition-colors hover:bg-(--surface-hover)"
+                className="flex min-h-10 w-full items-center gap-2 rounded-md bg-(--surface-hover) px-2.5 py-2 text-left transition-colors hover:bg-(--surface-active)"
                 onClick={() => usePanelStore.getState().open(k)}
               >
                 <Icon size={16} className="shrink-0 text-(--fg-tertiary)" />

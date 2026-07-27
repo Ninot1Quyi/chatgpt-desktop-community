@@ -126,69 +126,67 @@ export default function App() {
             />
           </>
         )}
-        <div className="mt-[46px] ml-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)">
-          {/* panel header row: view title + actions (see GlobalHeader for the
-              title bar). The action buttons keep the same position whether
-              the side panel is open or closed — opening the panel must not
-              shift them. */}
-          <div className="flex h-[46px] shrink-0 items-center gap-1 pl-3 pr-2">
-            {ui.navView === "chats" ? (
-              <>
-                <div className={cx("min-w-0", ui.rightOpen && ui.rightExpanded ? "w-0" : "flex-1")}>
-                  {!(ui.rightOpen && ui.rightExpanded) && <ConversationHeaderContent />}
-                </div>
-                {!ui.rightExpanded && <HeaderContextButtons />}
-                <HeaderPanelButtons />
-              </>
-            ) : (
-              <>
-                {ui.navView === "plugins" && <PluginsHeaderTabs />}
-                <div className="flex-1" />
-                <NavHeaderActions view={ui.navView} />
-              </>
-            )}
-          </div>
-          <div className="flex min-h-0 flex-1">
-            <div className={cx("flex min-w-[360px] flex-1 flex-col", ui.rightOpen && ui.rightExpanded && "hidden")}>
-              {ui.navView === "chats" ? <Conversation /> : <NavViews />}
-              {ui.bottomOpen && (
-                <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
-                  <BottomPanel />
-                </div>
+        <div className="mt-[46px] ml-2 flex min-w-0 flex-1 overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)">
+          {/* conversation column: its own toolbar row (official layout — each
+              region carries a 46px toolbar directly below the title bar) */}
+          <div className={cx("flex min-w-[360px] flex-1 flex-col", ui.rightOpen && ui.rightExpanded && "hidden")}>
+            <div className="flex h-[46px] shrink-0 items-center gap-1 pl-3 pr-2">
+              {ui.navView === "chats" ? (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <ConversationHeaderContent />
+                  </div>
+                  <HeaderContextButtons />
+                  {!ui.rightOpen && <HeaderPanelButtons />}
+                </>
+              ) : (
+                <>
+                  {ui.navView === "plugins" && <PluginsHeaderTabs />}
+                  <div className="flex-1" />
+                  <NavHeaderActions view={ui.navView} />
+                </>
               )}
             </div>
-            {ui.rightOpen && (
-              <>
-                {!ui.rightExpanded && (
-                  <DragHandle
-                    onDrag={(dx) => setUi({ rightWidth: clamp(ui.rightWidth - dx, 320, Math.max(340, window.innerWidth - 420)) })}
-                    onEnd={() => {
-                      // snap back into the available space on release
-                      const s = useStore.getState();
-                      const side = s.ui.sidebarOpen ? s.ui.sidebarWidth + 8 : 0;
-                      const max = Math.max(320, window.innerWidth - side - 380);
-                      if (s.ui.rightWidth > max) s.setUi({ rightWidth: max });
-                    }}
-                  />
-                )}
-                <div
-                  className={cx("slide-in-right flex shrink-0 flex-col border-l border-(--border-light)", ui.rightExpanded && "min-w-0 flex-1")}
-                  style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
-                >
-                  {/* the panel's tab strip tops the panel itself */}
-                  <div className="flex h-[46px] shrink-0 items-center border-b border-(--border-light) pl-2">
-                    <div className="h-full min-w-0 flex-1">
-                      <RightPanelHeader />
-                    </div>
-                    <div className="w-2 shrink-0" />
-                  </div>
-                  <div className="min-h-0 flex-1">
-                    <RightPanel />
-                  </div>
-                </div>
-              </>
+            {ui.navView === "chats" ? <Conversation /> : <NavViews />}
+            {ui.bottomOpen && (
+              <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
+                <BottomPanel />
+              </div>
             )}
           </div>
+          {ui.rightOpen && (
+            <>
+              {!ui.rightExpanded && (
+                <DragHandle
+                  onDrag={(dx) => setUi({ rightWidth: clamp(ui.rightWidth - dx, 320, Math.max(340, window.innerWidth - 420)) })}
+                  onEnd={() => {
+                    // snap back into the available space on release
+                    const s = useStore.getState();
+                    const side = s.ui.sidebarOpen ? s.ui.sidebarWidth + 8 : 0;
+                    const max = Math.max(320, window.innerWidth - side - 380);
+                    if (s.ui.rightWidth > max) s.setUi({ rightWidth: max });
+                  }}
+                />
+              )}
+              <div
+                className={cx("slide-in-right flex shrink-0 flex-col border-l border-(--border-light) bg-(--surface)", ui.rightExpanded && "min-w-0 flex-1")}
+                style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
+              >
+                {/* the panel's own toolbar: tab strip + panel buttons at right
+                    (same window-right spot they have when the panel is closed) */}
+                <div className="flex h-[46px] shrink-0 items-center pl-2">
+                  <div className="h-full min-w-0 flex-1">
+                    <RightPanelHeader />
+                  </div>
+                  <HeaderPanelButtons />
+                  <div className="w-2 shrink-0" />
+                </div>
+                <div className="min-h-0 flex-1">
+                  <RightPanel />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
       <GlobalHeader />
