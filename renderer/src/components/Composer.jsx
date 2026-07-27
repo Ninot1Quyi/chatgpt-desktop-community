@@ -17,7 +17,7 @@ import {
   IconCmdCodeReview, IconCmdFork, IconCmdFast, IconCmdFeedback, IconCmdGoal,
   IconCmdInit, IconCmdMcp, IconCmdMemories, IconCmdModel, IconCmdPlan,
   IconCmdReasoning, IconCmdSide, IconCmdStatus,
-  IconComposerPlus, IconComposerMic, IconComposerChevronDown, IconComposerChevronRight, IconGoalChevron, IconSkillCheck, IconModelPower,
+  IconComposerPlus, IconComposerMic, IconComposerChevronDown, IconComposerChevronRight, IconGoalChevron, IconSkillCheck, IconModelPower, IconCircleXFill,
 } from "./icons.jsx";
 import { panelHook } from "../lib/panelHook.js";
 
@@ -926,7 +926,7 @@ function HomeContextBar() {
                 useStore.getState().setCwd(useStore.getState().appInfo?.home || "");
               }}
             >
-              <LucideIcon name="CircleX" size={14} />
+              <IconCircleXFill size={15} />
             </button>
           )}
         </div>
