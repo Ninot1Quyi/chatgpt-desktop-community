@@ -910,7 +910,7 @@ function HomeContextBar() {
             onClick={() => { setOpen(!open); setQuery(""); }}
             className={cx(chipCls, "hover:bg-(--surface-hover)")}
           >
-            <IconFolder size={13} className={iconCls} />
+            <IconFolder size={13} className={cx(iconCls, project && "group-hover/projchip:invisible")} />
             <span className="max-w-[220px] truncate">{project ? project.name : "Select project"}</span>
           </button>
           {project && (
