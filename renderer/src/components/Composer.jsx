@@ -903,31 +903,33 @@ function HomeContextBar() {
   const iconCls = "opacity-70";
   return (
     <div className="relative z-0 mx-[13px] -mb-[18px] flex items-center gap-2 rounded-t-[20px] bg-(--surface-under) px-1.5 pt-1.5 pb-[27px] dark:bg-(--surface-fog)">
-      <div ref={wrapRef} className="group/projchip relative inline-flex min-w-0 rounded-full">
-        <button
-          title={project ? (project.rootPaths || [])[0] : "Select project"}
-          onClick={() => { setOpen(!open); setQuery(""); }}
-          className={cx(chipCls, "hover:bg-(--surface-hover)")}
-        >
-          <IconFolder size={13} className={iconCls} />
-          <span className="max-w-[220px] truncate">{project ? project.name : "Select project"}</span>
-        </button>
-        {project && (
-          // official behavior: hovering the chip covers the folder icon with a
-          // circled-X ("Don't work in a project") that clears the selection
+      <div ref={wrapRef} className="relative">
+        <div className="group/projchip relative inline-flex min-w-0 rounded-full">
           <button
-            aria-label="Don't work in a project"
-            title="Don't work in a project"
-            className="absolute inset-y-0 left-0 z-10 flex aspect-square items-center justify-center rounded-full text-(--fg-tertiary) opacity-0 transition-opacity group-hover/projchip:opacity-100 hover:text-(--fg)"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(false);
-              useStore.getState().setCwd(useStore.getState().appInfo?.home || "");
-            }}
+            title={project ? (project.rootPaths || [])[0] : "Select project"}
+            onClick={() => { setOpen(!open); setQuery(""); }}
+            className={cx(chipCls, "hover:bg-(--surface-hover)")}
           >
-            <LucideIcon name="CircleX" size={14} />
+            <IconFolder size={13} className={iconCls} />
+            <span className="max-w-[220px] truncate">{project ? project.name : "Select project"}</span>
           </button>
-        )}
+          {project && (
+            // official behavior: hovering the chip covers the folder icon with a
+            // circled-X ("Don't work in a project") that clears the selection
+            <button
+              aria-label="Don't work in a project"
+              title="Don't work in a project"
+              className="pointer-events-none absolute inset-y-0 left-0 z-10 flex aspect-square items-center justify-center rounded-full text-(--fg-tertiary) opacity-0 transition-opacity group-hover/projchip:pointer-events-auto group-hover/projchip:opacity-100 hover:text-(--fg)"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                useStore.getState().setCwd(useStore.getState().appInfo?.home || "");
+              }}
+            >
+              <LucideIcon name="CircleX" size={14} />
+            </button>
+          )}
+        </div>
         {open && (
           <div
             className="absolute bottom-full left-0 z-40 mb-2 w-64 overflow-hidden rounded-xl border border-(--border) bg-(--dropdown-bg)"
