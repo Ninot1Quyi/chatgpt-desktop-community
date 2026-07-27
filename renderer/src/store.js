@@ -499,7 +499,39 @@ export const useStore = create((set, get) => ({
     const model = get().model;
     const effort = get().effort;
 
+    // Optimistic echo: render the user's message and the running state
+    // instantly instead of waiting for the app-server's turn/started
+    // notification. The local turn is replaced by the real one when
+    // turn/started arrives (see handleNotification).
+    const localTurnId = `local-turn:${crypto.randomUUID()}`;
+    const optimisticTurn = {
+      id: localTurnId,
+      items: [{ id: `local-item:${crypto.randomUUID()}`, type: "userMessage", content: input }],
+    };
     let threadId = activeThreadId;
+    const tempThreadId = threadId ? null : `local-thread:${crypto.randomUUID()}`;
+    const shownId = threadId || tempThreadId;
+    set((s) => {
+      const conv = s.conversations[shownId] || {
+        thread: threadId ? null : { cwd: s.cwd },
+        turns: [],
+        activeTurnId: null,
+        plan: null,
+        tokenUsage: null,
+        diff: null,
+        loaded: true,
+        loading: false,
+        error: null,
+      };
+      return {
+        activeThreadId: shownId,
+        conversations: {
+          ...s.conversations,
+          [shownId]: { ...conv, activeTurnId: localTurnId, turns: upsertTurn(conv.turns, optimisticTurn) },
+        },
+      };
+    });
+
     try {
       if (!threadId) {
         set({ pendingNewThread: true });
@@ -516,23 +548,14 @@ export const useStore = create((set, get) => ({
         set({ pendingNewThread: false });
         if (!threadId) throw new Error("thread/start returned no thread");
         if (res.thread) get().upsertThread(res.thread);
-        set((s) => ({
-          activeThreadId: threadId,
-          conversations: {
-            ...s.conversations,
-            [threadId]: {
-              thread: res.thread || null,
-              turns: [],
-              activeTurnId: null,
-              plan: null,
-              tokenUsage: null,
-              diff: null,
-              loaded: true,
-              loading: false,
-              error: null,
-            },
-          },
-        }));
+        // move the optimistic conversation onto the real thread id
+        set((s) => {
+          const conv = s.conversations[tempThreadId];
+          const conversations = { ...s.conversations };
+          delete conversations[tempThreadId];
+          conversations[threadId] = { ...(conv || {}), thread: res.thread || null };
+          return { activeThreadId: threadId, conversations };
+        });
         get()._saveThreadPrefs();
       }
 
@@ -557,6 +580,20 @@ export const useStore = create((set, get) => ({
       await api.rpc("turn/start", turnParams);
     } catch (e) {
       set({ pendingNewThread: false });
+      // roll back the optimistic turn (and the temp draft conversation)
+      set((s) => {
+        const conversations = { ...s.conversations };
+        const conv = conversations[shownId];
+        if (conv) {
+          conversations[shownId] = {
+            ...conv,
+            activeTurnId: conv.activeTurnId === localTurnId ? null : conv.activeTurnId,
+            turns: conv.turns.filter((t) => t.id !== localTurnId),
+          };
+        }
+        if (tempThreadId) delete conversations[tempThreadId];
+        return { conversations, activeThreadId: tempThreadId ? null : s.activeThreadId };
+      });
       get().toast(`Send failed: ${e.message}`, "error");
     }
   },
@@ -825,7 +862,8 @@ export const useStore = create((set, get) => ({
           return {
             ...c,
             activeTurnId: params.turn?.id,
-            turns: upsertTurn(c.turns, turn),
+            // the real turn replaces the optimistic local echo
+            turns: upsertTurn(c.turns.filter((t) => !String(t.id).startsWith("local-turn:")), turn),
           };
         });
         break;
