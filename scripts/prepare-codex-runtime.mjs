@@ -87,7 +87,13 @@ async function extractRuntime(key) {
   const archivePath = await ensureArchive(runtime);
   const destination = path.join(resourceDir, key);
   await mkdir(destination, { recursive: true });
-  execFileSync("tar", ["-xzf", archivePath, "-C", destination], { stdio: "inherit" });
+  // Use repo-relative paths: GNU tar (Git Bash) mistakes "D:\..." for a
+  // remote host ("Cannot connect to D:"), while bsdtar handles both.
+  execFileSync(
+    "tar",
+    ["-xzf", path.relative(repoRoot, archivePath), "-C", path.relative(repoRoot, destination)],
+    { stdio: "inherit", cwd: repoRoot },
+  );
 
   const manifest = JSON.parse(await readFile(
     path.join(destination, "codex-package.json"),
