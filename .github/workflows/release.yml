@@ -30,6 +30,18 @@ jobs:
 
       - run: node scripts/prepare-codex-runtime.mjs win32-x64
 
+      # Pre-create one draft so electron-builder's parallel asset uploads all
+      # target the same release. Publishing happens only after every upload.
+      - name: Create draft release
+        run: gh release create "$env:GITHUB_REF_NAME" --draft --verify-tag --title "$env:GITHUB_REF_NAME" --notes "Windows installer and auto-update metadata." --repo "$env:GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - run: npx electron-builder --win --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure release is public
+        run: gh release edit "$env:GITHUB_REF_NAME" --draft=false --repo "$env:GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

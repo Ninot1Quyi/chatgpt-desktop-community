@@ -51,7 +51,8 @@
       {
         "provider": "github",
         "owner": "Ninot1Quyi",
-        "repo": "chatgpt-desktop-community"
+        "repo": "chatgpt-desktop-community",
+        "releaseType": "release"
       }
     ]
   },
