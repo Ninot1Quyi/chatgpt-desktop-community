@@ -361,7 +361,45 @@ function GeneralSection() {
           />
         </Row>
       </Card>
+      <Card title="Updates">
+        <UpdateRow />
+      </Card>
     </>
+  );
+}
+
+// App update row: version + check / download progress / restart-to-update.
+// Status comes from the main process (electron-updater, packaged builds only).
+function UpdateRow() {
+  const version = useStore((s) => s.appInfo?.version);
+  const [st, setSt] = useState(null);
+  useEffect(() => {
+    let live = true;
+    api.getUpdateStatus().then((s) => live && setSt(s)).catch(() => {});
+    return api.onUpdateStatus((s) => setSt(s));
+  }, []);
+  const status = st?.status || "idle";
+  const desc =
+    status === "dev" ? "Updates are only available in packaged builds" :
+    status === "checking" ? "Checking for updates…" :
+    status === "available" ? `Version ${st.version} found, downloading…` :
+    status === "downloading" ? `Downloading update — ${st.percent ?? 0}%` :
+    status === "downloaded" ? `Version ${st.version} is ready to install` :
+    status === "none" ? "You're up to date" :
+    status === "error" ? `Update check failed: ${st.message || "unknown error"}` :
+    `Current version ${version || "unknown"}`;
+  const busy = status === "checking" || status === "available" || status === "downloading";
+  const btnCls = "flex h-7 shrink-0 items-center rounded-full border border-(--border) px-3 text-sm hover:bg-(--surface-hover) disabled:opacity-50";
+  return (
+    <Row title="App updates" desc={desc}>
+      {status === "downloaded" ? (
+        <button className={btnCls} onClick={() => api.installUpdate()}>Restart to update</button>
+      ) : (
+        <button className={btnCls} disabled={busy || status === "dev"} onClick={() => api.checkForUpdates()}>
+          {busy ? "Working…" : "Check for updates"}
+        </button>
+      )}
+    </Row>
   );
 }
 

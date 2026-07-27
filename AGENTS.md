@@ -13,6 +13,8 @@
 - `npm run build` — compile the renderer into `dist-renderer/`.
 - `npm start` — build, then launch the packaged-style local app.
 - `node _analysis/smoke.mjs` — exercise the bundled Codex app-server handshake and read-only thread APIs.
+- `npm run dist:win` — build the NSIS installer into `release/` via electron-builder (auto-updatable; `package:win`'s electron-packager zip is not).
+- Release flow: bump `version` (tags must match it), push a `v*` tag — `.github/workflows/release.yml` builds on windows-latest and publishes the installer + `latest.yml` to GitHub Releases. Packaged builds check for updates on launch (every 6h) and from Settings → General → Updates; `main/updater.js` owns the electron-updater wiring.
 
 ## Coding Style & Naming Conventions
 

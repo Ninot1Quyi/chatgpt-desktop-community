@@ -1,0 +1,35 @@
+# Build the Windows NSIS installer and publish it to GitHub Releases.
+# Trigger by pushing a version tag, e.g.:
+#   npm version patch -m "release v%s"
+#   git push --follow-tags
+# The tag version must match package.json "version" — electron-updater
+# compares the installed version against latest.yml on the release.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - run: node scripts/prepare-codex-runtime.mjs win32-x64
+
+      - run: npx electron-builder --win --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

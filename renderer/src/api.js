@@ -23,6 +23,9 @@ export const getAppInfo = () => b.getAppInfo();
 export const rolloutActivity = (file) => b.rolloutActivity(file);
 export const captureWebview = (id) => b.captureWebview(id);
 export const saveTempFile = (dataUrl, prefix, ext) => b.saveTempFile(dataUrl, prefix, ext);
+// Absolute path of a File from <input type=file> / drag-drop / paste
+// (File.path was removed in Electron 32; webUtils is the replacement).
+export const getFilePath = (file) => b.getFilePath(file);
 export const gsRead = () => b.gsRead();
 export const gsPatch = (patch) => b.gsPatch(patch);
 export const onGsChanged = (cb) => b.onGsChanged(cb);
@@ -31,6 +34,10 @@ export const prefsWrite = (key, value) => b.prefsWrite(key, value);
 export const profileRead = (refresh) => b.profileRead(refresh);
 export const openThreadWindow = (threadId) => b.openThreadWindow(threadId);
 export const iconFetch = (url) => b.iconFetch(url);
+export const onUpdateStatus = (cb) => b.onUpdateStatus(cb);
+export const getUpdateStatus = () => b.getUpdateStatus();
+export const checkForUpdates = () => b.checkForUpdates();
+export const installUpdate = () => b.installUpdate();
 
 // Local file URL for the codex-file:// protocol.
 export const localFileUrl = (absPath) =>

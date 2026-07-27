@@ -224,6 +224,12 @@ export const useStore = create((set, get) => ({
     api.onNotification(({ method, params }) => get().handleNotification(method, params));
     api.onServerRequest((req) => get().handleServerRequest(req));
     api.onThemeUpdated(() => get().applyTheme());
+    // App updates: surface a toast when a new version is ready to install.
+    api.onUpdateStatus?.((s) => {
+      if (s?.status === "downloaded") {
+        get().toast(`Version ${s.version || ""} downloaded — restart to update (Settings → Updates)`);
+      }
+    });
     // Shared sidebar state (projects/pins) — same file the official app uses.
     api.gsRead().then((gs) => set({ gs: gs || {} })).catch(() => {});
     api.onGsChanged(() => api.gsRead().then((gs) => set({ gs: gs || {} })).catch(() => {}));

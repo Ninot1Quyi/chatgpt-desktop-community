@@ -101,6 +101,7 @@ export default function Composer({ centered = false, quick = false }) {
   const doSendRef = useRef(null);
   const browserTab = usePanelStore((s) => s.tabs.find((t) => t.kind === "browser" && t.url));
   const [images, setImages] = useState([]);
+  const [files, setFiles] = useState([]);
   const [mentions, setMentions] = useState([]);
   const [dragOver, setDragOver] = useState(false);
   const [menu, setMenu] = useState(null); // {kind:'slash'|'mention', query, start}
@@ -111,7 +112,7 @@ export default function Composer({ centered = false, quick = false }) {
   const imageFileRef = useRef(null);
   const anyFileRef = useRef(null);
 
-  const canSend = text.trim().length > 0 || images.length > 0 || mentions.length > 0;
+  const canSend = text.trim().length > 0 || images.length > 0 || files.length > 0 || mentions.length > 0;
 
   // Detect a trailing /command, @mention, or $skill token and open the
   // matching menu.
@@ -372,9 +373,12 @@ export default function Composer({ centered = false, quick = false }) {
       const tag = `$${m.name}`;
       if (!outText.includes(tag)) outText = `${outText.replace(/\s+$/, "")}${outText.trim() ? " " : ""}${tag} `;
     }
-    sendMessage(outText, images, mentions, opts); // the store queues it when a turn is running
+    // Attached (non-image) files ride along as mention inputs with absolute paths.
+    const allMentions = [...mentions, ...files.map((f) => ({ name: basename(f), path: f, kind: "file" }))];
+    sendMessage(outText, images, allMentions, opts); // the store queues it when a turn is running
     setText("");
     setImages([]);
+    setFiles([]);
     setMentions([]);
   };
   doSendRef.current = (txt) => {
@@ -419,8 +423,9 @@ export default function Composer({ centered = false, quick = false }) {
   const addFiles = (paths) => {
     const imgs = paths.filter((p) => IMAGE_EXTS.some((ext) => p.toLowerCase().endsWith(ext)));
     if (imgs.length) setImages((s) => [...s, ...imgs]);
+    // Non-image files become attachment cards (sent as mention inputs), not @path text.
     const others = paths.filter((p) => !imgs.includes(p));
-    if (others.length) setText((t) => (t ? t + "\n" : "") + others.map((p) => `@${p}`).join("\n"));
+    if (others.length) setFiles((s) => [...s, ...others]);
   };
 
   const onPasteFiles = async (e) => {
@@ -431,11 +436,11 @@ export default function Composer({ centered = false, quick = false }) {
     const files = itemFiles.length ? itemFiles : [...(e.clipboardData?.files || [])];
     if (!files.length) return;
     e.preventDefault();
-    addFiles(files.map((file) => file.path).filter(Boolean));
+    addFiles(files.map((file) => api.getFilePath(file)).filter(Boolean));
     try {
       const saved = [];
       for (const [i, file] of files.entries()) {
-        if (file.path || !file.type.startsWith("image/")) continue;
+        if (api.getFilePath(file) || !file.type.startsWith("image/")) continue;
         const dataUrl = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
@@ -453,7 +458,7 @@ export default function Composer({ centered = false, quick = false }) {
   };
 
   const onPickFiles = (e) => {
-    const paths = [...e.target.files].map((f) => f.path).filter(Boolean);
+    const paths = [...e.target.files].map((f) => api.getFilePath(f)).filter(Boolean);
     addFiles(paths);
     e.target.value = "";
   };
@@ -522,7 +527,7 @@ export default function Composer({ centered = false, quick = false }) {
       onDrop={(e) => {
         e.preventDefault();
         setDragOver(false);
-        addFiles([...e.dataTransfer.files].map((f) => f.path).filter(Boolean));
+        addFiles([...e.dataTransfer.files].map((f) => api.getFilePath(f)).filter(Boolean));
       }}
     >
       {dragOver && (
@@ -572,6 +577,34 @@ export default function Composer({ centered = false, quick = false }) {
                   aria-label={`Remove ${basename(p)}`}
                   className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-(--fg) text-(--surface) shadow-sm"
                   onClick={() => setImages((s) => s.filter((_, j) => j !== i))}
+                >
+                  <IconX size={10} />
+                </button>
+              </div>
+            ))}
+            </div>
+          </div>
+        )}
+
+        {files.length > 0 && (
+          <div className="hide-scrollbar w-full overflow-x-auto p-px pb-1">
+            <div className="flex min-w-max items-center gap-2">
+            {files.map((p, i) => (
+              <div
+                key={i}
+                className="relative flex items-center gap-2 rounded-[12px] border border-(--border) bg-(--surface) py-2 pr-2 pl-2.5"
+              >
+                <IconFile size={16} className="shrink-0 text-(--fg-tertiary)" />
+                <div className="flex min-w-0 flex-col">
+                  <span className="max-w-[200px] truncate text-[13px] leading-4">{basename(p)}</span>
+                  <span className="text-[11px] leading-4 text-(--fg-tertiary)">
+                    {(p.includes(".") ? p.split(".").pop() : "file").toUpperCase()}
+                  </span>
+                </div>
+                <button
+                  aria-label={`Remove ${basename(p)}`}
+                  className="flex size-4 shrink-0 items-center justify-center rounded-full bg-(--fg) text-(--surface) shadow-sm"
+                  onClick={() => setFiles((s) => s.filter((_, j) => j !== i))}
                 >
                   <IconX size={10} />
                 </button>

@@ -9,6 +9,7 @@ const crypto = require("node:crypto");
 const { pathToFileURL } = require("node:url");
 const { resolveCodexBinary } = require("./codex-runtime");
 const { readRolloutActivity } = require("./rollout-activity");
+const { initUpdater } = require("./updater");
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 const communityIconPath = path.join(__dirname, "..", "assets", "community-icon.png");
@@ -756,7 +757,11 @@ app.whenReady().then(() => {
   protocol.handle("codex-file", (request) => {
     try {
       const url = new URL(request.url);
-      const filePath = decodeURIComponent(url.pathname);
+      let filePath = decodeURIComponent(url.pathname);
+      // Windows drive paths arrive as "/D:/..." — the leading slash is the URL
+      // path separator, not part of the filesystem path. Leaving it in makes
+      // pathToFileURL produce file:///D:/D:/... (drive duplicated).
+      if (/^\/[A-Za-z]:[/\\]/.test(filePath)) filePath = filePath.slice(1);
       const ext = path.extname(filePath).toLowerCase();
       if (!LOCAL_FILE_EXTS.has(ext) || !path.isAbsolute(filePath)) {
         return new Response("forbidden", { status: 403 });
@@ -777,6 +782,7 @@ app.whenReady().then(() => {
   });
 
   bridge.start();
+  initUpdater({ broadcast: (channel, payload) => bridge.broadcast(channel, payload) });
   createMainWindow();
   createHotkeyWindow();
   createQuickChatWindow();
