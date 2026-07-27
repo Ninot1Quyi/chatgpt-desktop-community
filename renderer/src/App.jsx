@@ -127,7 +127,10 @@ export default function App() {
           </>
         )}
         <div className="mt-[46px] ml-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)">
-          {/* panel header row: view title + actions (see GlobalHeader for the title bar) */}
+          {/* panel header row: view title + actions (see GlobalHeader for the
+              title bar). The action buttons keep the same position whether
+              the side panel is open or closed — opening the panel must not
+              shift them. */}
           <div className="flex h-[46px] shrink-0 items-center gap-1 pl-3 pr-2">
             {ui.navView === "chats" ? (
               <>
@@ -135,7 +138,7 @@ export default function App() {
                   {!(ui.rightOpen && ui.rightExpanded) && <ConversationHeaderContent />}
                 </div>
                 {!ui.rightExpanded && <HeaderContextButtons />}
-                {!ui.rightOpen && <HeaderPanelButtons />}
+                <HeaderPanelButtons />
               </>
             ) : (
               <>
@@ -159,6 +162,13 @@ export default function App() {
                 {!ui.rightExpanded && (
                   <DragHandle
                     onDrag={(dx) => setUi({ rightWidth: clamp(ui.rightWidth - dx, 320, Math.max(340, window.innerWidth - 420)) })}
+                    onEnd={() => {
+                      // snap back into the available space on release
+                      const s = useStore.getState();
+                      const side = s.ui.sidebarOpen ? s.ui.sidebarWidth + 8 : 0;
+                      const max = Math.max(320, window.innerWidth - side - 380);
+                      if (s.ui.rightWidth > max) s.setUi({ rightWidth: max });
+                    }}
                   />
                 )}
                 <div
@@ -170,7 +180,6 @@ export default function App() {
                     <div className="h-full min-w-0 flex-1">
                       <RightPanelHeader />
                     </div>
-                    <HeaderPanelButtons />
                     <div className="w-2 shrink-0" />
                   </div>
                   <div className="min-h-0 flex-1">
@@ -450,7 +459,7 @@ function FloatingSidebarToggle() {
   );
 }
 
-function DragHandle({ onDrag }) {
+function DragHandle({ onDrag, onEnd }) {
   return (
     <div
       className="group relative z-20 w-0 shrink-0 cursor-col-resize bg-transparent"
@@ -461,6 +470,7 @@ function DragHandle({ onDrag }) {
         const up = () => {
           window.removeEventListener("mousemove", move);
           window.removeEventListener("mouseup", up);
+          onEnd?.();
         };
         window.addEventListener("mousemove", move);
         window.addEventListener("mouseup", up);
