@@ -30,6 +30,7 @@ export function CodexMark({ size = 56, className, style }) {
 export default function Conversation() {
   const activeThreadId = useStore((s) => s.activeThreadId);
   const conv = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId] : null));
+  const gs = useStore((s) => s.gs);
   const hasTurns = (conv?.turns || []).length > 0;
 
   if (!activeThreadId) {
@@ -52,7 +53,7 @@ export default function Conversation() {
           <div className="my-auto flex flex-col items-center px-4 py-6">
             <CodexMark size={56} className="text-(--fg) opacity-[0.24]" />
             <div className="mt-5 text-center text-[28px] leading-9 font-medium">
-              What should we build in {basename(threadCwdOf(conv)) || "this folder"}?
+              What should we build in {matchProjectName(gs, threadCwdOf(conv)) || basename(threadCwdOf(conv)) || "this folder"}?
             </div>
           </div>
         </div>
@@ -1272,9 +1273,28 @@ function GoalDialog({ open, goal }) {
 // Home screen: dimmed Codex mark + prompt + suggestion cards centered in the
 // middle area; the composer is anchored at the bottom (reference layout).
 // ---------------------------------------------------------------------------
+// Match a cwd to a known project's display name (longest rootPath wins).
+// Returns null outside every project — the reference home then drops the
+// location from the heading entirely ("我们该构建什么？").
+function matchProjectName(gs, cwd) {
+  const norm = (p) => (p || "").replace(/\\/g, "/");
+  const dir = norm(cwd);
+  let best = null;
+  for (const p of Object.values(gs?.["local-projects"] || {})) {
+    for (const rp of p.rootPaths || []) {
+      const r = norm(rp);
+      if (r && (dir === r || dir.startsWith(r + "/")) && (!best || r.length > best.len)) {
+        best = { name: p.name, len: r.length };
+      }
+    }
+  }
+  return best?.name || null;
+}
+
 function Home() {
   const cwd = useStore((s) => s.cwd);
-  const project = basename(cwd);
+  const gs = useStore((s) => s.gs);
+  const project = matchProjectName(gs, cwd);
   const [hasGit, setHasGit] = useState(false);
   useEffect(() => {
     let live = true;
