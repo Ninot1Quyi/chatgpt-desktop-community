@@ -41,3 +41,9 @@ export const viewZoom = (direction) => b.viewZoom(direction);
 export const viewReload = () => b.viewReload();
 export const viewToggleDevtools = () => b.viewToggleDevtools();
 export const windowClose = () => b.windowClose();
+
+// Custom Windows caption buttons
+export const windowMinimize = () => b.windowMinimize();
+export const windowToggleMaximize = () => b.windowToggleMaximize();
+export const windowIsMaximized = () => b.windowIsMaximized();
+export const onMaximizeChanged = (cb) => b.onMaximizeChanged(cb);

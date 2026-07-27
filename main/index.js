@@ -398,6 +398,16 @@ ipcMain.handle("view:reload", (e) => { e.sender.reload(); return true; });
 ipcMain.handle("view:toggle-devtools", (e) => { e.sender.toggleDevTools(); return true; });
 ipcMain.handle("window:close", (e) => { BrowserWindow.fromWebContents(e.sender)?.close(); return true; });
 
+// Custom Windows caption buttons (the transparent window draws no native ones).
+ipcMain.handle("window:minimize", (e) => { BrowserWindow.fromWebContents(e.sender)?.minimize(); return true; });
+ipcMain.handle("window:toggle-maximize", (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (!win) return false;
+  win.isMaximized() ? win.unmaximize() : win.maximize();
+  return true;
+});
+ipcMain.handle("window:is-maximized", (e) => !!BrowserWindow.fromWebContents(e.sender)?.isMaximized());
+
 // ---------------------------------------------------------------------------
 // Window
 // ---------------------------------------------------------------------------
@@ -434,6 +444,9 @@ function createMainWindow(query) {
   else mainWindow = win;
 
   win.once("ready-to-show", () => win.show());
+  // keep the custom caption buttons' maximize/restore icon in sync
+  win.on("maximize", () => win.webContents.send("window:maximize-changed", true));
+  win.on("unmaximize", () => win.webContents.send("window:maximize-changed", false));
   win.on("page-title-updated", (e) => e.preventDefault());
   win.on("closed", () => {
     if (win === mainWindow) mainWindow = null;

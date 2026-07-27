@@ -10,6 +10,7 @@ import Sidebar from "./components/Sidebar.jsx";
 import Conversation, { ConversationHeaderContent, HeaderPanelButtons, HeaderContextButtons } from "./components/Conversation.jsx";import NavViews from "./components/NavViews.jsx";
 import RightPanel, { RightPanelHeader } from "./components/RightPanel.jsx";
 import WinMenuBar from "./components/WinMenuBar.jsx";
+import WinWindowControls from "./components/WinWindowControls.jsx";
 import TerminalTab from "./components/panel/TerminalTab.jsx";
 import Settings from "./components/Settings.jsx";
 import { Toasts, Spinner, IconButton, Menu } from "./components/ui.jsx";
@@ -23,6 +24,7 @@ export default function App() {
   const requiresOpenaiAuth = useStore((s) => s.requiresOpenaiAuth);
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
+  const isWin = useStore((s) => s.appInfo?.platform === "win32");
 
   useEffect(() => { init(); }, []);
   // deep-link: ?thread=<id> (Open in new window) — open it once ready.
@@ -123,7 +125,13 @@ export default function App() {
             />
           </>
         )}
-        <div className={cx("flex min-w-0 flex-1 flex-col bg-(--surface) pt-[46px]", ui.rightOpen && ui.rightExpanded && "hidden")}>
+        <div className={cx(
+          "flex min-w-0 flex-1 flex-col bg-(--surface)",
+          // Windows: the content lives in its own rounded panel below the
+          // header, separated from the sidebar (official Windows client).
+          isWin ? "mt-[46px] ml-2 overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light)" : "pt-[46px]",
+          ui.rightOpen && ui.rightExpanded && "hidden"
+        )}>
           {ui.navView === "chats" ? <Conversation /> : <NavViews />}
           {ui.bottomOpen && (
             <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
@@ -272,6 +280,8 @@ function GlobalHeader() {
           <div className="w-2 shrink-0" />
         </>
       )}
+      {/* Windows caption buttons (a transparent window draws no native ones) */}
+      <WinWindowControls />
     </div>
   );
 }

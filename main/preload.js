@@ -61,4 +61,10 @@ contextBridge.exposeInMainWorld("codexBridge", {
   viewReload: () => ipcRenderer.invoke("view:reload"),
   viewToggleDevtools: () => ipcRenderer.invoke("view:toggle-devtools"),
   windowClose: () => ipcRenderer.invoke("window:close"),
+
+  // Custom Windows caption buttons
+  windowMinimize: () => ipcRenderer.invoke("window:minimize"),
+  windowToggleMaximize: () => ipcRenderer.invoke("window:toggle-maximize"),
+  windowIsMaximized: () => ipcRenderer.invoke("window:is-maximized"),
+  onMaximizeChanged: subscribe("window:maximize-changed"),
 });
