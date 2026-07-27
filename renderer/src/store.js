@@ -48,6 +48,8 @@ const stored = (k, fallback) => {
 };
 const persist = (k, v) => {
   try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+  // mirror to a file backup; localStorage does not survive hard kills
+  try { api.prefsWrite(k, v); } catch {}
 };
 const threadPlanKey = (threadId) => `thread.plan.${threadId}`;
 
@@ -188,6 +190,27 @@ export const useStore = create((set, get) => ({
   // boot
   // =======================================================================
   async init() {
+    // Hydrate persisted prefs from the file backup first (localStorage may
+    // have been wiped by a hard kill; the file mirror is authoritative).
+    try {
+      const prefs = await api.prefsRead();
+      if (prefs && typeof prefs === "object") {
+        for (const [k, v] of Object.entries(prefs)) {
+          try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+        }
+        const uiPatch = {};
+        for (const k of ["sidebarOpen", "sidebarWidth", "rightOpen", "rightTab", "rightWidth", "rightExpanded", "terminalLocation", "suggestedPrompts", "theme"]) {
+          if (`ui.${k}` in prefs) uiPatch[k] = prefs[`ui.${k}`];
+        }
+        set((s) => ({
+          model: "composer.model" in prefs ? prefs["composer.model"] : s.model,
+          effort: "composer.effort" in prefs ? prefs["composer.effort"] : s.effort,
+          serviceTier: "composer.serviceTier" in prefs ? prefs["composer.serviceTier"] : s.serviceTier,
+          permission: "composer.permission" in prefs ? prefs["composer.permission"] : s.permission,
+          ui: { ...s.ui, ...uiPatch },
+        }));
+      }
+    } catch {}
     api.onStatus(({ status, codexHome, binary, binaryCandidates, error }) => {
       set({
         status,
@@ -353,6 +376,16 @@ export const useStore = create((set, get) => ({
     // opening a thread always lands on the chat view (reference behavior)
     get().setUi({ navView: "chats" });
     set({ activeThreadId: threadId });
+    // restore this thread's composer prefs (model/effort/tier/permission)
+    const tp = stored(`thread.prefs.${threadId}`, null);
+    if (tp) {
+      set((s) => ({
+        model: tp.model ?? s.model,
+        effort: tp.effort ?? s.effort,
+        serviceTier: tp.serviceTier ?? s.serviceTier,
+        permission: tp.permission ?? s.permission,
+      }));
+    }
     const conv = get().conversations[threadId];
     if (conv?.loaded) return;
     set((s) => ({
@@ -500,6 +533,7 @@ export const useStore = create((set, get) => ({
             },
           },
         }));
+        get()._saveThreadPrefs();
       }
 
       const turnParams = {
@@ -618,18 +652,35 @@ export const useStore = create((set, get) => ({
     if (m && !m.supportedReasoningEfforts?.some((e) => e.reasoningEffort === get().effort)) {
       get().setEffort(m.defaultReasoningEffort || null);
     }
+    get()._saveThreadPrefs();
   },
   setEffort(effort) {
     set({ effort });
     persist("composer.effort", effort);
+    get()._saveThreadPrefs();
   },
   setServiceTier(tier) {
     set({ serviceTier: tier });
     persist("composer.serviceTier", tier);
+    get()._saveThreadPrefs();
   },
   setPermission(p) {
     set({ permission: p });
     persist("composer.permission", p);
+    get()._saveThreadPrefs();
+  },
+  // Per-thread composer prefs: the official client remembers model / effort /
+  // tier / permission per conversation. Saved whenever they change while a
+  // thread is active, restored on openThread.
+  _saveThreadPrefs() {
+    const id = get().activeThreadId;
+    if (!id) return;
+    persist(`thread.prefs.${id}`, {
+      model: get().model,
+      effort: get().effort,
+      serviceTier: get().serviceTier,
+      permission: get().permission,
+    });
   },
   setMode(mode) {
     set({ mode });

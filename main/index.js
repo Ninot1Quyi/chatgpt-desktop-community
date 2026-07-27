@@ -487,8 +487,45 @@ ipcMain.handle("window:open-thread", (_e, { threadId }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Codex global state (~/.codex/.codex-global-state.json). The official desktop
-// app keeps its sidebar projects / pins / thread assignments here; we share the
+// Renderer prefs backup (userData/renderer-prefs.json). Chromium commits
+// localStorage lazily, so a hard kill — or app.quit() racing the flush on
+// window close — wipes it; mirror every persisted key to a JSON file and
+// hydrate the renderer from it at startup.
+// ---------------------------------------------------------------------------
+const PREFS_PATH = path.join(app.getPath("userData"), "renderer-prefs.json");
+
+function readPrefs() {
+  try {
+    return JSON.parse(fs.readFileSync(PREFS_PATH, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+ipcMain.handle("prefs:read", () => readPrefs());
+
+let prefsPending = {};
+let prefsWriteTimer = null;
+ipcMain.handle("prefs:write", (_e, { key, value }) => {
+  prefsPending[key] = value;
+  clearTimeout(prefsWriteTimer);
+  prefsWriteTimer = setTimeout(() => {
+    const pending = prefsPending;
+    prefsPending = {};
+    try {
+      const next = { ...readPrefs(), ...pending };
+      const tmp = `${PREFS_PATH}.tmp-${process.pid}`;
+      fs.writeFileSync(tmp, JSON.stringify(next));
+      fs.renameSync(tmp, PREFS_PATH);
+    } catch (err) {
+      console.error("[prefs] write failed:", err.message);
+    }
+  }, 150);
+  return true;
+});
+
+// ---------------------------------------------------------------------------
+// Codex global state (~/.codex/.codex-global-state.json). The official desktop// app keeps its sidebar projects / pins / thread assignments here; we share the
 // same file so both apps render identical sidebars and stay in sync.
 // ---------------------------------------------------------------------------
 const GS_PATH = path.join(app.getPath("home"), ".codex", ".codex-global-state.json");

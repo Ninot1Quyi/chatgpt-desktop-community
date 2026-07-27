@@ -26,6 +26,8 @@ export const saveTempFile = (dataUrl, prefix, ext) => b.saveTempFile(dataUrl, pr
 export const gsRead = () => b.gsRead();
 export const gsPatch = (patch) => b.gsPatch(patch);
 export const onGsChanged = (cb) => b.onGsChanged(cb);
+export const prefsRead = () => b.prefsRead();
+export const prefsWrite = (key, value) => b.prefsWrite(key, value);
 export const profileRead = (refresh) => b.profileRead(refresh);
 export const openThreadWindow = (threadId) => b.openThreadWindow(threadId);
 export const iconFetch = (url) => b.iconFetch(url);

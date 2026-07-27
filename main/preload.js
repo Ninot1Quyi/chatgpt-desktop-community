@@ -43,6 +43,10 @@ contextBridge.exposeInMainWorld("codexBridge", {
   gsPatch: (patch) => ipcRenderer.invoke("gs:patch", patch),
   onGsChanged: subscribe("gs:changed"),
 
+  // Renderer prefs backup (localStorage mirror, survives hard kills)
+  prefsRead: () => ipcRenderer.invoke("prefs:read"),
+  prefsWrite: (key, value) => ipcRenderer.invoke("prefs:write", { key, value }),
+
   // ChatGPT profile (display name + avatar data url)
   profileRead: (refresh) => ipcRenderer.invoke("profile:read", { refresh }),
 
