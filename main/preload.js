@@ -11,7 +11,11 @@ function subscribe(channel) {
 
 contextBridge.exposeInMainWorld("codexBridge", {
   // JSON-RPC to app-server
-  request: (method, params) => ipcRenderer.invoke("rpc:request", { method, params }),
+  request: async (method, params) => {
+    const r = await ipcRenderer.invoke("rpc:request", { method, params });
+    if (r && r.ok === false) throw new Error(r.error);
+    return r && r.result;
+  },
   respond: (id, result, error) => ipcRenderer.invoke("rpc:respond", { id, result, error }),
   onNotification: subscribe("rpc:notification"),
   onServerRequest: subscribe("rpc:server-request"),

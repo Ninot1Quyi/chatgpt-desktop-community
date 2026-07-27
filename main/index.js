@@ -13,6 +13,25 @@ const { readRolloutActivity } = require("./rollout-activity");
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 const communityIconPath = path.join(__dirname, "..", "assets", "community-icon.png");
 
+// When the app is launched detached (or its parent terminal closes), stdout/stderr
+// point at a broken pipe and console.* throws EPIPE synchronously on Windows,
+// crashing the main process with an "Uncaught Exception" dialog. Swallow it.
+for (const method of ["log", "info", "warn", "error"]) {
+  const orig = console[method].bind(console);
+  console[method] = (...args) => {
+    try {
+      orig(...args);
+    } catch (err) {
+      if (!err || err.code !== "EPIPE") throw err;
+    }
+  };
+}
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on("error", (err) => {
+    if (!err || err.code !== "EPIPE") throw err;
+  });
+}
+
 // Keep our Electron storage separate from the official app (same productName
 // would otherwise share ~/Library/Application Support/Codex).
 app.setName("codex-desktop-rebuilt");
@@ -570,7 +589,16 @@ try {
 // ---------------------------------------------------------------------------
 // IPC
 // ---------------------------------------------------------------------------
-ipcMain.handle("rpc:request", (_e, { method, params }) => bridge.request(method, params));
+// Errors are returned as values ({ ok:false }) instead of rejecting: a rejected
+// ipcMain.handle makes Electron log "Error occurred in handler" on every failed
+// RPC (e.g. rate-limit polls when chatgpt.com is unreachable), spamming the console.
+ipcMain.handle("rpc:request", async (_e, { method, params }) => {
+  try {
+    return { ok: true, result: await bridge.request(method, params) };
+  } catch (err) {
+    return { ok: false, error: String((err && err.message) || err) };
+  }
+});
 ipcMain.handle("rpc:respond", (_e, { id, result, error }) => {
   bridge.respond(id, result, error);
   return true;
