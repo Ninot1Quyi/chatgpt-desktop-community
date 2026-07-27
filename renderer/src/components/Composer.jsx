@@ -816,13 +816,19 @@ export default function Composer({ centered = false, quick = false }) {
 }
 
 // ---------------------------------------------------------------------------
-// Home-screen context bar: folder / environment / git branch, tucked behind
-// the composer like the banner.
+// Home-screen context bar: the project chip opens the reference-style project
+// picker (search + project list + new project). With no project matched (for
+// example the home folder), it reads "Select project" and the Local/branch
+// chips stay hidden, like the official client.
 // ---------------------------------------------------------------------------
 function HomeContextBar() {
   const cwd = useStore((s) => s.cwd);
   const pickCwd = useStore((s) => s.pickCwd);
+  const gs = useStore((s) => s.gs);
   const [branch, setBranch] = useState(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -845,23 +851,112 @@ function HomeContextBar() {
     return () => { alive = false; };
   }, [cwd]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("mousedown", onDown, true);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // Match the cwd to a known project (longest rootPath wins, like the sidebar).
+  const project = useMemo(() => {
+    const norm = (p) => (p || "").replace(/\\/g, "/");
+    const dir = norm(cwd);
+    let best = null;
+    for (const p of Object.values(gs?.["local-projects"] || {})) {
+      for (const rp of p.rootPaths || []) {
+        const r = norm(rp);
+        if (r && (dir === r || dir.startsWith(r + "/")) && (!best || r.length > best.len)) {
+          best = { p, len: r.length };
+        }
+      }
+    }
+    return best?.p || null;
+  }, [gs, cwd]);
+
+  const projects = useMemo(
+    () => Object.values(gs?.["local-projects"] || {})
+      .map((p) => ({ name: p.name || "Project", path: (p.rootPaths || [])[0] || "" }))
+      .filter((p) => p.path)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    [gs]
+  );
+  const q = query.trim().toLowerCase();
+  const filtered = q ? projects.filter((p) => p.name.toLowerCase().includes(q)) : projects;
+
   const chipCls = "flex h-7 items-center gap-1.5 rounded-md px-2 text-xs text-(--fg)";
   const iconCls = "opacity-70";
   return (
     <div className="relative z-0 mx-[13px] -mb-[18px] flex items-center gap-2 rounded-t-[20px] bg-(--surface-under) px-1.5 pt-1.5 pb-[27px] dark:bg-(--surface-fog)">
-      <button title={cwd} onClick={pickCwd} className={cx(chipCls, "hover:bg-(--surface-hover)")}>
-        <IconFolder size={13} className={iconCls} />
-        <span className="max-w-[220px] truncate">{basename(cwd) || "Choose folder"}</span>
-      </button>
-      <span className={chipCls}>
-        <IconMonitor size={13} className={iconCls} />
-        Local
-      </span>
-      {branch && (
-        <span className={chipCls}>
-          <IconBranch size={13} className={iconCls} />
-          <span className="max-w-[180px] truncate">{branch}</span>
-        </span>
+      <div ref={wrapRef} className="relative">
+        <button
+          title={project ? (project.rootPaths || [])[0] : "Select project"}
+          onClick={() => { setOpen(!open); setQuery(""); }}
+          className={cx(chipCls, "hover:bg-(--surface-hover)")}
+        >
+          <IconFolder size={13} className={iconCls} />
+          <span className="max-w-[220px] truncate">{project ? project.name : "Select project"}</span>
+        </button>
+        {open && (
+          <div
+            className="absolute bottom-full left-0 z-40 mb-2 w-64 overflow-hidden rounded-xl border border-(--border) bg-(--dropdown-bg)"
+            style={{ boxShadow: "var(--shadow-menu)" }}
+          >
+            <div className="flex items-center gap-2 border-b border-(--border-light) px-3 py-2">
+              <LucideIcon name="Search" size={13} className="shrink-0 text-(--fg-tertiary)" />
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search projects"
+                className="w-full bg-transparent text-[13px] outline-none placeholder:text-(--fg-faint)"
+              />
+            </div>
+            <div className="max-h-[280px] overflow-y-auto p-1">
+              {filtered.map((p) => (
+                <button
+                  key={p.path}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] hover:bg-(--surface-hover)"
+                  onClick={() => { useStore.getState().setCwd(p.path); setOpen(false); }}
+                >
+                  <IconFolder size={14} className="shrink-0 text-(--fg-tertiary)" />
+                  <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                </button>
+              ))}
+              {filtered.length === 0 && (
+                <div className="px-3 py-2 text-xs text-(--fg-tertiary)">No matching projects</div>
+              )}
+            </div>
+            <div className="border-t border-(--border-light) p-1">
+              <button
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] hover:bg-(--surface-hover)"
+                onClick={() => { setOpen(false); pickCwd(); }}
+              >
+                <LucideIcon name="Plus" size={14} className="shrink-0 text-(--fg-tertiary)" />
+                New project…
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      {project && (
+        <>
+          <span className={chipCls}>
+            <IconMonitor size={13} className={iconCls} />
+            Local
+          </span>
+          {branch && (
+            <span className={chipCls}>
+              <IconBranch size={13} className={iconCls} />
+              <span className="max-w-[180px] truncate">{branch}</span>
+            </span>
+          )}
+        </>
       )}
     </div>
   );
