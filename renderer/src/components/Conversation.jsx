@@ -109,9 +109,12 @@ export function HeaderContextButtons() {
   const activeThreadId = useStore((s) => s.activeThreadId);
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
+  // New chat has no conversation context: only the panel toggles show then
+  // (reference new-chat page).
+  if (!activeThreadId) return null;
   return (
     <div className="flex shrink-0 translate-x-0.5 items-center gap-1.5">
-      {activeThreadId && <OpenInEditorButton />}
+      <OpenInEditorButton />
       <IconButton
         icon={<IconHeaderOutputs />}
         size={16}
