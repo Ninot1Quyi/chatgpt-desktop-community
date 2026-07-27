@@ -34,7 +34,11 @@ export function bindingsFor(commandId, overrides) {
   return [...(primary ? [primary] : []), ...(def?.[4] || [])];
 }
 
-const MODS = [["⌘", "metaKey"], ["⌃", "ctrlKey"], ["⌥", "altKey"], ["⇧", "shiftKey"]];
+// Windows-only branch: both ⌘ and ⌃ bindings mean the Ctrl key.
+const MODS = [["⌘", "ctrlKey"], ["⌥", "altKey"], ["⇧", "shiftKey"]];
+
+// Fold ⌃ bindings into ⌘ so both match Ctrl on Windows.
+const normalizeAccel = (accel) => (accel ? accel.replaceAll("⌃", "⌘") : accel);
 
 // Event → accelerator string ("⌘⇧K").
 export function eventToAccel(e) {
@@ -54,11 +58,11 @@ export function eventToAccel(e) {
 // Does the event match the accelerator?
 export function matchAccel(e, accel) {
   if (!accel) return false;
-  const want = new Set([...accel].filter((c) => "⌘⌃⌥⇧".includes(c)));
+  const want = new Set([...normalizeAccel(accel)].filter((c) => "⌘⌥⇧".includes(c)));
   for (const [sym, prop] of MODS) {
     if (want.has(sym) !== !!e[prop]) return false;
   }
-  const keyPart = accel.replace(/[⌘⌃⌥⇧]/g, "");
+  const keyPart = normalizeAccel(accel).replace(/[⌘⌥⇧]/g, "");
   let k = e.key;
   if (k === " ") k = "Space";
   else if (k === "Enter") k = "↵";

@@ -33,7 +33,7 @@ export default function EnvironmentPanel({ cwd, hasGit }) {
   const agents = useSubagentCounts(conv);
 
   return (
-    <div className="flex h-full w-full flex-col bg-(--surface-under) pt-[46px]">
+    <div className="flex h-full w-full flex-col bg-(--surface-under)">
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-6 pb-4">
         {/* header */}
         <div className="flex h-7 items-center justify-between pl-3 pr-1">
