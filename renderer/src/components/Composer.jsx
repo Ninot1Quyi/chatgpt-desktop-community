@@ -1,6 +1,6 @@
 // Composer: auto-growing editor, image attachments, model+effort / permission
 // selectors, context chips (home), queued pills, send/stop.
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useStore, PERMISSIONS, normalizePermission } from "../store.js";
 import * as api from "../api.js";
@@ -14,7 +14,7 @@ import {
   IconX, IconImage, IconFile, IconList, IconCheck, IconChevronRight, IconChevronLeft,
   IconShield, IconSparkle, IconMonitor, IconPaperclip, LucideIcon,
   IconSkillCube, IconSkillBox, IconChat,
-  IconCmdCodeReview, IconCmdFork, IconCmdFast, IconCmdFeedback, IconCmdGoal, IconGoalClear,
+  IconCmdCodeReview, IconCmdFork, IconCmdFast, IconCmdFeedback, IconCmdGoal,
   IconCmdInit, IconCmdMcp, IconCmdMemories, IconCmdModel, IconCmdPlan,
   IconCmdReasoning, IconCmdSide, IconCmdStatus,
   IconComposerPlus, IconComposerMic, IconComposerChevronDown, IconComposerChevronRight, IconGoalChevron, IconSkillCheck, IconModelPower,
@@ -22,6 +22,34 @@ import {
 import { panelHook } from "../lib/panelHook.js";
 
 const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"];
+
+// Uniform icon cell for the "/" menu. The extracted reference glyphs have
+// inconsistent viewBoxes — some clip their paths, some underfill — so each
+// glyph's bounding box is fitted to the same visual weight Lucide icons have
+// (glyph spans ~20/24 of the icon size) instead of trusting the viewBox.
+function FitIcon({ children, className }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const svg = ref.current?.querySelector("svg");
+    if (!svg) return;
+    try {
+      const bb = svg.getBBox();
+      if (!(bb.width > 0 && bb.height > 0)) return;
+      const size = Number(svg.getAttribute("width")) || 16;
+      const target = (size * 20) / 24;
+      const m = Math.max(bb.width, bb.height);
+      const v = (size * m) / target;
+      const cx = bb.x + bb.width / 2;
+      const cy = bb.y + bb.height / 2;
+      svg.setAttribute("viewBox", `${cx - v / 2} ${cy - v / 2} ${v} ${v}`);
+    } catch {}
+  }, []);
+  return (
+    <span ref={ref} className={cx("flex size-5 shrink-0 items-center justify-center text-(--fg)", className)}>
+      {children}
+    </span>
+  );
+}
 
 // ---------------------------------------------------------------------------
 export default function Composer({ centered = false, quick = false }) {
@@ -618,7 +646,7 @@ export default function Composer({ centered = false, quick = false }) {
                     onMouseEnter={() => setMenuIdx(i)}
                     onClick={() => runCommand(c)}
                   >
-                    <span className="flex size-5 shrink-0 items-center justify-center text-(--fg)">{c.icon}</span>
+                    <FitIcon>{c.icon}</FitIcon>
                     <span className="max-w-[60%] flex-none truncate">{c.label}</span>
                     <span className="ml-auto min-w-0 flex-1 truncate text-right text-sm text-(--fg-tertiary)">{c.desc}</span>
                   </button>
@@ -635,9 +663,9 @@ export default function Composer({ centered = false, quick = false }) {
                       onMouseEnter={() => setMenuIdx(gi)}
                       onClick={() => pickPrompt(p)}
                     >
-                      <span className="flex size-5 shrink-0 items-center justify-center text-(--fg)">
+                      <FitIcon>
                         <LucideIcon name="SquareTerminal" size={16} />
-                      </span>
+                      </FitIcon>
                       <span className="max-w-[60%] flex-none truncate">prompts:{p.name}</span>
                       <span className="ml-auto min-w-0 flex-1 truncate text-right text-sm text-(--fg-tertiary)">{p.desc}</span>
                     </button>
@@ -655,13 +683,13 @@ export default function Composer({ centered = false, quick = false }) {
                       onMouseEnter={() => setMenuIdx(gi)}
                       onClick={() => pickSkill(s)}
                     >
-                      <span className="flex size-5 shrink-0 items-center justify-center text-(--fg-secondary)">
+                      <FitIcon className="text-(--fg-secondary)">
                         {s.interface?.iconSmall ? (
                           <img src={api.localFileUrl(s.interface.iconSmall)} alt="" className="size-5 rounded object-cover" />
                         ) : (
                           <IconSkillBox size={16} />
                         )}
-                      </span>
+                      </FitIcon>
                       <span className="shrink-0 truncate">{skillName(s)}</span>
                       <span className="flex-1 truncate text-(--fg-tertiary)">{skillDesc(s)}</span>
                       <span className="ml-auto shrink-0 text-(--fg-tertiary)">{s.scopeLabel}</span>
@@ -1076,30 +1104,11 @@ const IconGear = (p) => <LucideIcon name="Settings" size={p.size || 16} classNam
 // ---------------------------------------------------------------------------
 // Model + reasoning effort chip (one combined menu, two sections).
 // Plan-mode indicator chip (visible while plan mode is on; click to exit).
+// Goal is not a resident composer button — it is set from the "/" menu.
 function PlanChip() {
   const planMode = useStore((s) => s.planMode);
   const setPlanMode = useStore((s) => s.setPlanMode);
-  const setUi = useStore((s) => s.setUi);
-  const activeThreadId = useStore((s) => s.activeThreadId);
-  const goal = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId]?.goal : null));
-  const clearGoal = async () => {
-    try { await api.rpc("thread/goal/clear", { threadId: activeThreadId }); } catch {}
-    useStore.getState()._mutateConv(activeThreadId, (c) => ({ ...c, goal: null }));
-  };
-  if (!planMode) {
-    return (
-      <button
-        type="button"
-        aria-label={goal?.objective ? "Clear goal" : "Set a goal"}
-        className="composer-goal-button group flex h-7 items-center gap-1 rounded-full border border-transparent px-2 py-0 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary)"
-        onClick={goal?.objective ? clearGoal : () => setUi({ goalDialogOpen: true })}
-      >
-        <IconCmdGoal size={16} className={goal?.objective ? "shrink-0 group-hover:hidden" : "shrink-0"} />
-        {goal?.objective && <IconGoalClear size={16} className="hidden shrink-0 group-hover:block" />}
-        <span className="max-w-28 truncate">Goal</span>
-      </button>
-    );
-  }
+  if (!planMode) return null;
   return (
     <button
       title="Plan mode is on — click to turn off"

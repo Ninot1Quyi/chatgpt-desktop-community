@@ -422,7 +422,7 @@ function createMainWindow(query) {
   const win = new BrowserWindow({
     width: 1280,
     height: 820,
-    minWidth: 480,
+    minWidth: 720,
     minHeight: 600,
     // Windows-only branch: hidden native title bar; the renderer draws the
     // caption buttons (WinWindowControls) and menu bar (WinMenuBar). No

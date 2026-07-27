@@ -306,17 +306,6 @@ body,
 .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 
-.composer-goal-button {
-  transition: none;
-}
-.composer-goal-button:hover {
-  background: color-mix(in srgb, var(--fg) 5.5%, transparent);
-}
-.composer-goal-button:active {
-  background: color-mix(in srgb, var(--fg) 15%, transparent);
-  transform: none;
-}
-
 .text-fade-truncate {
   overflow: hidden;
   white-space: nowrap;

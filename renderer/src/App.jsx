@@ -146,7 +146,7 @@ export default function App() {
             )}
           </div>
           <div className="flex min-h-0 flex-1">
-            <div className={cx("flex min-w-0 flex-1 flex-col", ui.rightOpen && ui.rightExpanded && "hidden")}>
+            <div className={cx("flex min-w-[360px] flex-1 flex-col", ui.rightOpen && ui.rightExpanded && "hidden")}>
               {ui.navView === "chats" ? <Conversation /> : <NavViews />}
               {ui.bottomOpen && (
                 <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
