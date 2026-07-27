@@ -1,8 +1,8 @@
 // Right side panel: a browser-like tab container, replicating the reference
-// app. The tab strip lives in the global header (RightPanelHeader, aligned
-// above the panel); the panel body hosts tab contents, or the empty state
-// (tab-type menu + suggested files) when no tabs are open. Closing the last
-// tab hides the panel; the panel can expand to fill the whole window.
+// app. The tab strip (RightPanelHeader) tops the panel itself; the panel body
+// hosts tab contents, or the empty state (tab-type menu + suggested files)
+// when no tabs are open. Closing the last tab hides the panel; the panel can
+// expand to fill the whole window.
 import React, { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { useStore } from "../store.js";

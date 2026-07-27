@@ -106,8 +106,10 @@ export default function App() {
   return (
     <div className="app-shell-root win-shell relative h-full w-full overflow-hidden">
       <>
-      {/* full-height regions; the 46px header floats transparently on top,
-          so vertical separators run from y=0 exactly like the reference app */}
+      {/* full-height regions; the 46px title bar floats transparently on top
+          (sidebar toggle, back/forward, menus, caption buttons). The white
+          content panel below carries its own header row with the view title
+          and action buttons, like the official Windows client. */}
       <div className="flex h-full w-full">
         {ui.sidebarOpen && (
           <>
@@ -124,32 +126,61 @@ export default function App() {
             />
           </>
         )}
-        <div className={cx(
-          "mt-[46px] ml-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)",
-          ui.rightOpen && ui.rightExpanded && "hidden"
-        )}>
-          {ui.navView === "chats" ? <Conversation /> : <NavViews />}
-          {ui.bottomOpen && (
-            <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
-              <BottomPanel />
-            </div>
-          )}
-        </div>
-        {ui.rightOpen && (
-          <>
-            {!ui.rightExpanded && (
-              <DragHandle
-                onDrag={(dx) => setUi({ rightWidth: clamp(ui.rightWidth - dx, 320, Math.max(340, window.innerWidth - 420)) })}
-              />
+        <div className="mt-[46px] ml-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)">
+          {/* panel header row: view title + actions (see GlobalHeader for the title bar) */}
+          <div className="flex h-[46px] shrink-0 items-center gap-1 pl-3 pr-2">
+            {ui.navView === "chats" ? (
+              <>
+                <div className={cx("min-w-0", ui.rightOpen && ui.rightExpanded ? "w-0" : "flex-1")}>
+                  {!(ui.rightOpen && ui.rightExpanded) && <ConversationHeaderContent />}
+                </div>
+                {!ui.rightExpanded && <HeaderContextButtons />}
+                {!ui.rightOpen && <HeaderPanelButtons />}
+              </>
+            ) : (
+              <>
+                {ui.navView === "plugins" && <PluginsHeaderTabs />}
+                <div className="flex-1" />
+                <NavHeaderActions view={ui.navView} />
+              </>
             )}
-            <div
-              className={cx("slide-in-right shrink-0 border-l border-(--border-light)", ui.rightExpanded && "min-w-0 flex-1")}
-              style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
-            >
-              <RightPanel />
+          </div>
+          <div className="flex min-h-0 flex-1">
+            <div className={cx("flex min-w-0 flex-1 flex-col", ui.rightOpen && ui.rightExpanded && "hidden")}>
+              {ui.navView === "chats" ? <Conversation /> : <NavViews />}
+              {ui.bottomOpen && (
+                <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
+                  <BottomPanel />
+                </div>
+              )}
             </div>
-          </>
-        )}
+            {ui.rightOpen && (
+              <>
+                {!ui.rightExpanded && (
+                  <DragHandle
+                    onDrag={(dx) => setUi({ rightWidth: clamp(ui.rightWidth - dx, 320, Math.max(340, window.innerWidth - 420)) })}
+                  />
+                )}
+                <div
+                  className={cx("slide-in-right flex shrink-0 flex-col border-l border-(--border-light)", ui.rightExpanded && "min-w-0 flex-1")}
+                  style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
+                >
+                  {/* the panel's tab strip tops the panel itself */}
+                  <div className="flex h-[46px] shrink-0 items-center border-b border-(--border-light) pl-2">
+                    <div className="h-full min-w-0 flex-1">
+                      <RightPanelHeader />
+                    </div>
+                    <HeaderPanelButtons />
+                    <div className="w-2 shrink-0" />
+                  </div>
+                  <div className="min-h-0 flex-1">
+                    <RightPanel />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
       <GlobalHeader />
       {/* collapsed sidebar: hover the left edge to slide it in (reference
@@ -186,9 +217,9 @@ export default function App() {
 }
 
 // ---------------------------------------------------------------------------
-// Global 46px header spanning the full window: traffic-light inset, sidebar
-// toggle + back/forward at left, view header content, then the side panel's
-// tab strip inside the right region (aligned above the panel).
+// Title bar spanning the full window: sidebar toggle + back/forward, the
+// File/Edit/View/Help menus, then the caption buttons. Everything else lives
+// in the content panel's own header row (see the panel layout above).
 // ---------------------------------------------------------------------------
 function GlobalHeader() {
   const ui = useStore((s) => s.ui);
@@ -218,7 +249,6 @@ function GlobalHeader() {
         disabled={!navFwd.length}
         onClick={goForward}
       />
-      {/* Windows only: File/Edit/View/Help share this row (official layout) */}
       <WinMenuBar />
       {/* collapsed sidebar exposes a quick new-chat button (reference header) */}
       {!ui.sidebarOpen && (
@@ -232,49 +262,7 @@ function GlobalHeader() {
           }}
         />
       )}
-      {/* the title area starts at the sidebar's right edge (reference layout) */}
-      {ui.sidebarOpen && <div className="shrink-0" style={{ width: Math.max(0, ui.sidebarWidth - 180) }} />}
-      {ui.navView === "chats" ? (
-        <>
-          <div className={cx("min-w-0", ui.rightOpen && ui.rightExpanded ? "w-0" : "flex-1")}>
-            {!(ui.rightOpen && ui.rightExpanded) && <ConversationHeaderContent />}
-          </div>
-          {ui.rightOpen ? (
-            <>
-              {/* conversation-side buttons sit at the middle column's right edge,
-                  before the panel's tab strip (reference layout) */}
-              {!ui.rightExpanded && <HeaderContextButtons />}
-              <div className="w-2 shrink-0" />
-              <div
-                className={cx("flex h-full shrink-0 items-center", ui.rightExpanded && "min-w-0 flex-1")}
-                style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
-              >
-                <div className="h-full min-w-0 flex-1">
-                  <RightPanelHeader />
-                </div>
-                <HeaderPanelButtons />
-              </div>
-            </>
-          ) : (
-            <>
-              <HeaderContextButtons />
-              <HeaderPanelButtons />
-              <div className="w-2 shrink-0" />
-            </>
-          )}
-        </>
-      ) : (
-        // Secondary pages (Scheduled/Sites/Plugins/Pull requests): the header
-        // band carries only the window controls and the page's own actions —
-        // no global header icons, no title (reference layout).
-        <>
-          {ui.navView === "plugins" && <PluginsHeaderTabs />}
-          <div className="flex-1" />
-          <NavHeaderActions view={ui.navView} />
-          <div className="w-2 shrink-0" />
-        </>
-      )}
-      {/* Windows caption buttons (a transparent window draws no native ones) */}
+      <div className="flex-1" />
       <WinWindowControls />
     </div>
   );

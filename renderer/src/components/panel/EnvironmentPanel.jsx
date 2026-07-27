@@ -205,8 +205,11 @@ function EnvPlusMenu() {
 }
 
 // Machine row: "Local" plus any paired remote hosts (display only).
+// Stable empty fallback: a fresh [] per getSnapshot call loops useSyncExternalStore.
+const NO_REMOTES = [];
+
 function MachineRow() {
-  const remotes = useStore((s) => s.gs?.["codex-managed-remote-connections"] || []);
+  const remotes = useStore((s) => s.gs?.["codex-managed-remote-connections"] || NO_REMOTES);
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const items = [
