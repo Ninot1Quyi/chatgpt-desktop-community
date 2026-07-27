@@ -1,7 +1,15 @@
 // Read-only smoke test: spawn codex app-server, initialize, thread/list, thread/read (first thread, no turns).
 import { spawn } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import codexRuntime from "../main/codex-runtime.js";
 
-const BIN = "/Applications/ChatGPT.app/Contents/Resources/codex";
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const { binary: BIN } = codexRuntime.resolveCodexBinary({
+  resourcesPath: path.join(repoRoot, "release", "codex-runtime-stage"),
+  homePath: os.homedir(),
+});
 const proc = spawn(BIN, ["-c", "features.code_mode_host=true", "app-server", "--analytics-default-enabled"], {
   stdio: ["pipe", "pipe", "pipe"],
   env: { ...process.env, LOG_FORMAT: "json", RUST_LOG: "warn" },
@@ -10,6 +18,10 @@ const proc = spawn(BIN, ["-c", "features.code_mode_host=true", "app-server", "--
 let buf = "";
 const pending = new Map();
 let idCounter = 0;
+proc.on("error", (error) => {
+  for (const { reject } of pending.values()) reject(error);
+  pending.clear();
+});
 
 function send(method, params, id) {
   const msg = { id: id ?? `${method}:${crypto.randomUUID()}`, method, params };
@@ -42,6 +54,7 @@ const summarize = (v, depth = 0) => {
   return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, summarize(x, depth + 1)]));
 };
 
+let exitCode = 0;
 try {
   const init = await send("initialize", {
     clientInfo: { name: "smoke_test", title: "Smoke", version: "0.0.1" },
@@ -64,8 +77,9 @@ try {
   const acct = await send("account/read", { refreshToken: false }).catch((e) => ({ err: String(e) }));
   console.log("ACCOUNT:", JSON.stringify(acct).slice(0, 800));
 } catch (e) {
+  exitCode = 1;
   console.error("FAIL:", e.message);
 } finally {
   proc.kill();
-  process.exit(0);
+  process.exit(exitCode);
 }
