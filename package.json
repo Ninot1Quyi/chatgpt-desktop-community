@@ -1,7 +1,7 @@
 {
   "name": "chatgpt-desktop-community",
   "productName": "ChatGPT Desktop Community",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Community desktop client for ChatGPT and Codex, powered by the local codex app-server",
   "main": "main/index.js",
