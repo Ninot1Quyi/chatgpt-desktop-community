@@ -35,7 +35,7 @@ export default function Sidebar() {
   const [renaming, setRenaming] = useState(null); // {id, name}
   const [expand, setExpand] = useState({}); // section key -> bool override
 
-  const model = useMemo(() => buildSidebarModel(threads, gs), [threads, gs]);
+  const model = useMemo(() => buildSidebarModel(threads, gs, !archivedView), [threads, gs, archivedView]);
   const pinnedThreads = useMemo(() => {
     if (archivedView) return [];
     const ids = gs?.["pinned-thread-ids"] || [];
@@ -62,7 +62,7 @@ export default function Sidebar() {
   };
 
   const onRename = (t) => setRenaming({ id: t.id, name: t.name || t.preview || "" });
-  const empty = model.projects.length === 0 && model.chats.length === 0 && model.pinned.length === 0;
+  const empty = model.projects.length === 0 && model.chats.length === 0 && model.pinned.length === 0 && pinnedThreads.length === 0;
 
   return (
     <div className="app-sidebar flex h-full w-full flex-col">
@@ -538,27 +538,29 @@ function ThreadRow({ thread, active, archived, onRename }) {  const needsInput =
       onMouseLeave={() => { clearTimeout(hoverTimer.current); setHoverCard(false); }}
     >
       <span className="min-w-0 flex-1 truncate text-[14px] leading-5">{title}</span>
-      {pinned && <IconPinFilled size={12} className="shrink-0 text-(--fg-tertiary)" />}
+      {pinned && <IconPinFilled size={12} className="shrink-0 text-(--fg-tertiary) group-hover/thr:hidden" />}
       {needsInput && <IconCircleAlert size={13} className="shrink-0 text-(--danger)" />}
       {running && (active
         ? <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />
         : <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-(--accent)" />
       )}
-      {/* hover actions: pin + archive directly (like the reference client) */}
-      <button
-        className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover/thr:flex"
-        title={pinned ? "Unpin chat" : "Pin chat"}
-        onClick={(e) => { e.stopPropagation(); useStore.getState().togglePinnedThread(thread.id); }}
-      >
-        <IconPin size={13} />
-      </button>
-      <button
-        className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover/thr:flex"
-        title={archived ? "Unarchive chat" : "Archive chat"}
-        onClick={(e) => { e.stopPropagation(); archived ? useStore.getState().unarchiveThread(thread.id) : useStore.getState().archiveThread(thread.id); }}
-      >
-        <IconArchive size={13} />
-      </button>
+      {/* hover actions: pin + archive grouped flush right (like the reference client) */}
+      <span className="hidden shrink-0 items-center gap-0.5 group-hover/thr:flex">
+        <button
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg)"
+          title={pinned ? "Unpin chat" : "Pin chat"}
+          onClick={(e) => { e.stopPropagation(); useStore.getState().togglePinnedThread(thread.id); }}
+        >
+          {pinned ? <IconPinFilled size={13} /> : <IconPin size={13} />}
+        </button>
+        <button
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg)"
+          title={archived ? "Unarchive chat" : "Archive chat"}
+          onClick={(e) => { e.stopPropagation(); archived ? useStore.getState().unarchiveThread(thread.id) : useStore.getState().archiveThread(thread.id); }}
+        >
+          <IconArchive size={13} />
+        </button>
+      </span>
       <Menu
         open={menuOpen}
         anchor={() => rowRef.current?.getBoundingClientRect()}
@@ -783,11 +785,15 @@ function RenameDialog({ renaming, onClose }) {
 // (~/.codex/.codex-global-state.json) — the same source the official desktop
 // app uses, so both apps render the same projects/pins/order.
 // ---------------------------------------------------------------------------
-function buildSidebarModel(threads, gs) {
+function buildSidebarModel(threads, gs, excludePinned = false) {
   const local = gs?.["local-projects"] || {};
   const remote = gs?.["remote-projects"] || [];
   const order = gs?.["project-order"] || [];
   const pinnedIds = gs?.["pinned-project-ids"] || [];
+  // Pinned threads live in the Pinned section only, never duplicated under
+  // their project / the chats list. In the archived view the Pinned section
+  // is hidden, so pinned archived threads stay listed in place.
+  const pinnedThreadSet = new Set(excludePinned ? gs?.["pinned-thread-ids"] || [] : []);
   const assignments = gs?.["thread-project-assignments"] || {};
   const hostNames = {};
   for (const c of gs?.["codex-managed-remote-connections"] || []) {
@@ -841,6 +847,7 @@ function buildSidebarModel(threads, gs) {
 
   const chats = [];
   for (const t of threads) {
+    if (pinnedThreadSet.has(t.id)) continue;
     const pid = matchProject(t);
     if (pid) {
       const p = projects.get(pid);
