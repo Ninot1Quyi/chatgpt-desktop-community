@@ -583,7 +583,16 @@ export const useStore = create((set, get) => ({
           settings: { model, reasoning_effort: effort || null },
         };
       }
-      await api.rpc("turn/start", turnParams);
+      try {
+        await api.rpc("turn/start", turnParams);
+      } catch (e) {
+        // After an app-server restart, previously opened threads are gone from
+        // its memory ("thread not found"). Resume from the rollout file and
+        // retry the turn once.
+        if (!/thread not found/i.test(e?.message || "")) throw e;
+        await api.rpc("thread/resume", { threadId });
+        await api.rpc("turn/start", turnParams);
+      }
     } catch (e) {
       set({ pendingNewThread: false });
       // roll back the optimistic turn (and the temp draft conversation)
