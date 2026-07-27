@@ -880,12 +880,22 @@ function HomeContextBar() {
   }, [gs, cwd]);
 
   const projects = useMemo(
-    () => Object.values(gs?.["local-projects"] || {})
-      .map((p) => ({ name: p.name || "Project", path: (p.rootPaths || [])[0] || "" }))
+    () => Object.entries(gs?.["local-projects"] || {})
+      .map(([id, p]) => ({ id, name: p.name || "Project", path: (p.rootPaths || [])[0] || "" }))
       .filter((p) => p.path)
       .sort((a, b) => a.name.localeCompare(b.name)),
     [gs]
   );
+
+  // Remove a project from the shared local-projects state (same file the
+  // official client reads, so it disappears from both apps' sidebars).
+  const removeProject = (id) => {
+    const s = useStore.getState();
+    const local = { ...(s.gs?.["local-projects"] || {}) };
+    delete local[id];
+    useStore.setState({ gs: { ...s.gs, "local-projects": local } });
+    api.gsPatch({ "local-projects": local });
+  };
   const q = query.trim().toLowerCase();
   const filtered = q ? projects.filter((p) => p.name.toLowerCase().includes(q)) : projects;
 
@@ -919,14 +929,22 @@ function HomeContextBar() {
             </div>
             <div className="max-h-[280px] overflow-y-auto p-1">
               {filtered.map((p) => (
-                <button
-                  key={p.path}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] hover:bg-(--surface-hover)"
-                  onClick={() => { useStore.getState().setCwd(p.path); setOpen(false); }}
-                >
-                  <IconFolder size={14} className="shrink-0 text-(--fg-tertiary)" />
-                  <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                </button>
+                <div key={p.id} className="group/projrow relative">
+                  <button
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 pr-7 text-left text-[13px] hover:bg-(--surface-hover)"
+                    onClick={() => { useStore.getState().setCwd(p.path); setOpen(false); }}
+                  >
+                    <IconFolder size={14} className="shrink-0 text-(--fg-tertiary)" />
+                    <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                  </button>
+                  <button
+                    title={`Remove ${p.name}`}
+                    className="absolute top-1/2 right-1.5 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-(--fg-tertiary) opacity-0 group-hover/projrow:opacity-100 hover:bg-(--surface-active) hover:text-(--fg)"
+                    onClick={(e) => { e.stopPropagation(); removeProject(p.id); }}
+                  >
+                    <IconX size={12} />
+                  </button>
+                </div>
               ))}
               {filtered.length === 0 && (
                 <div className="px-3 py-2 text-xs text-(--fg-tertiary)">No matching projects</div>
