@@ -407,6 +407,7 @@ ipcMain.handle("window:toggle-maximize", (e) => {
   return true;
 });
 ipcMain.handle("window:is-maximized", (e) => !!BrowserWindow.fromWebContents(e.sender)?.isMaximized());
+ipcMain.handle("window:get-bounds", (e) => BrowserWindow.fromWebContents(e.sender)?.getBounds() ?? null);
 
 // ---------------------------------------------------------------------------
 // Window
@@ -423,13 +424,13 @@ function createMainWindow(query) {
     height: 820,
     minWidth: 480,
     minHeight: 600,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 16 },
-    // Windows draws its own in-window menu bar (WinMenuBar) instead.
+    // Windows-only branch: hidden native title bar; the renderer draws the
+    // caption buttons (WinWindowControls) and menu bar (WinMenuBar). No
+    // `transparent` here — it breaks -webkit-app-region dragging on Windows.
+    titleBarStyle: "hidden",
     autoHideMenuBar: true,
-    transparent: true,
-    backgroundColor: "#00000000",
-    vibrancy: "menu",
+    icon: communityIconPath,
+    backgroundColor: dark ? "#1a1c22" : "#edf1f7",
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -687,8 +688,6 @@ ipcMain.handle("save-temp-file", (_e, { dataUrl, prefix = "codex-annotate", ext 
 // App lifecycle
 // ---------------------------------------------------------------------------
 app.whenReady().then(() => {
-  if (isDev && process.platform === "darwin") app.dock.setIcon(communityIconPath);
-
   protocol.handle("codex-file", (request) => {
     try {
       const url = new URL(request.url);
@@ -728,8 +727,7 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   bridge.killProcess();
-  if (process.platform !== "darwin") app.quit();
-  else app.quit(); // rebuild keeps it simple: always quit
+  app.quit();
 });
 
 app.on("before-quit", () => bridge.killProcess());

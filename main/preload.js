@@ -66,5 +66,6 @@ contextBridge.exposeInMainWorld("codexBridge", {
   windowMinimize: () => ipcRenderer.invoke("window:minimize"),
   windowToggleMaximize: () => ipcRenderer.invoke("window:toggle-maximize"),
   windowIsMaximized: () => ipcRenderer.invoke("window:is-maximized"),
+  windowGetBounds: () => ipcRenderer.invoke("window:get-bounds"),
   onMaximizeChanged: subscribe("window:maximize-changed"),
 });

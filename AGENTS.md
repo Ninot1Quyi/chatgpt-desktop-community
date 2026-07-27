@@ -1,8 +1,10 @@
 # Repository Guidelines
 
+> This branch (`codex-communicate-windows`) is Windows-only; macOS support (bundled darwin runtimes, traffic-light insets, vibrancy, platform branches) has been removed intentionally.
+
 ## Project Structure & Module Organization
 
-`main/index.js` owns the Electron lifecycle, file protocol, and JSON-RPC bridge to `codex app-server`; `main/preload.js` exposes IPC. The Vite root is `renderer/`: state and RPC helpers live in `renderer/src/store.js` and `renderer/src/api.js`, UI in `renderer/src/components/`, panel features in `renderer/src/components/panel/`, and helpers in `renderer/src/lib/`. Theme tokens are in `renderer/src/theme.css`. `_analysis/` contains smoke tools, CDP probes, generated schemas, and reference screenshots. Do not commit `dist-renderer/`, `node_modules/`, or `_analysis/asar-out/`.
+`main/index.js` owns the Electron lifecycle, file protocol, and JSON-RPC bridge to `codex app-server`; `main/preload.js` exposes IPC. The Vite root is `renderer/`: state and RPC helpers live in `renderer/src/store.js` and `renderer/src/api.js`, UI in `renderer/src/components/`, panel features in `renderer/src/components/panel/`, and helpers in `renderer/src/lib/`. Windows chrome (in-window menu bar, caption buttons) lives in `renderer/src/components/WinMenuBar.jsx` and `renderer/src/components/WinWindowControls.jsx`. Theme tokens are in `renderer/src/theme.css`. `_analysis/` contains smoke tools, CDP probes, generated schemas, and reference screenshots. Do not commit `dist-renderer/`, `node_modules/`, or `_analysis/asar-out/`.
 
 ## Build, Test, and Development Commands
 
@@ -10,7 +12,7 @@
 - `npm run dev` — start Vite on port 5175 and launch Electron with hot reload.
 - `npm run build` — compile the renderer into `dist-renderer/`.
 - `npm start` — build, then launch the packaged-style local app.
-- `node _analysis/smoke.mjs` — exercise the bundled Codex app-server handshake and read-only thread APIs on macOS.
+- `node _analysis/smoke.mjs` — exercise the bundled Codex app-server handshake and read-only thread APIs.
 
 ## Coding Style & Naming Conventions
 

@@ -24,7 +24,6 @@ export default function App() {
   const requiresOpenaiAuth = useStore((s) => s.requiresOpenaiAuth);
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
-  const isWin = useStore((s) => s.appInfo?.platform === "win32");
 
   useEffect(() => { init(); }, []);
   // deep-link: ?thread=<id> (Open in new window) — open it once ready.
@@ -105,7 +104,7 @@ export default function App() {
   }
 
   return (
-    <div className={cx("app-shell-root relative h-full w-full overflow-hidden", isWin && "win-shell")}>
+    <div className="app-shell-root win-shell relative h-full w-full overflow-hidden">
       <>
       {/* full-height regions; the 46px header floats transparently on top,
           so vertical separators run from y=0 exactly like the reference app */}
@@ -126,10 +125,7 @@ export default function App() {
           </>
         )}
         <div className={cx(
-          "flex min-w-0 flex-1 flex-col bg-(--surface)",
-          // Windows: the content lives in its own rounded panel below the
-          // header, separated from the sidebar (official Windows client).
-          isWin ? "mt-[46px] ml-2 overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light)" : "pt-[46px]",
+          "mt-[46px] ml-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)",
           ui.rightOpen && ui.rightExpanded && "hidden"
         )}>
           {ui.navView === "chats" ? <Conversation /> : <NavViews />}
@@ -200,10 +196,8 @@ function GlobalHeader() {
   const navBack = useStore((s) => s.navBack);
   const navFwd = useStore((s) => s.navFwd);
   const { goBack, goForward } = useStore();
-  // macOS needs the traffic-light inset; Windows has no left-side controls.
-  const isWin = useStore((s) => s.appInfo?.platform === "win32");
   return (
-    <div className={cx("app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1", isWin ? "pl-3" : "pl-[88px]")}>
+    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pl-3">
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
@@ -293,9 +287,8 @@ function PeekHeader() {
   const navBack = useStore((s) => s.navBack);
   const navFwd = useStore((s) => s.navFwd);
   const { goBack, goForward } = useStore();
-  const isWin = useStore((s) => s.appInfo?.platform === "win32");
   return (
-    <div className={cx("app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5", isWin ? "pl-3" : "pl-[84px]")}>
+    <div className="app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-3">
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
