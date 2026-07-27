@@ -105,7 +105,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell-root relative h-full w-full overflow-hidden">
+    <div className={cx("app-shell-root relative h-full w-full overflow-hidden", isWin && "win-shell")}>
       <>
       {/* full-height regions; the 46px header floats transparently on top,
           so vertical separators run from y=0 exactly like the reference app */}
