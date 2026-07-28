@@ -37,3 +37,11 @@ const macControlR = { ctrlKey: true, altKey: false, shiftKey: false, metaKey: fa
 assert.equal(macKeys.matchAccel(macCommandB, "⌘B"), true);
 assert.equal(macKeys.matchAccel(macControlR, "⌘B"), false);
 assert.equal(macKeys.matchAccel(macControlR, "⌃R"), true);
+
+const appShell = fs.readFileSync("renderer/src/App.jsx", "utf8");
+assert.match(appShell, /isWin \? \(/);
+assert.match(appShell, /Windows keeps a second toolbar row below its custom title bar/);
+assert.match(appShell, /bg-\(--surface\) pt-\[46px\]/);
+
+const rightPanel = fs.readFileSync("renderer/src/components/RightPanel.jsx", "utf8");
+assert.match(rightPanel, /isWin \? "bg-\(--surface\)" : "bg-\(--surface-under\) pt-\[46px\]"/);

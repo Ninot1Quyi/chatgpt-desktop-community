@@ -341,6 +341,7 @@ function IconCompress({ size = 15 }) {
 export default function RightPanel() {
   const tabs = usePanelStore((s) => s.tabs);
   const activeId = usePanelStore((s) => s.activeId);
+  const isWin = useStore((s) => s.appInfo?.platform === "win32");
   const cwd = usePanelCwd();
   const hasGit = useHasGit(cwd);
   if (!tabs.length) {
@@ -349,7 +350,7 @@ export default function RightPanel() {
     return hasGit ? <EnvironmentPanel cwd={cwd} hasGit={hasGit} /> : <PanelEmptyState />;
   }
   return (
-    <div className="flex h-full w-full flex-col bg-(--surface)">
+    <div className={cx("flex h-full w-full flex-col", isWin ? "bg-(--surface)" : "bg-(--surface-under) pt-[46px]")}>
       <div className="min-h-0 flex-1">
         {tabs.map((t) => {
           const C = TAB_KINDS[t.kind].component;
