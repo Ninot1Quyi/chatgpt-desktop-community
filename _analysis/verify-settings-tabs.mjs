@@ -1,5 +1,5 @@
 // Verify every Settings tab renders non-empty, placeholder-free content.
-// Opens Settings via a synthetic ⌘, keydown, then clicks each nav item.
+// Opens Settings via a synthetic Ctrl+, keydown, then clicks each nav item.
 const targets = await fetch("http://localhost:9222/json").then((r) => r.json());
 const page = targets.find((t) => t.type === "page" && t.url.endsWith("index.html")) || targets.find((t) => t.type === "page");
 const ws = new WebSocket(page.webSocketDebuggerUrl);
@@ -24,14 +24,14 @@ const evaluate = async (expression) => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Open settings (bubble-phase keydown like a real ⌘, press).
-await evaluate(`window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", metaKey: true, bubbles: true })), "sent"`);
+// Open settings (bubble-phase keydown like a real Ctrl+, press).
+await evaluate(`window.dispatchEvent(new KeyboardEvent("keydown", { key: ",", ctrlKey: true, bubbles: true })), "sent"`);
 await sleep(700);
 
 const open = await evaluate(`!!document.querySelector("h1")`);
 if (!open) { console.log("FAIL: settings did not open"); process.exit(1); }
 
-const tabs = ["General","Profile","Appearance","Voice","Configuration","Personalization","Pets","Keyboard shortcuts","Usage & billing","Account","Appshots","Plugins","Browser","Computer use","Hooks","Connections","Git","Environments","Worktrees","Archived chats"];
+const tabs = ["General","Profile","Appearance","Voice","Configuration","Personalization","Pets","Keyboard shortcuts","Usage & billing","Appshots","Plugins","Browser","Computer use","Hooks","Connections","Git","Environments","Worktrees","Archived chats"];
 let failures = 0;
 for (const tab of tabs) {
   const res = await evaluate(`(() => {

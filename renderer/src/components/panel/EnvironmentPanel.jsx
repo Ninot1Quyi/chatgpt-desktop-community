@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../../store.js";
 import * as api from "../../api.js";
-import { basename } from "../../lib/time.js";
+import { basename, isAbsolutePath } from "../../lib/time.js";
 import { Menu } from "../ui.jsx";
 import { IconPlus, IconBranch, IconGlobe } from "../icons.jsx";
 import { LucideIcon } from "../lucide/index.jsx";
@@ -345,7 +345,7 @@ function useSources(conv) {
     const seen = new Set();
     const pushFile = (p) => {
       if (!p || typeof p !== "string" || seen.has(p)) return;
-      if (!p.startsWith("/")) return;
+      if (!isAbsolutePath(p)) return;
       seen.add(p);
       out.push({ name: basename(p), full: p, url: false });
     };

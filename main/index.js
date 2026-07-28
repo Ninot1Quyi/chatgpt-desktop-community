@@ -1,11 +1,12 @@
 // Electron main process: window management + codex app-server stdio bridge.
 // Clean-room reimplementation. The app-server (codex CLI) owns all auth —
-// it reads ~/.codex/auth.json itself; we never touch credentials here.
+// it reads %USERPROFILE%\.codex\auth.json itself; we never touch credentials here.
 const { app, BrowserWindow, ipcMain, protocol, net, dialog, shell, nativeTheme } = require("electron");
 const { spawn, execFile } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs");
 const crypto = require("node:crypto");
+const os = require("node:os");
 const { pathToFileURL } = require("node:url");
 const { resolveCodexBinary } = require("./codex-runtime");
 const { readRolloutActivity } = require("./rollout-activity");
@@ -33,8 +34,7 @@ for (const stream of [process.stdout, process.stderr]) {
   });
 }
 
-// Keep our Electron storage separate from the official app (same productName
-// would otherwise share ~/Library/Application Support/Codex).
+// Keep our Electron storage separate from the official app under AppData.
 app.setName("codex-desktop-rebuilt");
 app.setPath("userData", path.join(app.getPath("appData"), "codex-desktop-rebuilt"));
 
@@ -268,7 +268,7 @@ class AppServerBridge {
 const bridge = new AppServerBridge();
 
 // ---------------------------------------------------------------------------
-// Hotkey popout window (quick new thread / quick view), ⌘⇧Space to toggle.
+// Hotkey popout window (quick new thread / quick view), Ctrl+Shift+Space.
 // ---------------------------------------------------------------------------
 let hotkeyWindow = null;
 
@@ -290,7 +290,7 @@ function createHotkeyWindow() {
       sandbox: true,
     },
   });
-  hotkeyWindow.setAlwaysOnTop(true, "floating");
+  hotkeyWindow.setAlwaysOnTop(true);
   bridge.addListener(hotkeyWindow.webContents);
   const url = isDev
     ? `${process.env.ELECTRON_RENDERER_URL}?window=hotkey`
@@ -324,7 +324,7 @@ ipcMain.handle("hotkey:toggle", () => { toggleHotkeyWindow(); return true; });
 ipcMain.handle("hotkey:toggle-pin", () => {
   if (!hotkeyWindow) return false;
   const on = !hotkeyWindow.isAlwaysOnTop();
-  hotkeyWindow.setAlwaysOnTop(on, "floating");
+  hotkeyWindow.setAlwaysOnTop(on);
   return on;
 });
 ipcMain.handle("app:show-main", () => {
@@ -334,7 +334,7 @@ ipcMain.handle("app:show-main", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Quick chat window (⌘⌥N): a compact ChatGPT-mode conversation window.
+// Quick chat window (Ctrl+Alt+N): a compact conversation window.
 // ---------------------------------------------------------------------------
 let quickChatWindow = null;
 
@@ -344,10 +344,10 @@ function createQuickChatWindow() {
     height: 700,
     minWidth: 400,
     minHeight: 400,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 16 },
+    frame: false,
+    autoHideMenuBar: true,
+    icon: communityIconPath,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#181818" : "#ffffff",
-    vibrancy: "menu",
     show: false,
     title: "ChatGPT",
     webPreferences: {
@@ -545,7 +545,8 @@ ipcMain.handle("prefs:write", (_e, { key, value }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Codex global state (~/.codex/.codex-global-state.json). The official desktop// app keeps its sidebar projects / pins / thread assignments here; we share the
+// Codex global state (%USERPROFILE%\.codex\.codex-global-state.json). The
+// official desktop app keeps its sidebar projects, pins, and assignments here.
 // same file so both apps render identical sidebars and stay in sync.
 // ---------------------------------------------------------------------------
 const GS_PATH = path.join(app.getPath("home"), ".codex", ".codex-global-state.json");
@@ -633,8 +634,10 @@ ipcMain.handle("shell:open-external", (_e, url) => {
 });
 ipcMain.handle("app:info", () => ({
   version: app.getVersion(),
-  platform: process.platform,
   home: app.getPath("home"),
+  temp: app.getPath("temp"),
+  username: process.env.USERNAME || os.userInfo().username,
+  hostname: os.hostname().split(".")[0],
   theme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
 }));
 ipcMain.handle("rollout:activity", (_e, { file }) => {
@@ -657,7 +660,7 @@ ipcMain.handle("webview:capture", async (_e, { webContentsId }) => {
 // ---------------------------------------------------------------------------
 // ChatGPT profile (display name + avatar). Fetched through Electron's net
 // stack (Chromium TLS fingerprint — passes Cloudflare where plain node fails).
-// The access token is read from ~/.codex/auth.json and never leaves main.
+// The access token is read from %USERPROFILE%\.codex\auth.json and never leaves main.
 // ---------------------------------------------------------------------------
 let profileCache = null;
 let profileCacheAt = 0;
@@ -787,13 +790,8 @@ app.whenReady().then(() => {
   createHotkeyWindow();
   createQuickChatWindow();
   const { globalShortcut } = require("electron");
-  globalShortcut.register("CommandOrControl+Shift+Space", toggleHotkeyWindow);
-  globalShortcut.register("CommandOrControl+Alt+N", toggleQuickChatWindow);
-
-  app.on("activate", () => {
-    if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
-    else mainWindow.show();
-  });
+  globalShortcut.register("Control+Shift+Space", toggleHotkeyWindow);
+  globalShortcut.register("Control+Alt+N", toggleQuickChatWindow);
 });
 
 app.on("window-all-closed", () => {
@@ -801,4 +799,7 @@ app.on("window-all-closed", () => {
   app.quit();
 });
 
-app.on("before-quit", () => bridge.killProcess());
+app.on("before-quit", () => {
+  app.isQuitting = true;
+  bridge.killProcess();
+});

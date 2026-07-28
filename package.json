@@ -3,7 +3,13 @@
   "productName": "ChatGPT Desktop Community",
   "version": "0.1.4",
   "private": true,
-  "description": "Community desktop client for ChatGPT and Codex, powered by the local codex app-server",
+  "description": "Windows desktop client for ChatGPT and Codex, powered by the local codex app-server",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
   "main": "main/index.js",
   "scripts": {
     "dev": "concurrently -k \"vite dev --port 5175\" \"wait-on http://localhost:5175 && cross-env ELECTRON_RENDERER_URL=http://localhost:5175 electron .\"",

@@ -57,12 +57,38 @@ export function formatDuration(ms) {
 
 export function basename(p) {
   if (!p) return "";
-  const parts = p.replace(/\/+$/, "").split("/");
+  const parts = p.replace(/[\\/]+$/, "").split(/[\\/]/);
   return parts[parts.length - 1] || p;
+}
+
+const normalizedWindowsPath = (p) => String(p || "").replace(/\\/g, "/").replace(/\/+$/, "");
+
+export function isAbsolutePath(p) {
+  return /^(?:[A-Za-z]:[\\/]|\\\\)/.test(String(p || ""));
+}
+
+export function joinPath(base, child) {
+  if (!base || isAbsolutePath(child)) return child || base || "";
+  return `${String(base).replace(/[\\/]+$/, "")}\\${String(child || "").replace(/^[\\/]+/, "").replace(/\//g, "\\")}`;
+}
+
+export function isPathInside(path, root) {
+  const value = normalizedWindowsPath(path).toLowerCase();
+  const parent = normalizedWindowsPath(root).toLowerCase();
+  return !!parent && (value === parent || value.startsWith(`${parent}/`));
+}
+
+export function relativePath(path, root) {
+  if (!isPathInside(path, root)) return null;
+  const value = normalizedWindowsPath(path);
+  const parent = normalizedWindowsPath(root);
+  return value.length === parent.length ? "" : value.slice(parent.length + 1);
 }
 
 export function shortenPath(p, home) {
   if (!p) return "";
-  if (home && p.startsWith(home)) return "~" + p.slice(home.length);
+  if (home && p.toLowerCase().startsWith(home.toLowerCase())) {
+    return "%USERPROFILE%" + p.slice(home.length);
+  }
   return p;
 }

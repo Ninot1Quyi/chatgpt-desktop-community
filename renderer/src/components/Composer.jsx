@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useStore, PERMISSIONS, normalizePermission } from "../store.js";
 import * as api from "../api.js";
 import { cx } from "../lib/cx.js";
-import { basename } from "../lib/time.js";
+import { basename, isAbsolutePath, joinPath } from "../lib/time.js";
 import { Menu } from "./ui.jsx";
 import { usePanelStore } from "./RightPanel.jsx";
 import { PluginIcon, skillName, skillDesc } from "./NavViews.jsx";
@@ -22,6 +22,36 @@ import {
 import { panelHook } from "../lib/panelHook.js";
 
 const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"];
+
+function joinWindowsPath(base, name) {
+  return `${String(base || "").replace(/[\\/]+$/, "")}\\${String(name || "").replace(/^[\\/]+/, "")}`;
+}
+
+function decodeFsRead(result) {
+  if (!result) return "";
+  if (typeof result === "string") return result;
+  if (typeof result.dataBase64 === "string") {
+    try {
+      const bytes = Uint8Array.from(atob(result.dataBase64), (char) => char.charCodeAt(0));
+      return new TextDecoder("utf-8").decode(bytes);
+    } catch {
+      return "";
+    }
+  }
+  return String(result.content ?? result.data ?? "");
+}
+
+async function readMetadataFiles(directory, extension, parse) {
+  const result = await api.rpc("fs/readDirectory", { path: directory }).catch(() => null);
+  const entries = (result?.entries || []).filter(
+    (entry) => entry.isFile && entry.fileName.toLowerCase().endsWith(extension),
+  );
+  return Promise.all(entries.map(async (entry) => {
+    const filePath = joinWindowsPath(directory, entry.fileName);
+    const content = decodeFsRead(await api.rpc("fs/readFile", { path: filePath }).catch(() => null));
+    return parse(entry.fileName, content);
+  }));
+}
 
 // Uniform icon cell for the "/" menu. The extracted reference glyphs have
 // inconsistent viewBoxes — some clip their paths, some underfill — so each
@@ -221,8 +251,8 @@ export default function Composer({ centered = false, quick = false }) {
     return () => { live = false; };
   }, [menu?.kind === "skill" || menu?.kind === "slash" ? menu.query : null, menu?.kind, activeThreadId]);
 
-  // Custom prompts from ~/.codex/prompts/*.md — the / menu's "prompts:*"
-  // section. Name + frontmatter description, cached.
+  // Custom prompts from %USERPROFILE%\.codex\prompts\*.md. Name and
+  // frontmatter description are cached for the slash-command menu.
   const [promptResults, setPromptResults] = useState([]);
   const promptsCacheRef = useRef(null);
   useEffect(() => {
@@ -231,16 +261,16 @@ export default function Composer({ centered = false, quick = false }) {
     let live = true;
     (async () => {
       if (!promptsCacheRef.current) {
-        promptsCacheRef.current = [];
-        const r = await api.rpc("command/exec", {
-          command: ["sh", "-c", 'cd "$1/.codex/prompts" 2>/dev/null && for f in *.md; do d=$(grep -m1 -E "^description:" "$f" | sed "s/^description: *//"); printf "%s\\t%s\\n" "${f%.md}" "$d"; done', "sh", home],
-          timeoutMs: 6000,
-        }).catch(() => null);
-        const out = String(r?.stdout || "");
-        promptsCacheRef.current = out.split("\n").filter(Boolean).map((line) => {
-          const [name, ...rest] = line.split("\t");
-          return { name, desc: rest.join("\t").trim().replace(/^"|"$/g, "") };
-        });
+        const directory = joinWindowsPath(home, ".codex\\prompts");
+        promptsCacheRef.current = home
+          ? await readMetadataFiles(directory, ".md", (fileName, content) => {
+            const raw = content.match(/^description:\s*(.*)$/m)?.[1]?.trim() || "";
+            return {
+              name: fileName.replace(/\.md$/i, ""),
+              desc: raw.replace(/^(['"])(.*)\1$/, "$2"),
+            };
+          })
+          : [];
       }
       if (!live) return;
       const q = (menu.query || "").toLowerCase();
@@ -329,7 +359,10 @@ export default function Composer({ centered = false, quick = false }) {
     const before = text.slice(0, menu.start);
     const after = text.slice(caret);
     setText(before + name + " " + after);
-    setMentions((s) => [...s.filter((m) => m.name !== name), { name, path: f.path.startsWith("/") ? f.path : `${useStore.getState().cwd}/${f.path}` }]);
+    setMentions((s) => [
+      ...s.filter((m) => m.name !== name),
+      { name, path: isAbsolutePath(f.path) ? f.path : joinPath(useStore.getState().cwd, f.path) },
+    ]);
     setMenu(null);
     setTimeout(() => taRef.current?.focus(), 0);
   };
@@ -1058,17 +1091,19 @@ function AttachButton({ onPickImages, onPickFiles, onInsertText, browserTab }) {
         setPlugins(flat);
       })
       .catch(() => setPlugins([]));
-    // Local agents (~/.codex/agents/*.toml) — the reference menu's agent rows.
+    // Local agents (%USERPROFILE%\.codex\agents\*.toml).
     const home = useStore.getState().appInfo?.home || "";
-    api.rpc("command/exec", {
-      command: ["sh", "-c", 'cd "$1/.codex/agents" 2>/dev/null && for f in *.toml; do n=$(grep -m1 "^name" "$f" | sed "s/.*= *//;s/\\"//g"); d=$(grep -m1 "^description" "$f" | sed "s/.*= *//;s/\\"//g"); printf "%s\\t%s\\n" "$n" "$d"; done', "sh", home],
-      timeoutMs: 6000,
+    if (!home) {
+      setAgents([]);
+      return;
+    }
+    const directory = joinWindowsPath(home, ".codex\\agents");
+    readMetadataFiles(directory, ".toml", (_fileName, content) => {
+      const value = (key) => content.match(new RegExp(`^${key}\\s*=\\s*"([^"]*)"`, "m"))?.[1] || "";
+      return { name: value("name"), desc: value("description") };
     })
-      .then((r) => {
-        const rows = String(r?.stdout || "").split("\n").filter(Boolean).map((line) => {
-          const [name, ...rest] = line.split("\t");
-          return { name, desc: rest.join("\t").trim() };
-        }).filter((a) => a.name);
+      .then((rows) => {
+        rows = rows.filter((agent) => agent.name);
         rows.sort((a, b) => a.name.localeCompare(b.name));
         setAgents(rows.slice(0, 5));
       })

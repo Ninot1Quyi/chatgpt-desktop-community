@@ -8,7 +8,7 @@ import { create } from "zustand";
 import { useStore } from "../store.js";
 import * as api from "../api.js";
 import { cx } from "../lib/cx.js";
-import { basename } from "../lib/time.js";
+import { basename, joinPath } from "../lib/time.js";
 import { Menu, IconButton } from "./ui.jsx";
 import {
   IconPlus, IconBranch, IconFolder, IconTerminal, IconChat, IconGlobe,
@@ -162,22 +162,12 @@ function FileTabGlyph({ path }) {
   return <FileIcon name={path} size={13} />;
 }
 
-// Terminal tabs take the shell-style title (user@host), like the reference.
-let shellTitleCache = null;
+// Terminal tabs use the local Windows account and computer name.
 function useShellTitle() {
-  const [t, setT] = useState(shellTitleCache);
-  useEffect(() => {
-    if (shellTitleCache) return undefined;
-    let live = true;
-    api.rpc("command/exec", { command: ["sh", "-c", "printf '%s@%s' \"$(whoami)\" \"$(hostname -s)\""], timeoutMs: 5000 })
-      .then((r) => {
-        const out = String(r?.stdout ?? r?.output ?? "").trim();
-        if (live && out) { shellTitleCache = out; setT(out); }
-      })
-      .catch(() => {});
-    return () => { live = false; };
-  }, []);
-  return t;
+  return useStore((state) => {
+    const { username, hostname } = state.appInfo || {};
+    return username && hostname ? `${username}@${hostname}` : null;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -413,7 +403,7 @@ function useSuggestedFiles() {
         if (!live) return;
         const list = (r?.entries || [])
           .filter((e) => !e.isDirectory && !e.fileName.startsWith("."))
-          .map((e) => ({ name: e.fileName, full: `${cwd.replace(/\/+$/, "")}/${e.fileName}` }))
+          .map((e) => ({ name: e.fileName, full: joinPath(cwd, e.fileName) }))
           .slice(0, 12);
         setFiles(list);
       })

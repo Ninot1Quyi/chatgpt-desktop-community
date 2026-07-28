@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as api from "../../api.js";
 import { useStore } from "../../store.js";
+import { basename } from "../../lib/time.js";
 import { Card } from "./shared.jsx";
 import { LucideIcon, IconFolder, IconSearch, IconPlus } from "../icons.jsx";
 
@@ -44,7 +45,7 @@ export default function EnvironmentsSection() {
     () =>
       local.filter((p) => {
         if (!q) return true;
-        const name = (p.name || p.rootPaths?.[0]?.split("/").pop() || "").toLowerCase();
+        const name = (p.name || basename(p.rootPaths?.[0]) || "").toLowerCase();
         const owner = (owners[p.rootPaths?.[0]] || "").toLowerCase();
         return name.includes(q) || owner.includes(q);
       }),
@@ -86,7 +87,7 @@ export default function EnvironmentsSection() {
           return (
             <div key={p.id || root || i} className="flex items-center gap-3 px-4 py-2.5">
               <IconFolder size={15} className="shrink-0 text-(--fg-tertiary)" />
-              <div className="min-w-0 flex-1 truncate text-[13px]">{p.name || root?.split("/").pop() || "Project"}</div>
+              <div className="min-w-0 flex-1 truncate text-[13px]">{p.name || basename(root) || "Project"}</div>
               {owners[root] && <div className="shrink-0 truncate text-[12px] text-(--fg-tertiary)">{owners[root]}</div>}
             </div>
           );

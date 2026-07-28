@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store.js";
 import { cx } from "../lib/cx.js";
+import { isPathInside } from "../lib/time.js";
 import { openExternal, toggleQuickChat, showItemInFolder, rpc, logout } from "../api.js";
 import { Menu, Dialog, Spinner, IconButton } from "./ui.jsx";
 import {
@@ -250,7 +251,7 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
       let best = null;
       for (const p of allLocalProjects) {
         for (const rp of p.rootPaths) {
-          if (rp && (storeCwd === rp || storeCwd.startsWith(rp + "/")) && (!best || rp.length > best.len)) {
+          if (rp && isPathInside(storeCwd, rp) && (!best || rp.length > best.len)) {
             best = { id: p.id, len: rp.length };
           }
         }
@@ -343,7 +344,7 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
               onSelect: () => useStore.getState().togglePinnedProjectId(project.id),
             },
             ...(project.kind === "local"
-              ? [{ id: "finder", label: "Show in Finder", icon: <IconFolder size={14} />, onSelect: () => showItemInFolder(project.path) }]
+              ? [{ id: "explorer", label: "Show in File Explorer", icon: <IconFolder size={14} />, onSelect: () => showItemInFolder(project.path) }]
               : []),
           ]}
         />
@@ -358,7 +359,7 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-(--fg-secondary)">
               <IconFolder size={12} className="shrink-0 text-(--fg-tertiary)" />
-              <span className="min-w-0 truncate">{tildePath(project.path)}</span>
+              <span className="min-w-0 truncate">{displayPath(project.path)}</span>
             </div>
           </div>
         )}
@@ -585,7 +586,7 @@ function ThreadHoverCard({ thread, title, anchor }) {
     let best = null;
     for (const p of Object.values(local)) {
       for (const rp of p.rootPaths || []) {
-        if (rp && (cwd === rp || cwd.startsWith(rp + "/")) && (!best || rp.length > best.len)) best = { name: p.name, len: rp.length };
+        if (rp && isPathInside(cwd, rp) && (!best || rp.length > best.len)) best = { name: p.name, len: rp.length };
       }
     }
     return best?.name || null;
@@ -743,7 +744,7 @@ function Footer() {
           { id: "usage", label: "Usage remaining", icon: <IconUsage size={14} />, onSelect: () => useStore.getState().setUi({ settingsOpen: true, settingsSection: "usage" }) },
           { id: "pet", label: "Show pet", icon: <IconPet size={14} />, disabled: true },
           { sep: true },
-          { id: "settings", label: "Settings", hint: "⌘,", icon: <IconGear size={14} />, onSelect: () => useStore.getState().setUi({ settingsOpen: true }) },
+          { id: "settings", label: "Settings", hint: "Ctrl+,", icon: <IconGear size={14} />, onSelect: () => useStore.getState().setUi({ settingsOpen: true }) },
           { id: "logout", label: "Log out", icon: <IconLogout size={14} />, onSelect: () => logout() },
         ]}
       />
@@ -782,7 +783,7 @@ function RenameDialog({ renaming, onClose }) {
 
 // ---------------------------------------------------------------------------
 // Build the sidebar model from threads + the shared codex global state
-// (~/.codex/.codex-global-state.json) — the same source the official desktop
+// (%USERPROFILE%\.codex\.codex-global-state.json) — the same source the official desktop
 // app uses, so both apps render the same projects/pins/order.
 // ---------------------------------------------------------------------------
 function buildSidebarModel(threads, gs, excludePinned = false) {
@@ -837,7 +838,7 @@ function buildSidebarModel(threads, gs, excludePinned = false) {
     for (const p of localList) {
       for (const rp of p.rootPaths) {
         if (!rp) continue;
-        if (cwd === rp || cwd.startsWith(rp + "/")) {
+        if (isPathInside(cwd, rp)) {
           if (!best || rp.length > best.len) best = { id: p.id, len: rp.length };
         }
       }
@@ -876,7 +877,9 @@ function firstLine(s) {
   return (s || "").split("\n")[0].trim();
 }
 
-// "/Users/example/x/y" → "~/x/y" (project hover card path display).
-function tildePath(p) {
-  return p ? p.replace(/^\/Users\/[^/]+/, "~") : p;
+function displayPath(p) {
+  const home = useStore.getState().appInfo?.home || "";
+  return home && p?.toLowerCase().startsWith(home.toLowerCase())
+    ? `%USERPROFILE%${p.slice(home.length)}`
+    : p;
 }

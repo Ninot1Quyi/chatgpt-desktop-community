@@ -1,6 +1,9 @@
 // Screenshot the original app's main window via CDP (Page.captureScreenshot).
 // Usage: node cdp-shot.mjs <outfile.png> [evalExprBeforeShot] [port] [clipJson]
-const out = process.argv[2] || "/tmp/orig-shot.png";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+const out = process.argv[2] || path.join(tmpdir(), "orig-shot.png");
 const preEval = process.argv[3];
 const port = Number(process.argv[4] || 9223);
 const clip = process.argv[5] ? JSON.parse(process.argv[5]) : undefined;

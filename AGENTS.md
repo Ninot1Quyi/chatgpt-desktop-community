@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-> This branch (`codex-communicate-windows`) is Windows-only; macOS support (bundled darwin runtimes, traffic-light insets, vibrancy, platform branches) has been removed intentionally.
+> This branch (`codex-communicate-windows`) targets Windows x64 only. Keep runtimes, window chrome, shortcuts, shell commands, packaging, and release automation Windows-specific.
 
 ## Project Structure & Module Organization
 
@@ -30,4 +30,4 @@ History favors concise, outcome-focused subjects such as `Sidebar: share officia
 
 ## Security & Configuration
 
-Never commit credentials or copy `~/.codex/auth.json`; authentication belongs to `codex app-server`. Use `CODEX_CLI_PATH` only as a local override, and keep filesystem access behind the existing `codex-file://` allowlist and preload IPC boundary.
+Never commit credentials or copy `%USERPROFILE%\.codex\auth.json`; authentication belongs to `codex app-server`. Use `CODEX_CLI_PATH` only as a local override, and keep filesystem access behind the existing `codex-file://` allowlist and preload IPC boundary.

@@ -43,7 +43,7 @@ function SimpleView({ title, desc }) {
 }
 
 // ---------------------------------------------------------------------------
-// Sites: generated .html artifacts under ~/.codex/visualizations.
+// Sites: generated .html artifacts under %USERPROFILE%\.codex\visualizations.
 // ---------------------------------------------------------------------------
 function SitesView() {
   const codexHome = useStore((s) => s.codexHome);
@@ -580,7 +580,7 @@ function PrDetail({ pr }) {
 }
 
 // ---------------------------------------------------------------------------
-// Scheduled: automations from ~/.codex/automations/*/automation.toml.
+// Scheduled: automations from %USERPROFILE%\.codex\automations.
 // ---------------------------------------------------------------------------
 const SCHEDULED_SUGGESTIONS = [
   {
@@ -1473,7 +1473,7 @@ function SkillsView({ query }) {
     const roots = new Map();
     for (const p of Object.values(local)) {
       for (const rp of p.rootPaths || []) {
-        if (!roots.has(rp)) roots.set(rp, rp.split("/").filter(Boolean).pop() || rp);
+        if (!roots.has(rp)) roots.set(rp, basename(rp) || rp);
       }
     }
     return [...roots.entries()].map(([root, name]) => ({ root, name }));
@@ -1677,10 +1677,9 @@ function SkillDetailDialog({ skill, onClose, onChanged }) {
   };
 
   const uninstall = () => {
-    const dir = skill.path.replace(/\/[^/]*$/, "");
-    // Move to Trash (recoverable) like a real uninstall, then refresh.
+    const dir = skill.path.replace(/[\\/][^\\/]*$/, "");
     api
-      .rpc("command/exec", { command: ["sh", "-c", `mv "$1" ~/.Trash/ 2>/dev/null || rm -rf "$1"`, "sh", dir], timeoutMs: 8000 })
+      .rpc("fs/remove", { path: dir, recursive: true })
       .catch(() => {})
       .finally(() => {
         onChanged?.();

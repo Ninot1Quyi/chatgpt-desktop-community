@@ -241,7 +241,7 @@ function GlobalHeader() {
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
-        title="Toggle sidebar (⌘B)"
+        title="Toggle sidebar (Ctrl+B)"
         onClick={() => setUi({ sidebarOpen: !ui.sidebarOpen })}
       />
       <IconButton
@@ -289,7 +289,7 @@ function PeekHeader() {
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
-        title="Show sidebar (⌘B)"
+        title="Show sidebar (Ctrl+B)"
         onClick={() => setUi({ sidebarOpen: true, sidebarPeek: false })}
       />
       <IconButton
@@ -452,7 +452,7 @@ function FloatingSidebarToggle() {
     <button
       className="app-no-drag fixed top-[9px] left-[84px] z-30 flex h-7 items-center gap-1 rounded-lg border border-(--border-light) bg-(--surface-raised) px-2 text-xs text-(--fg-secondary) shadow-sm hover:bg-(--surface-hover)"
       onClick={() => setUi({ sidebarOpen: true })}
-      title="Show sidebar (⌘B)"
+      title="Show sidebar (Ctrl+B)"
     >
       ☰ Chats
     </button>
