@@ -1,0 +1,86 @@
+{
+  "name": "chatgpt-desktop-community",
+  "productName": "ChatGPT Desktop Community",
+  "version": "0.1.4",
+  "private": true,
+  "description": "Windows desktop client for ChatGPT and Codex, powered by the local codex app-server",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "main/index.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite dev --port 5175\" \"wait-on http://localhost:5175 && cross-env ELECTRON_RENDERER_URL=http://localhost:5175 electron .\"",
+    "build": "vite build",
+    "test:runtime": "node --test main/codex-runtime.test.js",
+    "package:win": "npm run build && node scripts/prepare-codex-runtime.mjs win32-x64 && electron-packager . \"ChatGPT Desktop Community\" --platform=win32 --arch=x64 --out=release --overwrite --prune=true --asar --icon=assets/community-icon --extra-resource=release/codex-runtime-stage/codex-runtime --ignore=\"^/(release|\\\\.git|\\\\.omx|_analysis)($|/)\"",
+    "dist:win": "npm run build && node scripts/prepare-codex-runtime.mjs win32-x64 && electron-builder --win --x64",
+    "start": "npm run build && electron .",
+    "electron": "electron ."
+  },
+  "build": {
+    "appId": "com.ninot1quyi.chatgpt-desktop-community",
+    "productName": "ChatGPT Desktop Community",
+    "asar": true,
+    "electronDownload": {
+      "version": "37.10.3"
+    },
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main/**",
+      "dist-renderer/**",
+      "assets/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "release/codex-runtime-stage/codex-runtime",
+        "to": "codex-runtime"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/community-icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "ChatGPT Desktop Community"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Ninot1Quyi",
+        "repo": "chatgpt-desktop-community",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.0.4",
+    "@tailwindcss/vite": "^4.1.11",
+    "@vitejs/plugin-react": "^4.6.0",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.15.3",
+    "tailwindcss": "^4.1.11",
+    "vite": "^7.0.0",
+    "wait-on": "^8.0.3"
+  },
+  "dependencies": {
+    "@xterm/xterm": "^6.0.0",
+    "electron-updater": "^6.8.9",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zustand": "^5.0.6"
+  }
+}
