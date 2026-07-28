@@ -39,8 +39,29 @@ const MODS = IS_MAC
   ? [["⌘", "metaKey"], ["⌃", "ctrlKey"], ["⌥", "altKey"], ["⇧", "shiftKey"]]
   : [["⌘", "ctrlKey"], ["⌥", "altKey"], ["⇧", "shiftKey"]];
 
-// Windows has one Ctrl modifier; macOS keeps Command and Control distinct.
-const normalizeAccel = (accel) => (!IS_MAC && accel ? accel.replaceAll("⌃", "⌘") : accel);
+// Accept both the original symbolic format and persisted Windows "Ctrl+..."
+// bindings from the Windows-only branch.
+const normalizeAccel = (accel) => {
+  let value = String(accel || "");
+  if (value.includes("+")) {
+    const parts = value.split("+").filter(Boolean);
+    const key = parts.pop() || "";
+    const symbols = parts.map((part) => ({
+      Ctrl: "⌘",
+      Control: "⌘",
+      Alt: "⌥",
+      Option: "⌥",
+      Shift: "⇧",
+      Command: "⌘",
+      Cmd: "⌘",
+    })[part] || part).join("");
+    value = `${symbols}${key}`;
+  }
+  if (!IS_MAC) value = value.replaceAll("⌃", "⌘");
+  return value
+    .replace(/Arrow(Up|Down|Left|Right)$/, "$1")
+    .replace(/([↑↓←→])$/, (arrow) => ({ "↑": "Up", "↓": "Down", "←": "Left", "→": "Right" })[arrow]);
+};
 
 // Event → accelerator string ("⌘⇧K").
 export function eventToAccel(e) {
@@ -51,7 +72,7 @@ export function eventToAccel(e) {
   if (k === " ") k = "Space";
   else if (k === "Enter") k = "↵";
   else if (k === "Escape") k = "Esc";
-  else if (k.startsWith("Arrow")) k = { ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→" }[k];
+  else if (k.startsWith("Arrow")) k = k.slice("Arrow".length);
   else if (k.length === 1) k = k.toUpperCase();
   out += k;
   return out;
@@ -68,6 +89,7 @@ export function matchAccel(e, accel) {
   let k = e.key;
   if (k === " ") k = "Space";
   else if (k === "Enter") k = "↵";
+  else if (k.startsWith("Arrow")) k = k.slice("Arrow".length);
   else if (k.length === 1) k = k.toUpperCase();
   return k === keyPart || e.key === keyPart;
 }

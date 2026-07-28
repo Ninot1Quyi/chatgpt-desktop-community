@@ -57,12 +57,26 @@ export function formatDuration(ms) {
 
 export function basename(p) {
   if (!p) return "";
-  const parts = p.replace(/\/+$/, "").split("/");
+  const parts = p.replace(/[\\/]+$/, "").split(/[\\/]/);
   return parts[parts.length - 1] || p;
+}
+
+const isWindowsPath = (p) => /^(?:[A-Za-z]:[\\/]|\\\\)/.test(String(p || ""));
+const normalizedPath = (p) => String(p || "").replace(/\\/g, "/").replace(/\/+$/, "");
+
+export function isPathInside(path, root) {
+  let value = normalizedPath(path);
+  let parent = normalizedPath(root);
+  if (!parent) return false;
+  if (isWindowsPath(path) || isWindowsPath(root)) {
+    value = value.toLowerCase();
+    parent = parent.toLowerCase();
+  }
+  return value === parent || value.startsWith(`${parent}/`);
 }
 
 export function shortenPath(p, home) {
   if (!p) return "";
-  if (home && p.startsWith(home)) return "~" + p.slice(home.length);
+  if (home && isPathInside(p, home)) return "~" + normalizedPath(p).slice(normalizedPath(home).length);
   return p;
 }

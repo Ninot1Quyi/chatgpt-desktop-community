@@ -6,6 +6,7 @@ import { useStore, normalizePermission } from "../store.js";
 import * as api from "../api.js";
 import { cx } from "../lib/cx.js";
 import { COMMANDS, bindingFor, eventToAccel } from "../lib/keys.js";
+import { basename, isPathInside } from "../lib/time.js";
 import { Spinner } from "./ui.jsx";
 import {
   IconArchive,
@@ -281,10 +282,12 @@ const PERMISSION_ROWS = [
   },
 ];
 
-const OPEN_DESTINATIONS = [
+const openDestinations = (isWin) => [
   { id: "editor", label: "Editor default" },
   { id: "vscode", label: "VS Code" },
-  { id: "finder", label: "Finder" },
+  isWin
+    ? { id: "explorer", label: "File Explorer" }
+    : { id: "finder", label: "Finder" },
 ];
 
 function GeneralSection() {
@@ -292,8 +295,14 @@ function GeneralSection() {
   const setPermission = useStore((s) => s.setPermission);
   const bottomOpen = useStore((s) => s.ui.bottomOpen);
   const setUi = useStore((s) => s.setUi);
+  const isWin = useStore((s) => s.appInfo?.platform === "win32");
+  const destinations = openDestinations(isWin);
   const [openDest, setOpenDest] = useState(() => lsGet("settings.openDestination", "editor"));
   const [menuBar, setMenuBar] = useState(() => lsGet("settings.showInMenuBar", true));
+
+  useEffect(() => {
+    if (!destinations.some(({ id }) => id === openDest)) setOpenDest("editor");
+  }, [isWin, openDest]);
 
   return (
     <>
@@ -309,7 +318,7 @@ function GeneralSection() {
         <Row title="Default file open destination" desc="Where files and folders open by default">
           <Dropdown
             value={openDest}
-            options={OPEN_DESTINATIONS}
+            options={destinations}
             onChange={(v) => {
               setOpenDest(v);
               lsSet("settings.openDestination", v);
@@ -748,22 +757,22 @@ function ArchivedSection() {
     // exact root, or nested under a project root
     for (const p of Object.values(local)) {
       for (const rp of p.rootPaths || []) {
-        if (cwd === rp || cwd.startsWith(rp + "/")) return p.name || cwd.split("/").pop();
+        if (isPathInside(cwd, rp)) return p.name || basename(cwd);
       }
     }
     // codex worktrees map back to the project whose root basename matches
-    const m = cwd.match(/\/\.codex\/worktrees\/(?:[^/]+\/)?([^/]+)$/);
+    const m = cwd.match(/[\\/]\.codex[\\/]worktrees[\\/](?:[^\\/]+[\\/])?([^\\/]+)$/);
     const leaf = m ? m[1] : null;
     if (leaf) {
       for (const p of Object.values(local)) {
         for (const rp of p.rootPaths || []) {
-          const base = rp.split("/").filter(Boolean).pop();
+          const base = basename(rp);
           if (base && (leaf === base || leaf.startsWith(base))) return p.name || base;
         }
       }
       return leaf;
     }
-    return cwd.split("/").filter(Boolean).pop() || "Other";
+    return basename(cwd) || "Other";
   };
 
   const q = query.trim().toLowerCase();

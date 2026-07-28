@@ -5,7 +5,8 @@
 const { app, ipcMain } = require("electron");
 
 function initUpdater({ broadcast }) {
-  let last = { status: app.isPackaged ? "idle" : "dev" };
+  const enabled = app.isPackaged && process.platform === "win32";
+  let last = { status: enabled ? "idle" : "dev" };
   const send = (payload) => {
     last = { ...last, ...payload };
     broadcast("update:status", last);
@@ -13,7 +14,7 @@ function initUpdater({ broadcast }) {
 
   ipcMain.handle("update:status-get", () => last);
 
-  if (!app.isPackaged) {
+  if (!enabled) {
     ipcMain.handle("update:check", () => true);
     ipcMain.handle("update:install", () => false);
     return;
