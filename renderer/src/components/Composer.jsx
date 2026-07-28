@@ -1,11 +1,11 @@
 // Composer: auto-growing editor, image attachments, model+effort / permission
 // selectors, context chips (home), queued pills, send/stop.
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useStore, PERMISSIONS, normalizePermission } from "../store.js";
 import * as api from "../api.js";
 import { cx } from "../lib/cx.js";
-import { basename } from "../lib/time.js";
+import { basename, isAbsolutePath, joinPath } from "../lib/time.js";
 import { Menu } from "./ui.jsx";
 import { usePanelStore } from "./RightPanel.jsx";
 import { PluginIcon, skillName, skillDesc } from "./NavViews.jsx";
@@ -14,14 +14,72 @@ import {
   IconX, IconImage, IconFile, IconList, IconCheck, IconChevronRight, IconChevronLeft,
   IconShield, IconSparkle, IconMonitor, IconPaperclip, LucideIcon,
   IconSkillCube, IconSkillBox, IconChat,
-  IconCmdCodeReview, IconCmdFork, IconCmdFast, IconCmdFeedback, IconCmdGoal, IconGoalClear,
+  IconCmdCodeReview, IconCmdFork, IconCmdFast, IconCmdFeedback, IconCmdGoal,
   IconCmdInit, IconCmdMcp, IconCmdMemories, IconCmdModel, IconCmdPlan,
   IconCmdReasoning, IconCmdSide, IconCmdStatus,
-  IconComposerPlus, IconComposerMic, IconComposerChevronDown, IconComposerChevronRight, IconGoalChevron, IconSkillCheck, IconModelPower,
+  IconComposerPlus, IconComposerMic, IconComposerChevronDown, IconComposerChevronRight, IconGoalChevron, IconSkillCheck, IconModelPower, IconCircleXFill,
 } from "./icons.jsx";
 import { panelHook } from "../lib/panelHook.js";
 
 const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"];
+
+function joinWindowsPath(base, name) {
+  return `${String(base || "").replace(/[\\/]+$/, "")}\\${String(name || "").replace(/^[\\/]+/, "")}`;
+}
+
+function decodeFsRead(result) {
+  if (!result) return "";
+  if (typeof result === "string") return result;
+  if (typeof result.dataBase64 === "string") {
+    try {
+      const bytes = Uint8Array.from(atob(result.dataBase64), (char) => char.charCodeAt(0));
+      return new TextDecoder("utf-8").decode(bytes);
+    } catch {
+      return "";
+    }
+  }
+  return String(result.content ?? result.data ?? "");
+}
+
+async function readMetadataFiles(directory, extension, parse) {
+  const result = await api.rpc("fs/readDirectory", { path: directory }).catch(() => null);
+  const entries = (result?.entries || []).filter(
+    (entry) => entry.isFile && entry.fileName.toLowerCase().endsWith(extension),
+  );
+  return Promise.all(entries.map(async (entry) => {
+    const filePath = joinWindowsPath(directory, entry.fileName);
+    const content = decodeFsRead(await api.rpc("fs/readFile", { path: filePath }).catch(() => null));
+    return parse(entry.fileName, content);
+  }));
+}
+
+// Uniform icon cell for the "/" menu. The extracted reference glyphs have
+// inconsistent viewBoxes — some clip their paths, some underfill — so each
+// glyph's bounding box is fitted to the same visual weight Lucide icons have
+// (glyph spans ~20/24 of the icon size) instead of trusting the viewBox.
+function FitIcon({ children, className }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const svg = ref.current?.querySelector("svg");
+    if (!svg) return;
+    try {
+      const bb = svg.getBBox();
+      if (!(bb.width > 0 && bb.height > 0)) return;
+      const size = Number(svg.getAttribute("width")) || 16;
+      const target = (size * 20) / 24;
+      const m = Math.max(bb.width, bb.height);
+      const v = (size * m) / target;
+      const cx = bb.x + bb.width / 2;
+      const cy = bb.y + bb.height / 2;
+      svg.setAttribute("viewBox", `${cx - v / 2} ${cy - v / 2} ${v} ${v}`);
+    } catch {}
+  }, []);
+  return (
+    <span ref={ref} className={cx("flex size-5 shrink-0 items-center justify-center text-(--fg)", className)}>
+      {children}
+    </span>
+  );
+}
 
 // ---------------------------------------------------------------------------
 export default function Composer({ centered = false, quick = false }) {
@@ -73,6 +131,7 @@ export default function Composer({ centered = false, quick = false }) {
   const doSendRef = useRef(null);
   const browserTab = usePanelStore((s) => s.tabs.find((t) => t.kind === "browser" && t.url));
   const [images, setImages] = useState([]);
+  const [files, setFiles] = useState([]);
   const [mentions, setMentions] = useState([]);
   const [dragOver, setDragOver] = useState(false);
   const [menu, setMenu] = useState(null); // {kind:'slash'|'mention', query, start}
@@ -83,7 +142,7 @@ export default function Composer({ centered = false, quick = false }) {
   const imageFileRef = useRef(null);
   const anyFileRef = useRef(null);
 
-  const canSend = text.trim().length > 0 || images.length > 0 || mentions.length > 0;
+  const canSend = text.trim().length > 0 || images.length > 0 || files.length > 0 || mentions.length > 0;
 
   // Detect a trailing /command, @mention, or $skill token and open the
   // matching menu.
@@ -192,8 +251,8 @@ export default function Composer({ centered = false, quick = false }) {
     return () => { live = false; };
   }, [menu?.kind === "skill" || menu?.kind === "slash" ? menu.query : null, menu?.kind, activeThreadId]);
 
-  // Custom prompts from ~/.codex/prompts/*.md — the / menu's "prompts:*"
-  // section. Name + frontmatter description, cached.
+  // Custom prompts from %USERPROFILE%\.codex\prompts\*.md. Name and
+  // frontmatter description are cached for the slash-command menu.
   const [promptResults, setPromptResults] = useState([]);
   const promptsCacheRef = useRef(null);
   useEffect(() => {
@@ -202,16 +261,16 @@ export default function Composer({ centered = false, quick = false }) {
     let live = true;
     (async () => {
       if (!promptsCacheRef.current) {
-        promptsCacheRef.current = [];
-        const r = await api.rpc("command/exec", {
-          command: ["sh", "-c", 'cd "$1/.codex/prompts" 2>/dev/null && for f in *.md; do d=$(grep -m1 -E "^description:" "$f" | sed "s/^description: *//"); printf "%s\\t%s\\n" "${f%.md}" "$d"; done', "sh", home],
-          timeoutMs: 6000,
-        }).catch(() => null);
-        const out = String(r?.stdout || "");
-        promptsCacheRef.current = out.split("\n").filter(Boolean).map((line) => {
-          const [name, ...rest] = line.split("\t");
-          return { name, desc: rest.join("\t").trim().replace(/^"|"$/g, "") };
-        });
+        const directory = joinWindowsPath(home, ".codex\\prompts");
+        promptsCacheRef.current = home
+          ? await readMetadataFiles(directory, ".md", (fileName, content) => {
+            const raw = content.match(/^description:\s*(.*)$/m)?.[1]?.trim() || "";
+            return {
+              name: fileName.replace(/\.md$/i, ""),
+              desc: raw.replace(/^(['"])(.*)\1$/, "$2"),
+            };
+          })
+          : [];
       }
       if (!live) return;
       const q = (menu.query || "").toLowerCase();
@@ -300,7 +359,10 @@ export default function Composer({ centered = false, quick = false }) {
     const before = text.slice(0, menu.start);
     const after = text.slice(caret);
     setText(before + name + " " + after);
-    setMentions((s) => [...s.filter((m) => m.name !== name), { name, path: f.path.startsWith("/") ? f.path : `${useStore.getState().cwd}/${f.path}` }]);
+    setMentions((s) => [
+      ...s.filter((m) => m.name !== name),
+      { name, path: isAbsolutePath(f.path) ? f.path : joinPath(useStore.getState().cwd, f.path) },
+    ]);
     setMenu(null);
     setTimeout(() => taRef.current?.focus(), 0);
   };
@@ -344,9 +406,12 @@ export default function Composer({ centered = false, quick = false }) {
       const tag = `$${m.name}`;
       if (!outText.includes(tag)) outText = `${outText.replace(/\s+$/, "")}${outText.trim() ? " " : ""}${tag} `;
     }
-    sendMessage(outText, images, mentions, opts); // the store queues it when a turn is running
+    // Attached (non-image) files ride along as mention inputs with absolute paths.
+    const allMentions = [...mentions, ...files.map((f) => ({ name: basename(f), path: f, kind: "file" }))];
+    sendMessage(outText, images, allMentions, opts); // the store queues it when a turn is running
     setText("");
     setImages([]);
+    setFiles([]);
     setMentions([]);
   };
   doSendRef.current = (txt) => {
@@ -391,8 +456,9 @@ export default function Composer({ centered = false, quick = false }) {
   const addFiles = (paths) => {
     const imgs = paths.filter((p) => IMAGE_EXTS.some((ext) => p.toLowerCase().endsWith(ext)));
     if (imgs.length) setImages((s) => [...s, ...imgs]);
+    // Non-image files become attachment cards (sent as mention inputs), not @path text.
     const others = paths.filter((p) => !imgs.includes(p));
-    if (others.length) setText((t) => (t ? t + "\n" : "") + others.map((p) => `@${p}`).join("\n"));
+    if (others.length) setFiles((s) => [...s, ...others]);
   };
 
   const onPasteFiles = async (e) => {
@@ -403,11 +469,11 @@ export default function Composer({ centered = false, quick = false }) {
     const files = itemFiles.length ? itemFiles : [...(e.clipboardData?.files || [])];
     if (!files.length) return;
     e.preventDefault();
-    addFiles(files.map((file) => file.path).filter(Boolean));
+    addFiles(files.map((file) => api.getFilePath(file)).filter(Boolean));
     try {
       const saved = [];
       for (const [i, file] of files.entries()) {
-        if (file.path || !file.type.startsWith("image/")) continue;
+        if (api.getFilePath(file) || !file.type.startsWith("image/")) continue;
         const dataUrl = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
@@ -425,7 +491,7 @@ export default function Composer({ centered = false, quick = false }) {
   };
 
   const onPickFiles = (e) => {
-    const paths = [...e.target.files].map((f) => f.path).filter(Boolean);
+    const paths = [...e.target.files].map((f) => api.getFilePath(f)).filter(Boolean);
     addFiles(paths);
     e.target.value = "";
   };
@@ -494,7 +560,7 @@ export default function Composer({ centered = false, quick = false }) {
       onDrop={(e) => {
         e.preventDefault();
         setDragOver(false);
-        addFiles([...e.dataTransfer.files].map((f) => f.path).filter(Boolean));
+        addFiles([...e.dataTransfer.files].map((f) => api.getFilePath(f)).filter(Boolean));
       }}
     >
       {dragOver && (
@@ -544,6 +610,34 @@ export default function Composer({ centered = false, quick = false }) {
                   aria-label={`Remove ${basename(p)}`}
                   className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-(--fg) text-(--surface) shadow-sm"
                   onClick={() => setImages((s) => s.filter((_, j) => j !== i))}
+                >
+                  <IconX size={10} />
+                </button>
+              </div>
+            ))}
+            </div>
+          </div>
+        )}
+
+        {files.length > 0 && (
+          <div className="hide-scrollbar w-full overflow-x-auto p-px pb-1">
+            <div className="flex min-w-max items-center gap-2">
+            {files.map((p, i) => (
+              <div
+                key={i}
+                className="relative flex items-center gap-2 rounded-[12px] border border-(--border) bg-(--surface) py-2 pr-2 pl-2.5"
+              >
+                <IconFile size={16} className="shrink-0 text-(--fg-tertiary)" />
+                <div className="flex min-w-0 flex-col">
+                  <span className="max-w-[200px] truncate text-[13px] leading-4">{basename(p)}</span>
+                  <span className="text-[11px] leading-4 text-(--fg-tertiary)">
+                    {(p.includes(".") ? p.split(".").pop() : "file").toUpperCase()}
+                  </span>
+                </div>
+                <button
+                  aria-label={`Remove ${basename(p)}`}
+                  className="flex size-4 shrink-0 items-center justify-center rounded-full bg-(--fg) text-(--surface) shadow-sm"
+                  onClick={() => setFiles((s) => s.filter((_, j) => j !== i))}
                 >
                   <IconX size={10} />
                 </button>
@@ -618,7 +712,7 @@ export default function Composer({ centered = false, quick = false }) {
                     onMouseEnter={() => setMenuIdx(i)}
                     onClick={() => runCommand(c)}
                   >
-                    <span className="flex size-5 shrink-0 items-center justify-center text-(--fg)">{c.icon}</span>
+                    <FitIcon>{c.icon}</FitIcon>
                     <span className="max-w-[60%] flex-none truncate">{c.label}</span>
                     <span className="ml-auto min-w-0 flex-1 truncate text-right text-sm text-(--fg-tertiary)">{c.desc}</span>
                   </button>
@@ -635,9 +729,9 @@ export default function Composer({ centered = false, quick = false }) {
                       onMouseEnter={() => setMenuIdx(gi)}
                       onClick={() => pickPrompt(p)}
                     >
-                      <span className="flex size-5 shrink-0 items-center justify-center text-(--fg)">
+                      <FitIcon>
                         <LucideIcon name="SquareTerminal" size={16} />
-                      </span>
+                      </FitIcon>
                       <span className="max-w-[60%] flex-none truncate">prompts:{p.name}</span>
                       <span className="ml-auto min-w-0 flex-1 truncate text-right text-sm text-(--fg-tertiary)">{p.desc}</span>
                     </button>
@@ -655,13 +749,13 @@ export default function Composer({ centered = false, quick = false }) {
                       onMouseEnter={() => setMenuIdx(gi)}
                       onClick={() => pickSkill(s)}
                     >
-                      <span className="flex size-5 shrink-0 items-center justify-center text-(--fg-secondary)">
+                      <FitIcon className="text-(--fg-secondary)">
                         {s.interface?.iconSmall ? (
                           <img src={api.localFileUrl(s.interface.iconSmall)} alt="" className="size-5 rounded object-cover" />
                         ) : (
                           <IconSkillBox size={16} />
                         )}
-                      </span>
+                      </FitIcon>
                       <span className="shrink-0 truncate">{skillName(s)}</span>
                       <span className="flex-1 truncate text-(--fg-tertiary)">{skillDesc(s)}</span>
                       <span className="ml-auto shrink-0 text-(--fg-tertiary)">{s.scopeLabel}</span>
@@ -788,13 +882,19 @@ export default function Composer({ centered = false, quick = false }) {
 }
 
 // ---------------------------------------------------------------------------
-// Home-screen context bar: folder / environment / git branch, tucked behind
-// the composer like the banner.
+// Home-screen context bar: the project chip opens the reference-style project
+// picker (search + project list + new project). With no project matched (for
+// example the home folder), it reads "Select project" and the Local/branch
+// chips stay hidden, like the official client.
 // ---------------------------------------------------------------------------
 function HomeContextBar() {
   const cwd = useStore((s) => s.cwd);
   const pickCwd = useStore((s) => s.pickCwd);
+  const gs = useStore((s) => s.gs);
   const [branch, setBranch] = useState(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -817,23 +917,148 @@ function HomeContextBar() {
     return () => { alive = false; };
   }, [cwd]);
 
-  const chipCls = "flex h-7 items-center gap-1.5 rounded-md px-2 text-xs text-(--fg)";
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("mousedown", onDown, true);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // Match the cwd to a known project (longest rootPath wins, like the sidebar).
+  const project = useMemo(() => {
+    const norm = (p) => (p || "").replace(/\\/g, "/");
+    const dir = norm(cwd);
+    let best = null;
+    for (const p of Object.values(gs?.["local-projects"] || {})) {
+      for (const rp of p.rootPaths || []) {
+        const r = norm(rp);
+        if (r && (dir === r || dir.startsWith(r + "/")) && (!best || r.length > best.len)) {
+          best = { p, len: r.length };
+        }
+      }
+    }
+    return best?.p || null;
+  }, [gs, cwd]);
+
+  const projects = useMemo(
+    () => Object.entries(gs?.["local-projects"] || {})
+      .map(([id, p]) => ({ id, name: p.name || "Project", path: (p.rootPaths || [])[0] || "" }))
+      .filter((p) => p.path)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    [gs]
+  );
+
+  // Remove a project from the shared local-projects state (same file the
+  // official client reads, so it disappears from both apps' sidebars).
+  const removeProject = (id) => {
+    const s = useStore.getState();
+    const local = { ...(s.gs?.["local-projects"] || {}) };
+    delete local[id];
+    useStore.setState({ gs: { ...s.gs, "local-projects": local } });
+    api.gsPatch({ "local-projects": local });
+  };
+  const q = query.trim().toLowerCase();
+  const filtered = q ? projects.filter((p) => p.name.toLowerCase().includes(q)) : projects;
+
+  const chipCls = "flex h-7 items-center gap-1.5 rounded-full px-2 text-[13px] leading-[18px] text-(--fg-secondary)";
   const iconCls = "opacity-70";
   return (
     <div className="relative z-0 mx-[13px] -mb-[18px] flex items-center gap-2 rounded-t-[20px] bg-(--surface-under) px-1.5 pt-1.5 pb-[27px] dark:bg-(--surface-fog)">
-      <button title={cwd} onClick={pickCwd} className={cx(chipCls, "hover:bg-(--surface-hover)")}>
-        <IconFolder size={13} className={iconCls} />
-        <span className="max-w-[220px] truncate">{basename(cwd) || "Choose folder"}</span>
-      </button>
-      <span className={chipCls}>
-        <IconMonitor size={13} className={iconCls} />
-        Local
-      </span>
-      {branch && (
-        <span className={chipCls}>
-          <IconBranch size={13} className={iconCls} />
-          <span className="max-w-[180px] truncate">{branch}</span>
-        </span>
+      <div ref={wrapRef} className="relative">
+        <div className="group/projchip relative inline-flex min-w-0 rounded-full">
+          <button
+            title={project ? (project.rootPaths || [])[0] : "Select project"}
+            onClick={() => { setOpen(!open); setQuery(""); }}
+            className={cx(chipCls, "hover:bg-(--surface-hover)")}
+          >
+            <IconFolder size={13} className={cx(iconCls, project && "group-hover/projchip:invisible")} />
+            <span className="max-w-[220px] truncate">{project ? project.name : "Select project"}</span>
+          </button>
+          {project && (
+            // official behavior: hovering the chip covers the folder icon with a
+            // circled-X ("Don't work in a project") that clears the selection
+            <button
+              aria-label="Don't work in a project"
+              title="Don't work in a project"
+              className="pointer-events-none absolute inset-y-0 left-0 z-10 flex aspect-square items-center justify-center rounded-full text-(--fg-tertiary) opacity-0 transition-opacity group-hover/projchip:pointer-events-auto group-hover/projchip:opacity-100 hover:text-(--fg)"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                useStore.getState().setCwd(useStore.getState().appInfo?.home || "");
+              }}
+            >
+              <IconCircleXFill size={15} />
+            </button>
+          )}
+        </div>
+        {open && (
+          <div
+            className="absolute bottom-full left-0 z-40 mb-2 w-64 overflow-hidden rounded-xl border border-(--border) bg-(--dropdown-bg)"
+            style={{ boxShadow: "var(--shadow-menu)" }}
+          >
+            <div className="flex items-center gap-2 border-b border-(--border-light) px-3 py-2">
+              <LucideIcon name="Search" size={13} className="shrink-0 text-(--fg-tertiary)" />
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search projects"
+                className="w-full bg-transparent text-[13px] outline-none placeholder:text-(--fg-faint)"
+              />
+            </div>
+            <div className="max-h-[280px] overflow-y-auto p-1">
+              {filtered.map((p) => (
+                <div key={p.id} className="group/projrow relative">
+                  <button
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 pr-7 text-left text-[13px] hover:bg-(--surface-hover)"
+                    onClick={() => { useStore.getState().setCwd(p.path); setOpen(false); }}
+                  >
+                    <IconFolder size={14} className="shrink-0 text-(--fg-tertiary)" />
+                    <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                  </button>
+                  <button
+                    title={`Remove ${p.name}`}
+                    className="absolute top-1/2 right-1.5 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-(--fg-tertiary) opacity-0 group-hover/projrow:opacity-100 hover:bg-(--surface-active) hover:text-(--fg)"
+                    onClick={(e) => { e.stopPropagation(); removeProject(p.id); }}
+                  >
+                    <IconX size={12} />
+                  </button>
+                </div>
+              ))}
+              {filtered.length === 0 && (
+                <div className="px-3 py-2 text-xs text-(--fg-tertiary)">No matching projects</div>
+              )}
+            </div>
+            <div className="border-t border-(--border-light) p-1">
+              <button
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] hover:bg-(--surface-hover)"
+                onClick={() => { setOpen(false); pickCwd(); }}
+              >
+                <LucideIcon name="Plus" size={14} className="shrink-0 text-(--fg-tertiary)" />
+                New project…
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      {project && (
+        <>
+          <span className={chipCls}>
+            <IconMonitor size={13} className={iconCls} />
+            Local
+          </span>
+          {branch && (
+            <span className={chipCls}>
+              <IconBranch size={13} className={iconCls} />
+              <span className="max-w-[180px] truncate">{branch}</span>
+            </span>
+          )}
+        </>
       )}
     </div>
   );
@@ -866,17 +1091,19 @@ function AttachButton({ onPickImages, onPickFiles, onInsertText, browserTab }) {
         setPlugins(flat);
       })
       .catch(() => setPlugins([]));
-    // Local agents (~/.codex/agents/*.toml) — the reference menu's agent rows.
+    // Local agents (%USERPROFILE%\.codex\agents\*.toml).
     const home = useStore.getState().appInfo?.home || "";
-    api.rpc("command/exec", {
-      command: ["sh", "-c", 'cd "$1/.codex/agents" 2>/dev/null && for f in *.toml; do n=$(grep -m1 "^name" "$f" | sed "s/.*= *//;s/\\"//g"); d=$(grep -m1 "^description" "$f" | sed "s/.*= *//;s/\\"//g"); printf "%s\\t%s\\n" "$n" "$d"; done', "sh", home],
-      timeoutMs: 6000,
+    if (!home) {
+      setAgents([]);
+      return;
+    }
+    const directory = joinWindowsPath(home, ".codex\\agents");
+    readMetadataFiles(directory, ".toml", (_fileName, content) => {
+      const value = (key) => content.match(new RegExp(`^${key}\\s*=\\s*"([^"]*)"`, "m"))?.[1] || "";
+      return { name: value("name"), desc: value("description") };
     })
-      .then((r) => {
-        const rows = String(r?.stdout || "").split("\n").filter(Boolean).map((line) => {
-          const [name, ...rest] = line.split("\t");
-          return { name, desc: rest.join("\t").trim() };
-        }).filter((a) => a.name);
+      .then((rows) => {
+        rows = rows.filter((agent) => agent.name);
         rows.sort((a, b) => a.name.localeCompare(b.name));
         setAgents(rows.slice(0, 5));
       })
@@ -1076,30 +1303,11 @@ const IconGear = (p) => <LucideIcon name="Settings" size={p.size || 16} classNam
 // ---------------------------------------------------------------------------
 // Model + reasoning effort chip (one combined menu, two sections).
 // Plan-mode indicator chip (visible while plan mode is on; click to exit).
+// Goal is not a resident composer button — it is set from the "/" menu.
 function PlanChip() {
   const planMode = useStore((s) => s.planMode);
   const setPlanMode = useStore((s) => s.setPlanMode);
-  const setUi = useStore((s) => s.setUi);
-  const activeThreadId = useStore((s) => s.activeThreadId);
-  const goal = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId]?.goal : null));
-  const clearGoal = async () => {
-    try { await api.rpc("thread/goal/clear", { threadId: activeThreadId }); } catch {}
-    useStore.getState()._mutateConv(activeThreadId, (c) => ({ ...c, goal: null }));
-  };
-  if (!planMode) {
-    return (
-      <button
-        type="button"
-        aria-label={goal?.objective ? "Clear goal" : "Set a goal"}
-        className="composer-goal-button group flex h-7 items-center gap-1 rounded-full border border-transparent px-2 py-0 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary)"
-        onClick={goal?.objective ? clearGoal : () => setUi({ goalDialogOpen: true })}
-      >
-        <IconCmdGoal size={16} className={goal?.objective ? "shrink-0 group-hover:hidden" : "shrink-0"} />
-        {goal?.objective && <IconGoalClear size={16} className="hidden shrink-0 group-hover:block" />}
-        <span className="max-w-28 truncate">Goal</span>
-      </button>
-    );
-  }
+  if (!planMode) return null;
   return (
     <button
       title="Plan mode is on — click to turn off"

@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store.js";
 import { cx } from "../lib/cx.js";
+import { isPathInside } from "../lib/time.js";
 import { openExternal, toggleQuickChat, showItemInFolder, rpc, logout } from "../api.js";
 import { Menu, Dialog, Spinner, IconButton } from "./ui.jsx";
 import {
@@ -35,7 +36,7 @@ export default function Sidebar() {
   const [renaming, setRenaming] = useState(null); // {id, name}
   const [expand, setExpand] = useState({}); // section key -> bool override
 
-  const model = useMemo(() => buildSidebarModel(threads, gs), [threads, gs]);
+  const model = useMemo(() => buildSidebarModel(threads, gs, !archivedView), [threads, gs, archivedView]);
   const pinnedThreads = useMemo(() => {
     if (archivedView) return [];
     const ids = gs?.["pinned-thread-ids"] || [];
@@ -62,7 +63,7 @@ export default function Sidebar() {
   };
 
   const onRename = (t) => setRenaming({ id: t.id, name: t.name || t.preview || "" });
-  const empty = model.projects.length === 0 && model.chats.length === 0 && model.pinned.length === 0;
+  const empty = model.projects.length === 0 && model.chats.length === 0 && model.pinned.length === 0 && pinnedThreads.length === 0;
 
   return (
     <div className="app-sidebar flex h-full w-full flex-col">
@@ -250,7 +251,7 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
       let best = null;
       for (const p of allLocalProjects) {
         for (const rp of p.rootPaths) {
-          if (rp && (storeCwd === rp || storeCwd.startsWith(rp + "/")) && (!best || rp.length > best.len)) {
+          if (rp && isPathInside(storeCwd, rp) && (!best || rp.length > best.len)) {
             best = { id: p.id, len: rp.length };
           }
         }
@@ -343,7 +344,7 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
               onSelect: () => useStore.getState().togglePinnedProjectId(project.id),
             },
             ...(project.kind === "local"
-              ? [{ id: "finder", label: "Show in Finder", icon: <IconFolder size={14} />, onSelect: () => showItemInFolder(project.path) }]
+              ? [{ id: "explorer", label: "Show in File Explorer", icon: <IconFolder size={14} />, onSelect: () => showItemInFolder(project.path) }]
               : []),
           ]}
         />
@@ -358,7 +359,7 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-(--fg-secondary)">
               <IconFolder size={12} className="shrink-0 text-(--fg-tertiary)" />
-              <span className="min-w-0 truncate">{tildePath(project.path)}</span>
+              <span className="min-w-0 truncate">{displayPath(project.path)}</span>
             </div>
           </div>
         )}
@@ -538,27 +539,29 @@ function ThreadRow({ thread, active, archived, onRename }) {  const needsInput =
       onMouseLeave={() => { clearTimeout(hoverTimer.current); setHoverCard(false); }}
     >
       <span className="min-w-0 flex-1 truncate text-[14px] leading-5">{title}</span>
-      {pinned && <IconPinFilled size={12} className="shrink-0 text-(--fg-tertiary)" />}
+      {pinned && <IconPinFilled size={12} className="shrink-0 text-(--fg-tertiary) group-hover/thr:hidden" />}
       {needsInput && <IconCircleAlert size={13} className="shrink-0 text-(--danger)" />}
       {running && (active
         ? <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />
         : <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-(--accent)" />
       )}
-      {/* hover actions: pin + archive directly (like the reference client) */}
-      <button
-        className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover/thr:flex"
-        title={pinned ? "Unpin chat" : "Pin chat"}
-        onClick={(e) => { e.stopPropagation(); useStore.getState().togglePinnedThread(thread.id); }}
-      >
-        <IconPin size={13} />
-      </button>
-      <button
-        className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover/thr:flex"
-        title={archived ? "Unarchive chat" : "Archive chat"}
-        onClick={(e) => { e.stopPropagation(); archived ? useStore.getState().unarchiveThread(thread.id) : useStore.getState().archiveThread(thread.id); }}
-      >
-        <IconArchive size={13} />
-      </button>
+      {/* hover actions: pin + archive grouped flush right (like the reference client) */}
+      <span className="hidden shrink-0 items-center gap-0.5 group-hover/thr:flex">
+        <button
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg)"
+          title={pinned ? "Unpin chat" : "Pin chat"}
+          onClick={(e) => { e.stopPropagation(); useStore.getState().togglePinnedThread(thread.id); }}
+        >
+          {pinned ? <IconPinFilled size={13} /> : <IconPin size={13} />}
+        </button>
+        <button
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg)"
+          title={archived ? "Unarchive chat" : "Archive chat"}
+          onClick={(e) => { e.stopPropagation(); archived ? useStore.getState().unarchiveThread(thread.id) : useStore.getState().archiveThread(thread.id); }}
+        >
+          <IconArchive size={13} />
+        </button>
+      </span>
       <Menu
         open={menuOpen}
         anchor={() => rowRef.current?.getBoundingClientRect()}
@@ -583,7 +586,7 @@ function ThreadHoverCard({ thread, title, anchor }) {
     let best = null;
     for (const p of Object.values(local)) {
       for (const rp of p.rootPaths || []) {
-        if (rp && (cwd === rp || cwd.startsWith(rp + "/")) && (!best || rp.length > best.len)) best = { name: p.name, len: rp.length };
+        if (rp && isPathInside(cwd, rp) && (!best || rp.length > best.len)) best = { name: p.name, len: rp.length };
       }
     }
     return best?.name || null;
@@ -741,7 +744,7 @@ function Footer() {
           { id: "usage", label: "Usage remaining", icon: <IconUsage size={14} />, onSelect: () => useStore.getState().setUi({ settingsOpen: true, settingsSection: "usage" }) },
           { id: "pet", label: "Show pet", icon: <IconPet size={14} />, disabled: true },
           { sep: true },
-          { id: "settings", label: "Settings", hint: "⌘,", icon: <IconGear size={14} />, onSelect: () => useStore.getState().setUi({ settingsOpen: true }) },
+          { id: "settings", label: "Settings", hint: "Ctrl+,", icon: <IconGear size={14} />, onSelect: () => useStore.getState().setUi({ settingsOpen: true }) },
           { id: "logout", label: "Log out", icon: <IconLogout size={14} />, onSelect: () => logout() },
         ]}
       />
@@ -780,14 +783,18 @@ function RenameDialog({ renaming, onClose }) {
 
 // ---------------------------------------------------------------------------
 // Build the sidebar model from threads + the shared codex global state
-// (~/.codex/.codex-global-state.json) — the same source the official desktop
+// (%USERPROFILE%\.codex\.codex-global-state.json) — the same source the official desktop
 // app uses, so both apps render the same projects/pins/order.
 // ---------------------------------------------------------------------------
-function buildSidebarModel(threads, gs) {
+function buildSidebarModel(threads, gs, excludePinned = false) {
   const local = gs?.["local-projects"] || {};
   const remote = gs?.["remote-projects"] || [];
   const order = gs?.["project-order"] || [];
   const pinnedIds = gs?.["pinned-project-ids"] || [];
+  // Pinned threads live in the Pinned section only, never duplicated under
+  // their project / the chats list. In the archived view the Pinned section
+  // is hidden, so pinned archived threads stay listed in place.
+  const pinnedThreadSet = new Set(excludePinned ? gs?.["pinned-thread-ids"] || [] : []);
   const assignments = gs?.["thread-project-assignments"] || {};
   const hostNames = {};
   for (const c of gs?.["codex-managed-remote-connections"] || []) {
@@ -831,7 +838,7 @@ function buildSidebarModel(threads, gs) {
     for (const p of localList) {
       for (const rp of p.rootPaths) {
         if (!rp) continue;
-        if (cwd === rp || cwd.startsWith(rp + "/")) {
+        if (isPathInside(cwd, rp)) {
           if (!best || rp.length > best.len) best = { id: p.id, len: rp.length };
         }
       }
@@ -841,6 +848,7 @@ function buildSidebarModel(threads, gs) {
 
   const chats = [];
   for (const t of threads) {
+    if (pinnedThreadSet.has(t.id)) continue;
     const pid = matchProject(t);
     if (pid) {
       const p = projects.get(pid);
@@ -869,7 +877,9 @@ function firstLine(s) {
   return (s || "").split("\n")[0].trim();
 }
 
-// "/Users/example/x/y" → "~/x/y" (project hover card path display).
-function tildePath(p) {
-  return p ? p.replace(/^\/Users\/[^/]+/, "~") : p;
+function displayPath(p) {
+  const home = useStore.getState().appInfo?.home || "";
+  return home && p?.toLowerCase().startsWith(home.toLowerCase())
+    ? `%USERPROFILE%${p.slice(home.length)}`
+    : p;
 }

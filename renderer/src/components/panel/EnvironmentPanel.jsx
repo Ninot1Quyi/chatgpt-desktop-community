@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../../store.js";
 import * as api from "../../api.js";
-import { basename } from "../../lib/time.js";
+import { basename, isAbsolutePath } from "../../lib/time.js";
 import { Menu } from "../ui.jsx";
 import { IconPlus, IconBranch, IconGlobe } from "../icons.jsx";
 import { LucideIcon } from "../lucide/index.jsx";
@@ -33,7 +33,7 @@ export default function EnvironmentPanel({ cwd, hasGit }) {
   const agents = useSubagentCounts(conv);
 
   return (
-    <div className="flex h-full w-full flex-col bg-(--surface-under) pt-[46px]">
+    <div className="flex h-full w-full flex-col bg-(--surface)">
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-6 pb-4">
         {/* header */}
         <div className="flex h-7 items-center justify-between pl-3 pr-1">
@@ -205,8 +205,11 @@ function EnvPlusMenu() {
 }
 
 // Machine row: "Local" plus any paired remote hosts (display only).
+// Stable empty fallback: a fresh [] per getSnapshot call loops useSyncExternalStore.
+const NO_REMOTES = [];
+
 function MachineRow() {
-  const remotes = useStore((s) => s.gs?.["codex-managed-remote-connections"] || []);
+  const remotes = useStore((s) => s.gs?.["codex-managed-remote-connections"] || NO_REMOTES);
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const items = [
@@ -342,7 +345,7 @@ function useSources(conv) {
     const seen = new Set();
     const pushFile = (p) => {
       if (!p || typeof p !== "string" || seen.has(p)) return;
-      if (!p.startsWith("/")) return;
+      if (!isAbsolutePath(p)) return;
       seen.add(p);
       out.push({ name: basename(p), full: p, url: false });
     };

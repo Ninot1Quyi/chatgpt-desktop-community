@@ -48,7 +48,7 @@ export default function VoiceSection() {
         </Row>
         <Row title="Toggle dictation hotkey" desc="Press once anywhere on desktop to dictate, then press again to stop">
           <kbd className="rounded-md border border-(--border) bg-(--surface-hover) px-1.5 py-0.5 font-mono text-xs text-(--fg-secondary)">
-            ⌥A
+            Alt+A
           </kbd>
         </Row>
         <Row title="Keep dictation bar visible" desc="Show a small shortcut reminder when dictation isn't recording">

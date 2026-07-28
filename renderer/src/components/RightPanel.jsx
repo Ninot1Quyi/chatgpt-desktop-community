@@ -1,14 +1,14 @@
 // Right side panel: a browser-like tab container, replicating the reference
-// app. The tab strip lives in the global header (RightPanelHeader, aligned
-// above the panel); the panel body hosts tab contents, or the empty state
-// (tab-type menu + suggested files) when no tabs are open. Closing the last
-// tab hides the panel; the panel can expand to fill the whole window.
+// app. The tab strip (RightPanelHeader) tops the panel itself; the panel body
+// hosts tab contents, or the empty state (tab-type menu + suggested files)
+// when no tabs are open. Closing the last tab hides the panel; the panel can
+// expand to fill the whole window.
 import React, { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { useStore } from "../store.js";
 import * as api from "../api.js";
 import { cx } from "../lib/cx.js";
-import { basename } from "../lib/time.js";
+import { basename, joinPath } from "../lib/time.js";
 import { Menu, IconButton } from "./ui.jsx";
 import {
   IconPlus, IconBranch, IconFolder, IconTerminal, IconChat, IconGlobe,
@@ -34,14 +34,14 @@ import { FileIcon } from "./panel/FileIcon.jsx";
 const SINGLETON = new Set(["review", "browser", "sidechat"]);
 
 export const TAB_KINDS = {
-  review: { title: "Review", icon: IconBranch, component: ReviewTab, hint: "⌃⇧G" },
+  review: { title: "Review", icon: IconBranch, component: ReviewTab, hint: "Ctrl+Shift+G" },
   terminal: { title: "Terminal", icon: IconTerminal, component: TerminalTab, hint: "" },
-  browser: { title: "Browser", icon: IconGlobe, component: BrowserTab, hint: "⌘T" },
-  files: { title: "Files", icon: IconFolder, component: FilesTab, hint: "⌘P" },
-  sidechat: { title: "Side chat", icon: IconChat, component: SideChatTab, hint: "⌥⌘S" },
+  browser: { title: "Browser", icon: IconGlobe, component: BrowserTab, hint: "Ctrl+T" },
+  files: { title: "Files", icon: IconFolder, component: FilesTab, hint: "Ctrl+P" },
+  sidechat: { title: "Side chat", icon: IconChat, component: SideChatTab, hint: "Ctrl+Alt+S" },
 };
 // order shown in the empty state (matches the reference app)
-const MENU_ORDER = ["review", "terminal", "browser", "files", "sidechat"];
+const MENU_ORDER = ["sidechat", "browser", "terminal"];
 // order shown in the "+" dropdown (reference uses a different fixed order)
 const PLUS_MENU_ORDER = ["review", "files", "sidechat", "browser", "terminal"];
 
@@ -162,22 +162,12 @@ function FileTabGlyph({ path }) {
   return <FileIcon name={path} size={13} />;
 }
 
-// Terminal tabs take the shell-style title (user@host), like the reference.
-let shellTitleCache = null;
+// Terminal tabs use the local Windows account and computer name.
 function useShellTitle() {
-  const [t, setT] = useState(shellTitleCache);
-  useEffect(() => {
-    if (shellTitleCache) return undefined;
-    let live = true;
-    api.rpc("command/exec", { command: ["sh", "-c", "printf '%s@%s' \"$(whoami)\" \"$(hostname -s)\""], timeoutMs: 5000 })
-      .then((r) => {
-        const out = String(r?.stdout ?? r?.output ?? "").trim();
-        if (live && out) { shellTitleCache = out; setT(out); }
-      })
-      .catch(() => {});
-    return () => { live = false; };
-  }, []);
-  return t;
+  return useStore((state) => {
+    const { username, hostname } = state.appInfo || {};
+    return username && hostname ? `${username}@${hostname}` : null;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -349,7 +339,7 @@ export default function RightPanel() {
     return hasGit ? <EnvironmentPanel cwd={cwd} hasGit={hasGit} /> : <PanelEmptyState />;
   }
   return (
-    <div className="flex h-full w-full flex-col bg-(--surface-under) pt-[46px]">
+    <div className="flex h-full w-full flex-col bg-(--surface)">
       <div className="min-h-0 flex-1">
         {tabs.map((t) => {
           const C = TAB_KINDS[t.kind].component;
@@ -413,7 +403,7 @@ function useSuggestedFiles() {
         if (!live) return;
         const list = (r?.entries || [])
           .filter((e) => !e.isDirectory && !e.fileName.startsWith("."))
-          .map((e) => ({ name: e.fileName, full: `${cwd.replace(/\/+$/, "")}/${e.fileName}` }))
+          .map((e) => ({ name: e.fileName, full: joinPath(cwd, e.fileName) }))
           .slice(0, 12);
         setFiles(list);
       })
@@ -424,53 +414,31 @@ function useSuggestedFiles() {
 }
 
 // ---------------------------------------------------------------------------
-// Empty state: menu of tab types + suggested files from the thread cwd.
+// Empty state: the reference app's tab-type menu (side chat / browser /
+// terminal) in a centered max-w-xl column.
 // ---------------------------------------------------------------------------
 function PanelEmptyState() {
-  const hasGit = useHasGit(usePanelCwd());
-  const files = useSuggestedFiles();
-
-  const kinds = MENU_ORDER.filter((k) => k !== "review" || hasGit);
-
   return (
-    <div className="flex h-full w-full flex-col bg-(--surface-under) pt-[46px]">
+    <div className="flex h-full w-full flex-col bg-(--surface)">
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="m-auto flex w-full max-w-xl flex-col gap-1 px-4 py-6">
-          {kinds.map((k) => {
+          {MENU_ORDER.map((k) => {
             const def = TAB_KINDS[k];
             const Icon = def.icon;
             return (
               <button
                 key={k}
-                className="flex min-h-10 w-full items-center gap-2 rounded-md bg-(--surface-fog) px-2.5 py-2 text-left transition-colors hover:bg-(--surface-hover)"
+                className="flex min-h-10 w-full items-center gap-2 rounded-md bg-(--surface-hover) px-2.5 py-2 text-left transition-colors hover:bg-(--surface-active)"
                 onClick={() => usePanelStore.getState().open(k)}
               >
                 <Icon size={16} className="shrink-0 text-(--fg-tertiary)" />
                 <span className="min-w-0 flex-1 truncate text-[13px] text-(--fg)">{def.title}</span>
                 {def.hint && (
-                  <kbd className="shrink-0 rounded-md bg-(--surface-hover) px-1.5 py-0.5 text-[11px] text-(--fg-tertiary)">{def.hint}</kbd>
+                  <kbd className="shrink-0 rounded-md bg-(--surface-active) px-1.5 py-0.5 text-xs text-(--fg-secondary)">{def.hint}</kbd>
                 )}
               </button>
             );
           })}
-          {files.length > 0 && (
-            <>
-              <div className="pt-4 pb-1 pl-2.5 text-[13px] text-(--fg-secondary)">Suggested</div>
-              <ul className="w-full">
-                {files.map((f, i) => (
-                  <li key={f.full} className={cx("relative flex w-full", i < files.length - 1 && "border-b border-(--border-light)")}>
-                    <button
-                      className="flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-left transition-colors hover:bg-(--surface-hover)"
-                      onClick={() => openFileInPanel(f.full)}
-                    >
-                      <FileIcon name={f.name} size={15} />
-                      <span className="min-w-0 flex-1 truncate text-[13px] text-(--fg)">{f.name}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
         </div>
       </div>
     </div>

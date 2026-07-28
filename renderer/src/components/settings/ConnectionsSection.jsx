@@ -1,5 +1,5 @@
 // Connections: remote-control status, known remote connections (SSH), devices
-// allowed to control this Mac, and related toggles.
+// allowed to control this PC, and related toggles.
 import React, { useEffect, useState } from "react";
 import * as api from "../../api.js";
 import { useStore } from "../../store.js";
@@ -39,8 +39,8 @@ export default function ConnectionsSection() {
 
   return (
     <>
-      <Card title="Control this Mac">
-        <Row title="Control this Mac" desc={statusText ? `Status: ${statusText}` : "Remote control status unavailable"} />
+      <Card title="Control this PC">
+        <Row title="Control this PC" desc={statusText ? `Status: ${statusText}` : "Remote control status unavailable"} />
       </Card>
 
       <Card title="Control other devices">
@@ -57,17 +57,17 @@ export default function ConnectionsSection() {
         )}
       </Card>
 
-      <Card title="Devices that can control this Mac">
+      <Card title="Devices that can control this PC">
         {clients == null ? (
           <div className="px-4 py-4 text-[12px] text-(--fg-faint)">Loading…</div>
         ) : clients.length === 0 ? (
-          <div className="px-4 py-4 text-[12px] text-(--fg-faint)">No devices are currently allowed to control this Mac.</div>
+          <div className="px-4 py-4 text-[12px] text-(--fg-faint)">No devices are currently allowed to control this PC.</div>
         ) : (
           clients.map((c, i) => (
             <Row key={c.id || i} title={c.name || c.deviceName || c.id || "Unknown device"} desc={c.platform || c.kind || undefined} />
           ))
         )}
-        <Row title="Allow connections" desc="Let trusted devices connect and control this Mac">
+        <Row title="Allow connections" desc="Let trusted devices connect and control this PC">
           <Toggle
             on={allow}
             onChange={(v) => {
@@ -79,7 +79,7 @@ export default function ConnectionsSection() {
       </Card>
 
       <Card title="Other settings">
-        <Row title="Keep this Mac awake" desc="Prevent sleep when computer is plugged in and remote access is enabled">
+        <Row title="Keep this PC awake" desc="Prevent sleep when the computer is plugged in and remote access is enabled">
           <Toggle
             on={keepAwake}
             onChange={(v) => {

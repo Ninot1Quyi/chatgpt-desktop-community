@@ -66,7 +66,6 @@ export const IconEye = lucide("Eye");
 export const IconImage = lucide("Image");
 export const IconList = lucide("ListTodo");
 export const IconBolt = lucide("Zap");
-export const IconCommand = lucide("Command");
 export const IconCpu = lucide("Cpu");
 export const IconShield = lucide("ShieldCheck");
 export const IconWrench = lucide("Wrench");
@@ -232,6 +231,12 @@ export const IconPluginFallback = ({ size = 24, className, style }) => (
 // (outline package box, 20x20).
 export const IconSkillBox = ({ size = 20, className, style }) => (
   <svg width={size} height={size} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={style} aria-hidden="true"><path d="M9.79 18.5102C9.48333 18.6969 9.15333 18.7869 8.8 18.7802C8.45333 18.7736 8.13 18.6669 7.83 18.4602L4.35 16.0802C4.07666 15.8936 3.86333 15.6569 3.71 15.3702C3.55666 15.0836 3.48 14.7802 3.48 14.4602V6.53024C3.48 6.20358 3.55333 5.90691 3.7 5.64024C3.85333 5.37358 4.07333 5.15358 4.36 4.98024L10.08 1.46024C10.4067 1.26024 10.76 1.16358 11.14 1.17024C11.52 1.17024 11.87 1.27691 12.19 1.49024L15.71 3.89024C15.97 4.07691 16.17 4.30024 16.31 4.56024C16.45 4.81358 16.52 5.09358 16.52 5.40024V13.2902C16.52 13.6236 16.4367 13.9402 16.27 14.2402C16.1033 14.5402 15.8733 14.7769 15.58 14.9502L9.79 18.5102ZM14.38 4.66024L11.42 2.64024C11.3267 2.57358 11.2233 2.54024 11.11 2.54024C11.0033 2.53358 10.9033 2.56024 10.81 2.62024L5.5 5.89024L8.77 8.11024L14.38 4.66024ZM8.14 9.33025L4.86 7.11024V10.2102L8.14 12.4502V9.33025ZM8.14 14.0402L4.86 11.8002V14.4602C4.86 14.5602 4.88 14.6536 4.92 14.7402C4.96 14.8202 5.02333 14.8902 5.11 14.9502L8.14 17.0202V14.0402ZM15.14 8.89024V5.81024L9.52 9.26025V12.3502L15.14 8.89024ZM14.86 13.7902C14.9533 13.7302 15.0233 13.6602 15.07 13.5802C15.1167 13.4936 15.14 13.3969 15.14 13.2902V10.4802L9.52 13.9402V17.0702L14.86 13.7902Z" fill="currentColor"></path></svg>
+);
+
+// Filled circled-X used by the reference project chip's hover clear button
+// (solid glyph so the folder icon underneath is fully covered).
+export const IconCircleXFill = ({ size = 16, className, style }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={style} aria-hidden="true"><path fillRule="evenodd" clipRule="evenodd" d="M8 1.47461C11.6037 1.47461 14.5254 4.39634 14.5254 8C14.5254 11.6037 11.6037 14.5254 8 14.5254C4.39634 14.5254 1.47461 11.6037 1.47461 8C1.47461 4.39634 4.39634 1.47461 8 1.47461ZM10.0918 5.9082C9.88683 5.70329 9.55463 5.7024 9.34961 5.90723L8 7.25684L6.65039 5.90723C6.44535 5.70239 6.11219 5.70227 5.90723 5.90723C5.70232 6.11219 5.70241 6.44537 5.90723 6.65039L7.25684 8L5.90723 9.34961C5.70241 9.55463 5.70232 9.88781 5.90723 10.0928C6.11219 10.2977 6.44535 10.2976 6.65039 10.0928L8 8.74316L9.34961 10.0928C9.55463 10.2976 9.88683 10.2967 10.0918 10.0918C10.2968 9.88683 10.2976 9.55465 10.0928 9.34961L8.74316 8L10.0928 6.65039C10.2976 6.44535 10.2968 6.11317 10.0918 5.9082Z" fill="currentColor"></path></svg>
 );
 
 // ---- Slash-command glyphs extracted from the reference "/" menu ----

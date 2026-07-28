@@ -1,4 +1,4 @@
-// Quick chat window (⌥⌘N): the reference layout — "New chat" header with
+// Quick chat window (Ctrl+Alt+N): the reference layout — "New chat" header with
 // expand/close, an empty state of tab-type rows + Recent chats, and a
 // compact Message ChatGPT composer at the bottom.
 import React, { useEffect, useMemo } from "react";

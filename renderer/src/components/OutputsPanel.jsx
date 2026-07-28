@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store.js";
 import * as api from "../api.js";
-import { basename } from "../lib/time.js";
+import { basename, isAbsolutePath, joinPath } from "../lib/time.js";
 import { Menu } from "./ui.jsx";
 import {
   IconPlus, IconBranch, IconGlobe, LucideIcon,
@@ -223,8 +223,11 @@ function SourceRow({ item }) {
 }
 
 // Machine row: "Local" plus paired remote hosts (display only).
+// Stable empty fallback: a fresh [] per getSnapshot call loops useSyncExternalStore.
+const NO_REMOTES = [];
+
 function MachineRow() {
-  const remotes = useStore((s) => s.gs?.["codex-managed-remote-connections"] || []);
+  const remotes = useStore((s) => s.gs?.["codex-managed-remote-connections"] || NO_REMOTES);
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const items = [
@@ -352,8 +355,8 @@ function useConversationItems(conv) {
     const activeTurnId = conv?.activeTurnId || null;
     const pushFile = (map, p, kind) => {
       if (!p || typeof p !== "string") return;
-      const full = p.startsWith("/") ? p : conv?.thread?.cwd ? `${conv.thread.cwd.replace(/\/+$/, "")}/${p}` : p;
-      if (!full.startsWith("/") || map.has(full)) return;
+      const full = isAbsolutePath(p) ? p : joinPath(conv?.thread?.cwd, p);
+      if (!isAbsolutePath(full) || map.has(full)) return;
       map.set(full, { path: full, kind });
     };
     const pushUrl = (u) => {

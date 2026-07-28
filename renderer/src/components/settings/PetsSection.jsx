@@ -32,7 +32,7 @@ export default function PetsSection() {
     return first ? String(first).replace(/^custom:/, "") : null;
   })();
   const [pet, setPet] = useState(() => sharedId || lsGet("pet", "codex"));
-  const petsDir = `${appInfo?.home || "~"}/.codex/pets`;
+  const petsDir = `${appInfo?.home || "%USERPROFILE%"}\\.codex\\pets`;
 
   return (
     <>

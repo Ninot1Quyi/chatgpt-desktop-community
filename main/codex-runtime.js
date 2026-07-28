@@ -1,39 +1,32 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const BUNDLED_TARGETS = {
-  "darwin-arm64": "darwin-arm64",
-  "darwin-x64": "darwin-x64",
-  "win32-x64": "win32-x64",
-};
-
+// Windows-only codex binary resolution. Candidate order:
+// explicit override → bundled runtime → standalone install → documented
+// install dir → npm global install → PATH.
 function resolveCodexBinary({
-  platform = process.platform,
-  arch = process.arch,
   resourcesPath = process.resourcesPath,
   env = process.env,
   homePath,
   existsSync = fs.existsSync,
 }) {
-  const paths = platform === "win32" ? path.win32 : path.posix;
-  const executable = platform === "win32" ? "codex.exe" : "codex";
-  const codexHome = env.CODEX_HOME || paths.join(homePath, ".codex");
+  const executable = "codex.exe";
+  const codexHome = env.CODEX_HOME || path.join(homePath, ".codex");
   const candidates = [];
 
   if (env.CODEX_CLI_PATH) candidates.push(env.CODEX_CLI_PATH);
 
-  const bundledTarget = BUNDLED_TARGETS[`${platform}-${arch}`];
-  if (bundledTarget && resourcesPath) {
-    candidates.push(paths.join(
+  if (resourcesPath) {
+    candidates.push(path.join(
       resourcesPath,
       "codex-runtime",
-      bundledTarget,
+      "win32-x64",
       "bin",
       executable,
     ));
   }
 
-  candidates.push(paths.join(
+  candidates.push(path.join(
     codexHome,
     "packages",
     "standalone",
@@ -42,33 +35,35 @@ function resolveCodexBinary({
     executable,
   ));
 
-  if (platform === "win32") {
-    if (env.CODEX_INSTALL_DIR) {
-      candidates.push(paths.join(env.CODEX_INSTALL_DIR, executable));
-    }
-    if (env.LOCALAPPDATA) {
-      candidates.push(paths.join(
-        env.LOCALAPPDATA,
-        "Programs",
-        "OpenAI",
-        "Codex",
-        "bin",
-        executable,
-      ));
-    }
-  } else {
-    candidates.push(paths.join(homePath, ".local", "bin", executable));
+  if (env.CODEX_INSTALL_DIR) {
+    candidates.push(path.join(env.CODEX_INSTALL_DIR, executable));
   }
-
-  if (platform === "darwin") {
-    candidates.push("/Applications/ChatGPT.app/Contents/Resources/codex");
-    candidates.push(paths.join(
-      homePath,
-      "Applications",
-      "ChatGPT.app",
-      "Contents",
-      "Resources",
+  if (env.LOCALAPPDATA) {
+    candidates.push(path.join(
+      env.LOCALAPPDATA,
+      "Programs",
+      "OpenAI",
+      "Codex",
+      "bin",
+      executable,
+    ));
+  }
+  if (env.APPDATA) {
+    // npm global install: `npm i -g @openai/codex` puts the native binary
+    // inside the platform package under the global node_modules tree.
+    candidates.push(path.join(
+      env.APPDATA,
+      "npm",
+      "node_modules",
+      "@openai",
       "codex",
+      "node_modules",
+      "@openai",
+      "codex-win32-x64",
+      "vendor",
+      "x86_64-pc-windows-msvc",
+      "bin",
+      executable,
     ));
   }
 

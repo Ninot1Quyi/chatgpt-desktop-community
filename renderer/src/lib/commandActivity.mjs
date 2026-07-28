@@ -4,20 +4,34 @@ function leaf(path) {
 
 export function displayCommand(command) {
   const value = String(command || "").trim();
-  const wrapped = value.match(/^(?:\/bin\/)?(?:zsh|bash|sh)\s+-lc\s+(['"])([\s\S]*)\1$/);
-  return wrapped ? wrapped[2] : value;
+  const unwrap = (candidate) => {
+    const quote = candidate[0];
+    return (quote === "\"" || quote === "'") && candidate.at(-1) === quote
+      ? candidate.slice(1, -1)
+      : candidate;
+  };
+  const powershell = value.match(/^(?:"?[^"\r\n]*[\\/])?(?:powershell|pwsh)(?:\.exe)?"?\s+([\s\S]+)$/i);
+  const powershellCommand = powershell?.[1].match(/(?:^|\s)-(?:Command|C)\s+([\s\S]+)$/i);
+  if (powershellCommand) return unwrap(powershellCommand[1].trim());
+  const commandPrompt = value.match(/^(?:"?[^"\r\n]*[\\/])?cmd(?:\.exe)?"?\s+[\s\S]*?\/c\s+([\s\S]+)$/i);
+  return commandPrompt ? unwrap(commandPrompt[1].trim()) : value;
 }
 
 function fallbackAction(command) {
   if (!command || /(?:[;&|]|\$\()/.test(command)) return null;
   const args = command.match(/"[^"]*"|'[^']*'|\S+/g)?.map((part) => part.replace(/^(['"])(.*)\1$/, "$2")) || [];
-  const program = leaf(args[0]);
+  const program = leaf(args[0]).toLowerCase();
   const target = leaf(args.at(-1));
-  if (/^(?:sed|cat|head|tail)$/.test(program) && target) return { type: "read", path: target };
-  if ((program === "rg" && args.includes("--files")) || /^(?:find|fd|ls)$/.test(program)) {
-    return { type: "listFiles", path: program === "find" ? args[1] : args.at(-1) };
+  if (/^(?:get-content|gc|type)$/.test(program) && target && target.toLowerCase() !== program) {
+    return { type: "read", path: target };
   }
-  if (/^(?:rg|grep)$/.test(program) || (program === "git" && args[1] === "grep")) {
+  if ((program === "rg" && args.includes("--files"))
+    || /^(?:get-childitem|gci|dir|fd)$/.test(program)
+    || (program === "git" && args[1] === "ls-files")) {
+    const path = args.length > 1 ? args.at(-1) : undefined;
+    return { type: "listFiles", path };
+  }
+  if (/^(?:rg|select-string|sls|findstr)$/.test(program) || (program === "git" && args[1] === "grep")) {
     const start = program === "git" ? 2 : 1;
     const values = args.slice(start).filter((part) => !part.startsWith("-"));
     return values.length > 1

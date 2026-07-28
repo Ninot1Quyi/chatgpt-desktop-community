@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store.js";
 import { cx } from "../lib/cx.js";
 import * as api from "../api.js";
-import { basename, formatDuration } from "../lib/time.js";
+import { basename, formatDuration, joinPath } from "../lib/time.js";
 import { commandActivity } from "../lib/commandActivity.mjs";
 import vscodeIcon from "../assets/vscode.png";
 import Composer from "./Composer.jsx";
@@ -30,6 +30,7 @@ export function CodexMark({ size = 56, className, style }) {
 export default function Conversation() {
   const activeThreadId = useStore((s) => s.activeThreadId);
   const conv = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId] : null));
+  const gs = useStore((s) => s.gs);
   const hasTurns = (conv?.turns || []).length > 0;
 
   if (!activeThreadId) {
@@ -52,7 +53,7 @@ export default function Conversation() {
           <div className="my-auto flex flex-col items-center px-4 py-6">
             <CodexMark size={56} className="text-(--fg) opacity-[0.24]" />
             <div className="mt-5 text-center text-[28px] leading-9 font-medium">
-              What should we build in {basename(threadCwdOf(conv)) || "this folder"}?
+              What should we build in {matchProjectName(gs, threadCwdOf(conv)) || basename(threadCwdOf(conv)) || "this folder"}?
             </div>
           </div>
         </div>
@@ -109,9 +110,12 @@ export function HeaderContextButtons() {
   const activeThreadId = useStore((s) => s.activeThreadId);
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
+  // New chat has no conversation context: only the panel toggles show then
+  // (reference new-chat page).
+  if (!activeThreadId) return null;
   return (
     <div className="flex shrink-0 translate-x-0.5 items-center gap-1.5">
-      {activeThreadId && <OpenInEditorButton />}
+      <OpenInEditorButton />
       <IconButton
         icon={<IconHeaderOutputs />}
         size={16}
@@ -184,7 +188,7 @@ function OpenInEditorButton() {
         align="end"
         items={[
           { id: "vscode", label: "Open in VS Code", onSelect: openVSCode },
-          { id: "finder", label: "Reveal in Finder", onSelect: () => cwd && api.showItemInFolder(cwd) },
+          { id: "explorer", label: "Show in File Explorer", onSelect: () => cwd && api.showItemInFolder(cwd) },
           { id: "copy", label: "Copy path", onSelect: () => cwd && navigator.clipboard.writeText(cwd) },
         ]}
       />
@@ -209,7 +213,7 @@ function ThreadMenu({ thread }) {
   const [worktreeOpen, setWorktreeOpen] = useState(false);
   const [name, setName] = useState("");
 
-  // ⌃R (Rename chat command) opens the same dialog.
+  // Ctrl+R (Rename chat command) opens the same dialog.
   useEffect(() => {
     if (!renameRequest || !activeThreadId) return;
     setName(thread?.name || "");
@@ -259,24 +263,24 @@ function ThreadMenu({ thread }) {
           {
             id: "pin",
             label: pinned ? "Unpin chat" : "Pin chat",
-            hint: "⌥⌘P",
+            hint: "Ctrl+Alt+P",
             onSelect: () => useStore.getState().togglePinnedThread(activeThreadId),
           },
           {
             id: "rename",
             label: "Rename chat",
-            hint: "⌥⌘R",
+            hint: "Ctrl+R",
             onSelect: () => {
               setName(thread?.name || "");
               setRenameOpen(true);
             },
           },
-          { id: "archive", label: "Archive chat", hint: "⇧⌘A", onSelect: () => setArchiveOpen(true) },
+          { id: "archive", label: "Archive chat", hint: "Ctrl+Shift+A", onSelect: () => setArchiveOpen(true) },
           { sep: true },
           {
             id: "sidechat",
             label: "Open side chat",
-            hint: "⌥⌘S",
+            hint: "Ctrl+Alt+S",
             onSelect: () => panelHook.open?.("sidechat"),
           },
           {
@@ -417,8 +421,11 @@ function WorktreeDialog({ open, thread, activeThreadId, onClose }) {
     if (!cwd || !b) return;
     setBusy(true);
     try {
-      const repo = (thread?.cwd || "").replace(/\/+$/, "").split("/").pop() || "repo";
-      const wtDir = `${codexHome || ""}/worktrees/${repo}-${b.replace(/[^\w\u4e00-\u9fff-]+/g, "-")}`;
+      const repo = basename(thread?.cwd) || "repo";
+      const wtDir = joinPath(
+        joinPath(codexHome, "worktrees"),
+        `${repo}-${b.replace(/[^\w\u4e00-\u9fff-]+/g, "-")}`,
+      );
       const r = await api.rpc("command/exec", {
         command: ["git", "worktree", "add", wtDir, "-b", b],
         cwd,
@@ -468,7 +475,7 @@ function WorktreeDialog({ open, thread, activeThreadId, onClose }) {
 // scroll-to-bottom button, top fade gradient.
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
-// Find-in-thread bar (⌘F): query + match navigation with item highlighting.
+// Find-in-thread bar (Ctrl+F): query + match navigation with item highlighting.
 // ---------------------------------------------------------------------------
 function FindBar({ conv }) {
   const setUi = useStore((s) => s.setUi);
@@ -1269,9 +1276,28 @@ function GoalDialog({ open, goal }) {
 // Home screen: dimmed Codex mark + prompt + suggestion cards centered in the
 // middle area; the composer is anchored at the bottom (reference layout).
 // ---------------------------------------------------------------------------
+// Match a cwd to a known project's display name (longest rootPath wins).
+// Returns null outside every project — the reference home then drops the
+// location from the heading entirely ("我们该构建什么？").
+function matchProjectName(gs, cwd) {
+  const norm = (p) => (p || "").replace(/\\/g, "/");
+  const dir = norm(cwd);
+  let best = null;
+  for (const p of Object.values(gs?.["local-projects"] || {})) {
+    for (const rp of p.rootPaths || []) {
+      const r = norm(rp);
+      if (r && (dir === r || dir.startsWith(r + "/")) && (!best || r.length > best.len)) {
+        best = { name: p.name, len: r.length };
+      }
+    }
+  }
+  return best?.name || null;
+}
+
 function Home() {
   const cwd = useStore((s) => s.cwd);
-  const project = basename(cwd);
+  const gs = useStore((s) => s.gs);
+  const project = matchProjectName(gs, cwd);
   const [hasGit, setHasGit] = useState(false);
   useEffect(() => {
     let live = true;
@@ -1282,15 +1308,13 @@ function Home() {
       .catch(() => {});
     return () => { live = false; };
   }, [cwd]);
-  // reference rules: build-in for git projects (name ≤ 15), work-on otherwise
-  // (name too long drops the project name entirely)
+  // reference rules: a matched project always puts its name in the heading;
+  // git projects say "build in", anything else "work on"
   const title = !project
     ? "What should we build?"
-    : project.length > 15
-      ? "What should we work on?"
-      : hasGit
-        ? <>What should we build in <span className="underline decoration-dotted decoration-2 underline-offset-8">{project}</span>?</>
-        : <>What should we work on in <span className="underline decoration-dotted decoration-2 underline-offset-8">{project}</span>?</>;
+    : hasGit
+      ? <>What should we build in <span className="underline decoration-dotted decoration-2 underline-offset-8">{project}</span>?</>
+      : <>What should we work on in <span className="underline decoration-dotted decoration-2 underline-offset-8">{project}</span>?</>;
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center">
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto">

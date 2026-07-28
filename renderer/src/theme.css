@@ -149,6 +149,24 @@
   background: rgb(33 33 33 / 0.7);
 }
 
+/* ---- Windows shell: one continuous gradient behind the sidebar, header,
+   and the gap around the content panel (official Windows client look) ---- */
+.win-shell {
+  background: linear-gradient(155deg, #f2eef7 0%, #edf1f7 52%, #f7f2ec 100%);
+}
+
+.win-shell .app-sidebar {
+  background: transparent;
+}
+
+.dark .win-shell {
+  background: linear-gradient(155deg, #1e2028 0%, #1a1c22 52%, #221f1c 100%);
+}
+
+.dark .win-shell .app-sidebar {
+  background: transparent;
+}
+
 /* ---- shared metrics ---- */
 :root {
   --height-toolbar: 46px;
@@ -287,17 +305,6 @@ body,
 /* horizontal scrollbars hidden (tab strips) */
 .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
-
-.composer-goal-button {
-  transition: none;
-}
-.composer-goal-button:hover {
-  background: color-mix(in srgb, var(--fg) 5.5%, transparent);
-}
-.composer-goal-button:active {
-  background: color-mix(in srgb, var(--fg) 15%, transparent);
-  transform: none;
-}
 
 .text-fade-truncate {
   overflow: hidden;

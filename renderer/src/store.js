@@ -48,6 +48,8 @@ const stored = (k, fallback) => {
 };
 const persist = (k, v) => {
   try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+  // mirror to a file backup; localStorage does not survive hard kills
+  try { api.prefsWrite(k, v); } catch {}
 };
 const threadPlanKey = (threadId) => `thread.plan.${threadId}`;
 
@@ -118,7 +120,7 @@ export const useStore = create((set, get) => ({
   navFwd: [],
   gs: {}, // shared codex global state (projects/pins/assignments)
   profile: null, // { name, username, photo(dataUrl) } from /wham/profiles/me
-  renameRequest: 0, // bump to open the thread rename dialog (⌃R)
+    renameRequest: 0, // bump to open the thread rename dialog (Ctrl+R)
   draftAt: 0, // when the current new-chat draft was opened (seconds)
   composerPrefill: null, // { text, nonce } — Composer consumes and clears
 
@@ -188,6 +190,27 @@ export const useStore = create((set, get) => ({
   // boot
   // =======================================================================
   async init() {
+    // Hydrate persisted prefs from the file backup first (localStorage may
+    // have been wiped by a hard kill; the file mirror is authoritative).
+    try {
+      const prefs = await api.prefsRead();
+      if (prefs && typeof prefs === "object") {
+        for (const [k, v] of Object.entries(prefs)) {
+          try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+        }
+        const uiPatch = {};
+        for (const k of ["sidebarOpen", "sidebarWidth", "rightOpen", "rightTab", "rightWidth", "rightExpanded", "terminalLocation", "suggestedPrompts", "theme"]) {
+          if (`ui.${k}` in prefs) uiPatch[k] = prefs[`ui.${k}`];
+        }
+        set((s) => ({
+          model: "composer.model" in prefs ? prefs["composer.model"] : s.model,
+          effort: "composer.effort" in prefs ? prefs["composer.effort"] : s.effort,
+          serviceTier: "composer.serviceTier" in prefs ? prefs["composer.serviceTier"] : s.serviceTier,
+          permission: "composer.permission" in prefs ? prefs["composer.permission"] : s.permission,
+          ui: { ...s.ui, ...uiPatch },
+        }));
+      }
+    } catch {}
     api.onStatus(({ status, codexHome, binary, binaryCandidates, error }) => {
       set({
         status,
@@ -201,6 +224,12 @@ export const useStore = create((set, get) => ({
     api.onNotification(({ method, params }) => get().handleNotification(method, params));
     api.onServerRequest((req) => get().handleServerRequest(req));
     api.onThemeUpdated(() => get().applyTheme());
+    // App updates: surface a toast when a new version is ready to install.
+    api.onUpdateStatus?.((s) => {
+      if (s?.status === "downloaded") {
+        get().toast(`Version ${s.version || ""} downloaded — restart to update (Settings → Updates)`);
+      }
+    });
     // Shared sidebar state (projects/pins) — same file the official app uses.
     api.gsRead().then((gs) => set({ gs: gs || {} })).catch(() => {});
     api.onGsChanged(() => api.gsRead().then((gs) => set({ gs: gs || {} })).catch(() => {}));
@@ -353,6 +382,16 @@ export const useStore = create((set, get) => ({
     // opening a thread always lands on the chat view (reference behavior)
     get().setUi({ navView: "chats" });
     set({ activeThreadId: threadId });
+    // restore this thread's composer prefs (model/effort/tier/permission)
+    const tp = stored(`thread.prefs.${threadId}`, null);
+    if (tp) {
+      set((s) => ({
+        model: tp.model ?? s.model,
+        effort: tp.effort ?? s.effort,
+        serviceTier: tp.serviceTier ?? s.serviceTier,
+        permission: tp.permission ?? s.permission,
+      }));
+    }
     const conv = get().conversations[threadId];
     if (conv?.loaded) return;
     set((s) => ({
@@ -466,7 +505,39 @@ export const useStore = create((set, get) => ({
     const model = get().model;
     const effort = get().effort;
 
+    // Optimistic echo: render the user's message and the running state
+    // instantly instead of waiting for the app-server's turn/started
+    // notification. The local turn is replaced by the real one when
+    // turn/started arrives (see handleNotification).
+    const localTurnId = `local-turn:${crypto.randomUUID()}`;
+    const optimisticTurn = {
+      id: localTurnId,
+      items: [{ id: `local-item:${crypto.randomUUID()}`, type: "userMessage", content: input }],
+    };
     let threadId = activeThreadId;
+    const tempThreadId = threadId ? null : `local-thread:${crypto.randomUUID()}`;
+    const shownId = threadId || tempThreadId;
+    set((s) => {
+      const conv = s.conversations[shownId] || {
+        thread: threadId ? null : { cwd: s.cwd },
+        turns: [],
+        activeTurnId: null,
+        plan: null,
+        tokenUsage: null,
+        diff: null,
+        loaded: true,
+        loading: false,
+        error: null,
+      };
+      return {
+        activeThreadId: shownId,
+        conversations: {
+          ...s.conversations,
+          [shownId]: { ...conv, activeTurnId: localTurnId, turns: upsertTurn(conv.turns, optimisticTurn) },
+        },
+      };
+    });
+
     try {
       if (!threadId) {
         set({ pendingNewThread: true });
@@ -483,23 +554,15 @@ export const useStore = create((set, get) => ({
         set({ pendingNewThread: false });
         if (!threadId) throw new Error("thread/start returned no thread");
         if (res.thread) get().upsertThread(res.thread);
-        set((s) => ({
-          activeThreadId: threadId,
-          conversations: {
-            ...s.conversations,
-            [threadId]: {
-              thread: res.thread || null,
-              turns: [],
-              activeTurnId: null,
-              plan: null,
-              tokenUsage: null,
-              diff: null,
-              loaded: true,
-              loading: false,
-              error: null,
-            },
-          },
-        }));
+        // move the optimistic conversation onto the real thread id
+        set((s) => {
+          const conv = s.conversations[tempThreadId];
+          const conversations = { ...s.conversations };
+          delete conversations[tempThreadId];
+          conversations[threadId] = { ...(conv || {}), thread: res.thread || null };
+          return { activeThreadId: threadId, conversations };
+        });
+        get()._saveThreadPrefs();
       }
 
       const turnParams = {
@@ -520,9 +583,32 @@ export const useStore = create((set, get) => ({
           settings: { model, reasoning_effort: effort || null },
         };
       }
-      await api.rpc("turn/start", turnParams);
+      try {
+        await api.rpc("turn/start", turnParams);
+      } catch (e) {
+        // After an app-server restart, previously opened threads are gone from
+        // its memory ("thread not found"). Resume from the rollout file and
+        // retry the turn once.
+        if (!/thread not found/i.test(e?.message || "")) throw e;
+        await api.rpc("thread/resume", { threadId });
+        await api.rpc("turn/start", turnParams);
+      }
     } catch (e) {
       set({ pendingNewThread: false });
+      // roll back the optimistic turn (and the temp draft conversation)
+      set((s) => {
+        const conversations = { ...s.conversations };
+        const conv = conversations[shownId];
+        if (conv) {
+          conversations[shownId] = {
+            ...conv,
+            activeTurnId: conv.activeTurnId === localTurnId ? null : conv.activeTurnId,
+            turns: conv.turns.filter((t) => t.id !== localTurnId),
+          };
+        }
+        if (tempThreadId) delete conversations[tempThreadId];
+        return { conversations, activeThreadId: tempThreadId ? null : s.activeThreadId };
+      });
       get().toast(`Send failed: ${e.message}`, "error");
     }
   },
@@ -618,18 +704,35 @@ export const useStore = create((set, get) => ({
     if (m && !m.supportedReasoningEfforts?.some((e) => e.reasoningEffort === get().effort)) {
       get().setEffort(m.defaultReasoningEffort || null);
     }
+    get()._saveThreadPrefs();
   },
   setEffort(effort) {
     set({ effort });
     persist("composer.effort", effort);
+    get()._saveThreadPrefs();
   },
   setServiceTier(tier) {
     set({ serviceTier: tier });
     persist("composer.serviceTier", tier);
+    get()._saveThreadPrefs();
   },
   setPermission(p) {
     set({ permission: p });
     persist("composer.permission", p);
+    get()._saveThreadPrefs();
+  },
+  // Per-thread composer prefs: the official client remembers model / effort /
+  // tier / permission per conversation. Saved whenever they change while a
+  // thread is active, restored on openThread.
+  _saveThreadPrefs() {
+    const id = get().activeThreadId;
+    if (!id) return;
+    persist(`thread.prefs.${id}`, {
+      model: get().model,
+      effort: get().effort,
+      serviceTier: get().serviceTier,
+      permission: get().permission,
+    });
   },
   setMode(mode) {
     set({ mode });
@@ -643,9 +746,32 @@ export const useStore = create((set, get) => ({
     set({ cwd });
     persist("composer.cwd", cwd);
   },
+  // Register a folder as a local project in the shared global-state file,
+  // like the official client does — otherwise no picker can match the cwd
+  // and the chip keeps reading "Select project".
+  addLocalProject(dir) {
+    if (!dir) return;
+    const norm = (p) => (p || "").replace(/\\/g, "/");
+    const dirN = norm(dir);
+    const local = { ...(get().gs?.["local-projects"] || {}) };
+    const known = Object.values(local).some((p) =>
+      (p.rootPaths || []).some((rp) => {
+        const r = norm(rp);
+        return r && (dirN === r || dirN.startsWith(r + "/"));
+      })
+    );
+    if (known) return;
+    const now = Date.now();
+    const id = `local-${crypto.randomUUID().replaceAll("-", "")}`;
+    local[id] = { id, name: dirN.split("/").pop() || dirN, rootPaths: [dir], createdAt: now, updatedAt: now };
+    set((s) => ({ gs: { ...s.gs, "local-projects": local } }));
+    api.gsPatch({ "local-projects": local });
+  },
   async pickCwd() {
     const dir = await api.pickDirectory(get().cwd);
-    if (dir) get().setCwd(dir);
+    if (!dir) return;
+    get().addLocalProject(dir);
+    get().setCwd(dir);
   },
 
   // =======================================================================
@@ -774,7 +900,8 @@ export const useStore = create((set, get) => ({
           return {
             ...c,
             activeTurnId: params.turn?.id,
-            turns: upsertTurn(c.turns, turn),
+            // the real turn replaces the optimistic local echo
+            turns: upsertTurn(c.turns.filter((t) => !String(t.id).startsWith("local-turn:")), turn),
           };
         });
         break;

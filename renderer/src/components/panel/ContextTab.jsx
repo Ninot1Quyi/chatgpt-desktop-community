@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { useStore } from "../../store.js";
 import { localFileUrl, showItemInFolder, openPath } from "../../api.js";
-import { basename } from "../../lib/time.js";
+import { basename, isAbsolutePath, joinPath } from "../../lib/time.js";
 import { cx } from "../../lib/cx.js";
 import { IconFile, IconImage, IconFolder, IconChevronDown } from "../icons.jsx";
 import { EmptyState } from "./common.jsx";
@@ -96,7 +96,7 @@ function Row({ item }) {
       </button>
       <button
         className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover:flex"
-        title="Reveal in Finder"
+        title="Show in File Explorer"
         onClick={() => showItemInFolder(item.path)}
       >
         <IconFolder size={12} />
@@ -107,6 +107,5 @@ function Row({ item }) {
 
 function absolutize(p, cwd) {
   if (!p) return p;
-  if (p.startsWith("/")) return p;
-  return cwd ? `${cwd.replace(/\/+$/, "")}/${p}` : p;
+  return isAbsolutePath(p) ? p : joinPath(cwd, p);
 }

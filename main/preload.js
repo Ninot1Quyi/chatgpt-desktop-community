@@ -1,5 +1,5 @@
 // Preload: exposes a minimal, safe bridge to the renderer (contextIsolation on).
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 function subscribe(channel) {
   return (cb) => {
@@ -11,7 +11,11 @@ function subscribe(channel) {
 
 contextBridge.exposeInMainWorld("codexBridge", {
   // JSON-RPC to app-server
-  request: (method, params) => ipcRenderer.invoke("rpc:request", { method, params }),
+  request: async (method, params) => {
+    const r = await ipcRenderer.invoke("rpc:request", { method, params });
+    if (r && r.ok === false) throw new Error(r.error);
+    return r && r.result;
+  },
   respond: (id, result, error) => ipcRenderer.invoke("rpc:respond", { id, result, error }),
   onNotification: subscribe("rpc:notification"),
   onServerRequest: subscribe("rpc:server-request"),
@@ -43,6 +47,10 @@ contextBridge.exposeInMainWorld("codexBridge", {
   gsPatch: (patch) => ipcRenderer.invoke("gs:patch", patch),
   onGsChanged: subscribe("gs:changed"),
 
+  // Renderer prefs backup (localStorage mirror, survives hard kills)
+  prefsRead: () => ipcRenderer.invoke("prefs:read"),
+  prefsWrite: (key, value) => ipcRenderer.invoke("prefs:write", { key, value }),
+
   // ChatGPT profile (display name + avatar data url)
   profileRead: (refresh) => ipcRenderer.invoke("profile:read", { refresh }),
 
@@ -52,6 +60,30 @@ contextBridge.exposeInMainWorld("codexBridge", {
   // Fetch a remote image via the main process (CSP/Cloudflare-safe) → data URL
   iconFetch: (url) => ipcRenderer.invoke("icon:fetch", { url }),
 
+  // Auto-update (packaged builds only)
+  onUpdateStatus: subscribe("update:status"),
+  getUpdateStatus: () => ipcRenderer.invoke("update:status-get"),
+  checkForUpdates: () => ipcRenderer.invoke("update:check"),
+  installUpdate: () => ipcRenderer.invoke("update:install"),
+
+  // Absolute path of a File from <input type=file> / drag-drop / paste
+  // (File.path was removed in Electron 32; webUtils is the replacement).
+  getFilePath: (file) => webUtils.getPathForFile(file),
+
   // Sign out (backs up auth.json then restarts into the connect screen)
   logout: () => ipcRenderer.invoke("account:logout"),
+
+  // Windows in-window menu bar actions
+  editRole: (role) => ipcRenderer.invoke("edit:role", role),
+  viewZoom: (direction) => ipcRenderer.invoke("view:zoom", direction),
+  viewReload: () => ipcRenderer.invoke("view:reload"),
+  viewToggleDevtools: () => ipcRenderer.invoke("view:toggle-devtools"),
+  windowClose: () => ipcRenderer.invoke("window:close"),
+
+  // Custom Windows caption buttons
+  windowMinimize: () => ipcRenderer.invoke("window:minimize"),
+  windowToggleMaximize: () => ipcRenderer.invoke("window:toggle-maximize"),
+  windowIsMaximized: () => ipcRenderer.invoke("window:is-maximized"),
+  windowGetBounds: () => ipcRenderer.invoke("window:get-bounds"),
+  onMaximizeChanged: subscribe("window:maximize-changed"),
 });
