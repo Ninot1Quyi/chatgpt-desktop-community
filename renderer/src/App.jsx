@@ -24,6 +24,7 @@ export default function App() {
   const requiresOpenaiAuth = useStore((s) => s.requiresOpenaiAuth);
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
+  const isWin = useStore((s) => s.appInfo?.platform === "win32");
 
   useEffect(() => { init(); }, []);
   // deep-link: ?thread=<id> (Open in new window) — open it once ready.
@@ -104,7 +105,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell-root win-shell relative h-full w-full overflow-hidden">
+    <div className={cx("app-shell-root relative h-full w-full overflow-hidden", isWin && "win-shell")}>
       <>
       {/* full-height regions; the 46px title bar floats transparently on top
           (sidebar toggle, back/forward, menus, caption buttons). The white
@@ -126,7 +127,10 @@ export default function App() {
             />
           </>
         )}
-        <div className="mt-[46px] ml-2 flex min-w-0 flex-1 overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)">
+        <div className={cx(
+          "flex min-w-0 flex-1 overflow-hidden bg-(--surface)",
+          isWin ? "mt-[46px] ml-2 rounded-tl-[10px] border-t border-l border-(--border-light)" : "pt-[46px]",
+        )}>
           {/* conversation column: its own toolbar row (official layout — each
               region carries a 46px toolbar directly below the title bar) */}
           <div className={cx("flex min-w-[360px] flex-1 flex-col", ui.rightOpen && ui.rightExpanded && "hidden")}>
@@ -236,12 +240,14 @@ function GlobalHeader() {
   const navBack = useStore((s) => s.navBack);
   const navFwd = useStore((s) => s.navFwd);
   const { goBack, goForward } = useStore();
+  // macOS needs the traffic-light inset; Windows has no left-side controls.
+  const isWin = useStore((s) => s.appInfo?.platform === "win32");
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pl-3">
+    <div className={cx("app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1", isWin ? "pl-3" : "pl-[88px]")}>
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
-        title="Toggle sidebar (Ctrl+B)"
+        title="Toggle sidebar (⌘B)"
         onClick={() => setUi({ sidebarOpen: !ui.sidebarOpen })}
       />
       <IconButton
@@ -284,12 +290,13 @@ function PeekHeader() {
   const navBack = useStore((s) => s.navBack);
   const navFwd = useStore((s) => s.navFwd);
   const { goBack, goForward } = useStore();
+  const isWin = useStore((s) => s.appInfo?.platform === "win32");
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-3">
+    <div className={cx("app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5", isWin ? "pl-3" : "pl-[84px]")}>
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
-        title="Show sidebar (Ctrl+B)"
+        title="Show sidebar (⌘B)"
         onClick={() => setUi({ sidebarOpen: true, sidebarPeek: false })}
       />
       <IconButton
@@ -452,7 +459,7 @@ function FloatingSidebarToggle() {
     <button
       className="app-no-drag fixed top-[9px] left-[84px] z-30 flex h-7 items-center gap-1 rounded-lg border border-(--border-light) bg-(--surface-raised) px-2 text-xs text-(--fg-secondary) shadow-sm hover:bg-(--surface-hover)"
       onClick={() => setUi({ sidebarOpen: true })}
-      title="Show sidebar (Ctrl+B)"
+      title="Show sidebar (⌘B)"
     >
       ☰ Chats
     </button>

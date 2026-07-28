@@ -1,10 +1,7 @@
 // Click an element by visible text in the original app, wait, screenshot.
 // Usage: node cdp-click.mjs "<text>" <outfile.png> [waitMs] [which=first|last]
-import { tmpdir } from "node:os";
-import path from "node:path";
-
 const text = process.argv[2];
-const out = process.argv[3] || path.join(tmpdir(), "orig-click.png");
+const out = process.argv[3] || "/tmp/orig-click.png";
 const waitMs = Number(process.argv[4] || 3000);
 const which = process.argv[5] || "first";
 

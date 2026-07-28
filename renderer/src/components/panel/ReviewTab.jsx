@@ -18,7 +18,6 @@ export default function ReviewTab() {
   const conv = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId] : null));
   const globalCwd = useStore((s) => s.cwd);
   const home = useStore((s) => s.appInfo?.home);
-  const temp = useStore((s) => s.appInfo?.temp);
   const cwd = conv?.thread?.cwd || globalCwd;
   const gitBranch = conv?.thread?.gitInfo?.branch;
   const [state, setState] = useState({ status: "loading", branch: "", staged: [], unstaged: [], untracked: [] });
@@ -116,7 +115,7 @@ export default function ReviewTab() {
     const body = hunk.lines
       .map((l) => (l.type === "add" ? "+" : l.type === "del" ? "-" : l.type === "meta" ? "\\" : " ") + l.text)
       .join("\n");
-    const tmp = `${String(temp || home || cwd).replace(/[\\/]+$/, "")}\\codex-hunk-${Date.now()}.patch`;
+    const tmp = `/tmp/codex-hunk-${Date.now()}.patch`;
     try {
       await api.rpc("fs/writeFile", { path: tmp, content: header + body + "\n" });
       const r = await api.rpc("command/exec", { command: ["git", "apply", "-R", tmp], cwd, timeoutMs: 15000 });

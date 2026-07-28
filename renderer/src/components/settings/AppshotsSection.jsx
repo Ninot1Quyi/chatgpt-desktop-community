@@ -1,4 +1,4 @@
-// Appshots screenshot preferences. Persisted under `appshots.*`.
+// Appshots: ⌘+⌘ screenshot hotkey prefs. Persisted under `appshots.*`.
 import React, { useState } from "react";
 import { Card, Row, Toggle, Dropdown, lsGet, lsSet } from "./shared.jsx";
 
@@ -13,9 +13,9 @@ export default function AppshotsSection() {
         <div className="mt-0.5">Appshots include visual and text content, including text scrolled offscreen</div>
       </div>
       <Card>
-      <Row title="Hotkey" desc="Capture the foreground window">
+      <Row title="Hotkey" desc="Press both ⌘ keys simultaneously">
         <kbd className="rounded-md border border-(--border) bg-(--surface-hover) px-1.5 py-0.5 font-mono text-xs text-(--fg-secondary)">
-          Ctrl+Shift+S
+          ⌘ + ⌘
         </kbd>
       </Row>
       <Row title="Appshot destination" desc="Choose where appshots go when you use the hotkey">

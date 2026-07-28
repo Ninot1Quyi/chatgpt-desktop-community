@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../../store.js";
 import * as api from "../../api.js";
 import { cx } from "../../lib/cx.js";
-import { basename, isAbsolutePath, isPathInside, joinPath, relativePath } from "../../lib/time.js";
+import { basename } from "../../lib/time.js";
 import { Menu, Spinner } from "../ui.jsx";
 import Markdown from "../Markdown.jsx";
 import {
@@ -74,8 +74,8 @@ export default function FilesTab({ tab }) {
 
   const segments = useMemo(() => {
     if (!path || !root) return [];
-    const rel = relativePath(path, root) ?? basename(path);
-    return rel.split(/[\\/]/);
+    const rel = path.startsWith(root.replace(/\/+$/, "") + "/") ? path.slice(root.replace(/\/+$/, "").length + 1) : basename(path);
+    return rel.split("/");
   }, [path, root]);
 
   return (
@@ -83,7 +83,7 @@ export default function FilesTab({ tab }) {
       {/* breadcrumb bar (h-toolbar-pane = 40px) */}
       <nav className="flex h-10 shrink-0 items-center gap-1 border-b border-(--border-light) px-2 select-none">
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1 text-xs text-(--fg-secondary)">
-          <Crumb text={basename(root) || root} />
+          <Crumb text={basename(root.replace(/\/+$/, "")) || root} />
           {segments.map((seg, i) => (
             <React.Fragment key={i}>
               <IconChevronRight size={10} className="shrink-0 text-(--fg-faint)" />
@@ -104,10 +104,10 @@ export default function FilesTab({ tab }) {
             className="mr-1 flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-(--border) px-2.5 text-[13px] text-(--fg) hover:bg-(--surface-hover)"
             onClick={save}
             disabled={saving}
-            title="Save (Ctrl+S)"
+            title="Save (⌘S)"
           >
             {saving ? "Saving…" : "Save"}
-            <kbd className="rounded bg-(--surface-hover) px-1 py-px text-[10px] text-(--fg-tertiary)">Ctrl+S</kbd>
+            <kbd className="rounded bg-(--surface-hover) px-1 py-px text-[10px] text-(--fg-tertiary)">⌘S</kbd>
           </button>
         )}
         <IconBtn title="Toggle file tree" active={treeOpen} onClick={() => setTreeOpen(!treeOpen)}>
@@ -232,7 +232,7 @@ function OpenSplitButton({ path }) {
         onClose={() => setOpen(false)}
         align="end"
         items={[
-          { id: "reveal", label: "Show in File Explorer", onSelect: () => api.showItemInFolder(path) },
+          { id: "reveal", label: "Reveal in Finder", onSelect: () => api.showItemInFolder(path) },
           { id: "copy", label: "Copy path", onSelect: () => navigator.clipboard.writeText(path) },
         ]}
       />
@@ -384,7 +384,7 @@ function CodeEditor({ path, value, onChange, onSave }) {
         onChange={(e) => onChange(e.target.value)}
         onScroll={syncScroll}
         onKeyDown={(e) => {
-          if (e.ctrlKey && e.key.toLowerCase() === "s") {
+          if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
             e.preventDefault();
             onSave?.();
           }
@@ -422,7 +422,7 @@ function FileTree({ root, selected, onSelect }) {
           if (arrow >= 0) p = p.slice(arrow + 4);
           const letter = xy.includes("D") ? "D" : xy.includes("R") ? "R" : xy.includes("A") || xy.includes("?") ? (xy.includes("?") ? "U" : "A") : "M";
           const color = letter === "D" ? "#e05252" : letter === "R" ? "#4a90d9" : letter === "M" ? "#d8913a" : "#40c977";
-          map.set(joinPath(root, p), { letter, color });
+          map.set(`${root.replace(/\/+$/, "")}/${p}`, { letter, color });
         }
         setGitMap(map);
       })
@@ -461,12 +461,12 @@ function FileTree({ root, selected, onSelect }) {
         {results ? (
           results.length ? (
             results.map((p) => {
-              const full = isAbsolutePath(p) ? p : joinPath(root, p);
+              const full = p.startsWith("/") ? p : `${root.replace(/\/+$/, "")}/${p}`;
               return (
                 <TreeRow
                   key={p}
                   depth={0}
-                  name={isPathInside(p, root) ? relativePath(p, root) : p}
+                  name={p.startsWith(root) ? p.slice(root.replace(/\/+$/, "").length + 1) : p}
                   full={full}
                   isDir={false}
                   selected={selected === full}
@@ -520,7 +520,7 @@ function DirNode({ path, depth, selected, onSelect, gitMap }) {
 
 function TreeEntry({ entry, parent, depth, selected, onSelect, gitMap }) {
   const [open, setOpen] = useState(false);
-  const full = joinPath(parent, entry.fileName);
+  const full = `${parent}/${entry.fileName}`;
   return (
     <div>
       <TreeRow

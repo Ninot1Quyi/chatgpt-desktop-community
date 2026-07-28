@@ -130,7 +130,7 @@ export default function TerminalTab() {
     ro.observe(el);
 
     api.rpc("command/exec", {
-      command: ["powershell.exe", "-NoLogo", "-NoProfile", "-NoExit"],
+      command: ["zsh", "-il"],
       cwd: root || undefined,
       env: { TERM: "xterm-256color" },
       tty: true,
@@ -138,9 +138,6 @@ export default function TerminalTab() {
       streamStdin: true,
       streamStdoutStderr: true,
       disableTimeout: true,
-      // Windows sandbox execution does not support streaming. This is a
-      // user-controlled interactive shell, so run only the PTY session outside it.
-      sandboxPolicy: { type: "dangerFullAccess" },
       size: { cols, rows },
     })
       .then((res) => {
@@ -181,14 +178,10 @@ export default function TerminalTab() {
 
   const runOneshot = async (cmd) => {
     if (!cmd.trim()) return;
-    append(`PS> ${cmd}\n`);
+    append(`$ ${cmd}\n`);
     setBusy(true);
     try {
-      const r = await api.rpc("command/exec", {
-        command: ["powershell.exe", "-NoLogo", "-NoProfile", "-Command", cmd],
-        cwd: root || undefined,
-        timeoutMs: 60000,
-      });
+      const r = await api.rpc("command/exec", { command: ["zsh", "-lc", cmd], cwd: root || undefined, timeoutMs: 60000 });
       const stdout = r?.stdout ?? r?.output ?? "";
       const stderr = r?.stderr ?? "";
       const text = [stdout.trimEnd(), stderr.trimEnd()].filter(Boolean).join("\n");

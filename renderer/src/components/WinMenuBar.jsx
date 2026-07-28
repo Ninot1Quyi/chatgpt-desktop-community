@@ -1,6 +1,7 @@
-// In-window menu bar (File / Edit / View / Help), rendered inside the global
-// header next to the sidebar/back/forward buttons — matching the official
-// Windows client, where these menus share the header row.
+// Windows-only in-window menu bar (File / Edit / View / Help), rendered inside
+// the global header next to the sidebar/back/forward buttons — matching the
+// official Windows client, where these menus share the header row. On macOS
+// the menus live in the system menu bar, so this component renders nothing.
 import React, { useRef, useState } from "react";
 import { useStore } from "../store.js";
 import * as api from "../api.js";
@@ -10,8 +11,11 @@ import { Menu } from "./ui.jsx";
 const DOCS_URL = "https://developers.openai.com/codex/";
 
 export default function WinMenuBar() {
+  const isWin = useStore((s) => s.appInfo?.platform === "win32");
   const [openId, setOpenId] = useState(null);
   const btnRefs = useRef({});
+
+  if (!isWin) return null;
 
   const newChat = () => {
     const s = useStore.getState();

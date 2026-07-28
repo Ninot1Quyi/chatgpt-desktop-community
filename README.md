@@ -4,7 +4,7 @@
 
 # ChatGPT Desktop Community
 
-An unofficial community-built Windows desktop client for ChatGPT and Codex.
+An unofficial community-built desktop client for ChatGPT and Codex.
 
 This project recreates the ChatGPT Desktop experience with Electron and React, using the official local `codex app-server` for chats, tools, approvals, and account access.
 
@@ -44,35 +44,25 @@ The interface is under active development. Protocol changes in `codex app-server
 
 ## Getting started
 
-The supported target is Windows 10/11 x64. Download the NSIS installer from the [latest release](https://github.com/Ninot1Quyi/chatgpt-desktop-community/releases/latest). Installed builds check GitHub Releases for updates at launch, every six hours, and on demand in Settings → General → Updates.
+To install and use the app, download a prebuilt version from the [latest release](https://github.com/Ninot1Quyi/chatgpt-desktop-community/releases/latest).
 
 ### Development
 
-Development requires Windows x64, Node.js 22, npm, and Git. Install and build with:
+Recommended: use ChatGPT Desktop, Claude Code, or Cursor and say:
 
-```powershell
-npm ci
-npm run build
-npm start
-```
-
-Create the Windows installer with:
-
-```powershell
-npm run dist:win
-```
+> Clone [Ninot1Quyi/chatgpt-desktop-community](https://github.com/Ninot1Quyi/chatgpt-desktop-community), then start it.
 
 ## Privacy and security
 
-- Never commit or share `%USERPROFILE%\.codex\auth.json`.
+- Never commit or share `~/.codex/auth.json`.
 - Keep local paths, account details, thread content, and private project names out of screenshots and bug reports.
 - Treat Full Access mode as privileged: it can run commands, use the network, and modify files.
 - Review protocol and filesystem boundary changes carefully, especially Electron IPC and preload code.
 
 ## Current limitations
 
-- The installer is currently unsigned, so Windows may show a SmartScreen warning.
-- Only Windows x64 is supported.
+- macOS is the only platform regularly exercised.
+- There is no signed installer or automatic update channel yet.
 - The Browser panel provides practical embedded navigation, but it does not reproduce every browser-control feature of the official client.
 - Compatibility can lag behind newly released app-server methods or notification shapes.
 - This remains an independent community implementation, so visual and behavioral differences are expected for now; the goal is complete visual and behavioral parity.

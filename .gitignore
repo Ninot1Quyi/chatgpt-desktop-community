@@ -4,3 +4,4 @@ release/
 _analysis/asar-out/
 _analysis/reference/
 *.log
+.DS_Store

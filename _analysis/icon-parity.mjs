@@ -6,21 +6,15 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
-function readOriginalBundle() {
-  const asarPath = process.env.ORIGINAL_CHATGPT_ASAR;
-  if (!asarPath) {
-    throw new Error("Set ORIGINAL_CHATGPT_ASAR to the reference app.asar path");
-  }
-  return readFileSync(asarPath);
-}
-
 const manifestPath = process.argv[2];
 const actualPort = Number(process.argv[3] || 9222);
 const referencePort = process.argv[4] ? Number(process.argv[4]) : null;
 if (!manifestPath) throw new Error("Expected: <manifest.json> [actualPort] [referencePort]");
 
 if (manifestPath === "--source-fragments") {
-  const originalBundle = readOriginalBundle();
+  const originalBundle = readFileSync(
+    process.env.ORIGINAL_CHATGPT_ASAR || "/Applications/ChatGPT.app/Contents/Resources/app.asar",
+  );
   const files = [];
   const walk = (directory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -74,7 +68,9 @@ if (["--lucide-catalog", "--custom-catalog", "--call-site-catalog"].includes(man
         })),
       };
     } else if (manifestPath === "--custom-catalog") {
-      const originalBundle = readOriginalBundle();
+      const originalBundle = readFileSync(
+        process.env.ORIGINAL_CHATGPT_ASAR || "/Applications/ChatGPT.app/Contents/Resources/app.asar",
+      );
       const lucideExports = new Set(mappings.map(({ exportName }) => exportName));
       manifest = {
         icons: Object.keys(icons)
@@ -95,7 +91,9 @@ if (["--lucide-catalog", "--custom-catalog", "--call-site-catalog"].includes(man
           }),
       };
     } else {
-      const originalBundle = readOriginalBundle();
+      const originalBundle = readFileSync(
+        process.env.ORIGINAL_CHATGPT_ASAR || "/Applications/ChatGPT.app/Contents/Resources/app.asar",
+      );
       const references = new Map(mappings.map(({ exportName, referenceName }) => [exportName, referenceName]));
       const exportedIcons = new Set(Object.keys(icons).filter((name) => name.startsWith("Icon")));
       const files = [];

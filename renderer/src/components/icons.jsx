@@ -66,6 +66,7 @@ export const IconEye = lucide("Eye");
 export const IconImage = lucide("Image");
 export const IconList = lucide("ListTodo");
 export const IconBolt = lucide("Zap");
+export const IconCommand = lucide("Command");
 export const IconCpu = lucide("Cpu");
 export const IconShield = lucide("ShieldCheck");
 export const IconWrench = lucide("Wrench");

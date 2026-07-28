@@ -3,20 +3,24 @@ const test = require("node:test");
 const { resolveCodexBinary } = require("./codex-runtime");
 
 test("prefers an explicit override", () => {
-  const override = String.raw`D:\tools\codex.exe`;
+  const override = "/custom/codex";
   const result = resolveCodexBinary({
-    resourcesPath: String.raw`C:\App\resources`,
+    platform: "darwin",
+    arch: "arm64",
+    resourcesPath: "/App/Resources",
     env: { CODEX_CLI_PATH: override },
-    homePath: String.raw`C:\Users\Test`,
+    homePath: "/Users/test",
     existsSync: (candidate) => candidate === override,
   });
 
   assert.equal(result.binary, override);
 });
 
-test("uses the bundled runtime before installed copies", () => {
+test("uses the bundled Windows runtime before installed copies", () => {
   const bundled = String.raw`C:\App\resources\codex-runtime\win32-x64\bin\codex.exe`;
   const result = resolveCodexBinary({
+    platform: "win32",
+    arch: "x64",
     resourcesPath: String.raw`C:\App\resources`,
     env: {
       LOCALAPPDATA: String.raw`C:\Users\Test\AppData\Local`,
@@ -28,9 +32,11 @@ test("uses the bundled runtime before installed copies", () => {
   assert.equal(result.binary, bundled);
 });
 
-test("finds the documented standalone install location", () => {
+test("finds the documented standalone Windows install location", () => {
   const installed = String.raw`C:\Users\Test\AppData\Local\Programs\OpenAI\Codex\bin\codex.exe`;
   const result = resolveCodexBinary({
+    platform: "win32",
+    arch: "x64",
     resourcesPath: String.raw`C:\Missing\resources`,
     env: {
       LOCALAPPDATA: String.raw`C:\Users\Test\AppData\Local`,
@@ -42,9 +48,11 @@ test("finds the documented standalone install location", () => {
   assert.equal(result.binary, installed);
 });
 
-test("finds the npm global install location", () => {
+test("finds the npm global install location on Windows", () => {
   const npmGlobal = String.raw`C:\Users\Test\AppData\Roaming\npm\node_modules\@openai\codex\node_modules\@openai\codex-win32-x64\vendor\x86_64-pc-windows-msvc\bin\codex.exe`;
   const result = resolveCodexBinary({
+    platform: "win32",
+    arch: "x64",
     resourcesPath: String.raw`C:\Missing\resources`,
     env: {
       APPDATA: String.raw`C:\Users\Test\AppData\Roaming`,
@@ -56,14 +64,17 @@ test("finds the npm global install location", () => {
   assert.equal(result.binary, npmGlobal);
 });
 
-test("falls back to PATH only after checking install locations", () => {
+test("falls back to PATH only after checking OS-specific locations", () => {
   const result = resolveCodexBinary({
-    resourcesPath: String.raw`C:\Missing\resources`,
+    platform: "darwin",
+    arch: "x64",
+    resourcesPath: "/App/Resources",
     env: {},
-    homePath: String.raw`C:\Users\Test`,
+    homePath: "/Users/test",
     existsSync: () => false,
   });
 
   assert.equal(result.binary, "codex");
   assert.equal(result.candidates.at(-1), "PATH: codex");
+  assert.ok(result.candidates.includes("/Applications/ChatGPT.app/Contents/Resources/codex"));
 });

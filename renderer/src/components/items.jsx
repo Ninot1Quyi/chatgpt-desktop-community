@@ -5,7 +5,7 @@ import { cx } from "../lib/cx.js";
 import * as api from "../api.js";
 import { localFileUrl, showItemInFolder } from "../api.js";
 import { countDiff, parseUnifiedDiff } from "../lib/diff.js";
-import { basename, formatDuration, isAbsolutePath, joinPath, relativePath } from "../lib/time.js";
+import { basename, formatDuration } from "../lib/time.js";
 import { commandActivity } from "../lib/commandActivity.mjs";
 import { useStore } from "../store.js";
 import { openFileInPanel } from "./RightPanel.jsx";
@@ -482,7 +482,7 @@ function DocumentCard({ change }) {
         items={[
           { id: "panel", label: "Open in panel", onSelect: openIn },
           { id: "external", label: "Open in default app", onSelect: () => api.openPath(change.path) },
-          { id: "reveal", label: "Show in File Explorer", onSelect: () => api.showItemInFolder(change.path) },
+          { id: "reveal", label: "Reveal in Finder", onSelect: () => api.showItemInFolder(change.path) },
         ]}
       />
     </div>
@@ -520,7 +520,7 @@ function EditedGroupCard({ item, changes }) {
     for (const c of changes) {
       try {
         if (c.kind?.type === "add") {
-          await api.rpc("fs/remove", { path: isAbsolutePath(c.path) ? c.path : joinPath(cwd, c.path) });
+          await api.rpc("fs/remove", { path: c.path.startsWith("/") ? c.path : `${cwd}/${c.path}` });
         } else {
           await api.rpc("command/exec", { command: ["git", "restore", "--worktree", "--", c.path], cwd, timeoutMs: 15000 });
         }
@@ -599,7 +599,7 @@ function EditedGroupCard({ item, changes }) {
           {visible.map((c, i) => {
             const { add, del } = countDiff(c.diff);
             const name = basename(c.path);
-            const path = (cwd && relativePath(c.path, cwd)) ?? c.path ?? "";
+            const path = cwd && c.path?.startsWith(`${cwd}/`) ? c.path.slice(cwd.length + 1) : c.path || "";
             const dir = path.slice(0, -name.length);
             return (
               <button
@@ -764,7 +764,7 @@ function ImageGeneration({ item }) {
   return (
     <div>
       {item.savedPath ? (
-        <button onClick={() => showItemInFolder(item.savedPath)} title="Show in File Explorer">
+        <button onClick={() => showItemInFolder(item.savedPath)} title="Reveal in Finder">
           <img src={localFileUrl(item.savedPath)} className="max-h-72 rounded-xl border border-(--border-light)" alt="" />
         </button>
       ) : running ? (
@@ -801,7 +801,7 @@ function CollabRow({ item }) {
 // agents (path contains "monitor") render as "Name · status" chips like the
 // reference client; spawn/message/close events get the plain labels.
 function SubAgentActivityRow({ item }) {
-  const base = basename(item.agentPath);
+  const base = item.agentPath ? item.agentPath.replace(/\/+$/, "").split("/").pop() : "";
   if (/^monitor/i.test(base)) {
     const status = { started: "started working", interacted: "updated", interrupted: "finished" }[item.kind] || "updated";
     const name = base.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).replace(/(\d{4})\d+/, "$1…");

@@ -120,7 +120,7 @@ export const useStore = create((set, get) => ({
   navFwd: [],
   gs: {}, // shared codex global state (projects/pins/assignments)
   profile: null, // { name, username, photo(dataUrl) } from /wham/profiles/me
-    renameRequest: 0, // bump to open the thread rename dialog (Ctrl+R)
+  renameRequest: 0, // bump to open the thread rename dialog (⌃R)
   draftAt: 0, // when the current new-chat draft was opened (seconds)
   composerPrefill: null, // { text, nonce } — Composer consumes and clears
 

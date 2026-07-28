@@ -7,12 +7,11 @@ import React, { useEffect, useState } from "react";
 import * as api from "../../api.js";
 import { useStore } from "../../store.js";
 import { cx } from "../../lib/cx.js";
-import { basename } from "../../lib/time.js";
 import { Card } from "./shared.jsx";
 import { IconChevronDown, IconChevronRight } from "../icons.jsx";
 import { Spinner } from "../ui.jsx";
 
-const base = (p) => basename(p);
+const base = (p) => String(p || "").replace(/\/+$/, "").split("/").pop();
 
 function groupHooks(data) {
   const user = new Map(); // key -> hook (deduped across cwd groups)

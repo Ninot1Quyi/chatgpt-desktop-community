@@ -1,9 +1,6 @@
 // Screenshot helper for OUR rebuilt app on port 9222.
 // Usage: node rebuilt-shot.mjs <out.png> [evalExprBefore]
-import { tmpdir } from "node:os";
-import path from "node:path";
-
-const out = process.argv[2] || path.join(tmpdir(), "rebuilt-shot.png");
+const out = process.argv[2] || "/tmp/rebuilt-shot.png";
 const preEval = process.argv[3];
 const targets = await fetch("http://127.0.0.1:9222/json").then((r) => r.json());
 const page = targets.find((t) => t.type === "page" && t.url.endsWith("index.html"))

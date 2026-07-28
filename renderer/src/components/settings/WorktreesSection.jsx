@@ -1,5 +1,5 @@
 // Worktrees: the reference settings rows (root dir, auto-delete toggle and
-// limit) plus the managed-worktree list scanned from %USERPROFILE%\.codex\worktrees.
+// limit) plus the managed-worktree list scanned from ~/.codex/worktrees.
 import React, { useCallback, useEffect, useState } from "react";
 import * as api from "../../api.js";
 import { useStore } from "../../store.js";
@@ -26,7 +26,7 @@ export default function WorktreesSection() {
   const [autoDelete, setAutoDelete] = useState(lsGet("settings.worktreeAutoDelete", true));
   const [limit, setLimit] = useState(lsGet("settings.worktreeAutoDeleteLimit", 20));
 
-  const base = root || (appInfo?.home ? `${appInfo.home}\\.codex\\worktrees` : null);
+  const base = root || (appInfo?.home ? `${appInfo.home}/.codex/worktrees` : null);
 
   const load = useCallback(async () => {
     if (!base) return;
@@ -77,7 +77,7 @@ export default function WorktreesSection() {
               setRoot(e.target.value);
               lsSet("settings.worktreeRoot", e.target.value);
             }}
-            placeholder={appInfo?.home ? `${appInfo.home}\\.codex\\worktrees` : "%USERPROFILE%\\.codex\\worktrees"}
+            placeholder={appInfo?.home ? `${appInfo.home}/.codex/worktrees` : "~/.codex/worktrees"}
             spellCheck={false}
             className="h-7 w-[260px] rounded-lg border border-(--border-light) bg-(--surface) px-2.5 font-mono text-[12px] outline-none placeholder:text-(--fg-faint) focus:border-(--border-heavy)"
           />

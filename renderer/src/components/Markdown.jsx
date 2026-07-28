@@ -42,7 +42,7 @@ function PreBlock({ children }) {
   );
 }
 
-const PATH_RE = /^(?:(?:%USERPROFILE%)[\\/]|[./]|[A-Za-z]:[\\/]|\\\\)?[\w.@+\-/\\ ()\u4e00-\u9fff]*\.[A-Za-z0-9]{1,10}$/i;
+const PATH_RE = /^(?:[~./]|[A-Za-z]:\\)?[\w.@+\-/\\ ()\u4e00-\u9fff]*\.[A-Za-z0-9]{1,10}$/;
 function looksLikePath(s) {
   if (!s || s.length > 120) return false;
   if (!PATH_RE.test(s)) return false;
@@ -62,14 +62,12 @@ function FileChip({ name }) {
   );
 }
 
-// Best-effort Windows path: expand %USERPROFILE% and prefix relative paths.
+// Best-effort absolute path: ~ expansion + cwd prefix for relative paths.
 function resolveMaybePath(p) {
   const home = useStore.getState().appInfo?.home || "";
   const cwd = useStore.getState().activeConversation?.()?.thread?.cwd || useStore.getState().cwd || "";
-  if (/^%USERPROFILE%[\\/]/i.test(p)) return home + p.slice("%USERPROFILE%".length);
-  if (!/^(?:[A-Za-z]:[\\/]|\\\\)/.test(p) && cwd) {
-    return `${cwd.replace(/[\\/]+$/, "")}\\${p.replace(/^[\\/]+/, "")}`;
-  }
+  if (p.startsWith("~/")) return home + p.slice(1);
+  if (!p.startsWith("/") && cwd) return `${cwd.replace(/\/+$/, "")}/${p}`;
   return p;
 }
 

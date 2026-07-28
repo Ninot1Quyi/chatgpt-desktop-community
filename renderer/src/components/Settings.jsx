@@ -5,8 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useStore, normalizePermission } from "../store.js";
 import * as api from "../api.js";
 import { cx } from "../lib/cx.js";
-import { basename, isPathInside } from "../lib/time.js";
-import { COMMANDS, bindingFor, eventToAccel, isWindowsAccelerator } from "../lib/keys.js";
+import { COMMANDS, bindingFor, eventToAccel } from "../lib/keys.js";
 import { Spinner } from "./ui.jsx";
 import {
   IconArchive,
@@ -285,7 +284,7 @@ const PERMISSION_ROWS = [
 const OPEN_DESTINATIONS = [
   { id: "editor", label: "Editor default" },
   { id: "vscode", label: "VS Code" },
-  { id: "explorer", label: "File Explorer" },
+  { id: "finder", label: "Finder" },
 ];
 
 function GeneralSection() {
@@ -293,10 +292,8 @@ function GeneralSection() {
   const setPermission = useStore((s) => s.setPermission);
   const bottomOpen = useStore((s) => s.ui.bottomOpen);
   const setUi = useStore((s) => s.setUi);
-  const [openDest, setOpenDest] = useState(() => {
-    const saved = lsGet("settings.openDestination", "editor");
-    return OPEN_DESTINATIONS.some(({ id }) => id === saved) ? saved : "editor";
-  });
+  const [openDest, setOpenDest] = useState(() => lsGet("settings.openDestination", "editor"));
+  const [menuBar, setMenuBar] = useState(() => lsGet("settings.showInMenuBar", true));
 
   return (
     <>
@@ -321,6 +318,15 @@ function GeneralSection() {
         </Row>
         <Row title="Language" desc="Language for the app UI">
           <Dropdown value="en" options={[{ id: "en", label: "English (United States)" }]} onChange={() => {}} disabled />
+        </Row>
+        <Row title="Show in menu bar" desc="Keep ChatGPT in the macOS menu bar when the main window is closed">
+          <Toggle
+            on={menuBar}
+            onChange={(v) => {
+              setMenuBar(v);
+              lsSet("settings.showInMenuBar", v);
+            }}
+          />
         </Row>
         <Row title="Bottom panel" desc="Show the bottom panel control in the app header">
           <Toggle on={bottomOpen} onChange={(v) => setUi({ bottomOpen: v })} />
@@ -469,7 +475,7 @@ function ShortcutsSection() {
       <Card>
         {rows.map(([id, label, def, desc, extras]) => {
           const current = bindingFor(id, keybindings);
-          const isCustom = !!keybindings[id] && isWindowsAccelerator(keybindings[id]);
+          const isCustom = !!keybindings[id];
           const chips = [...(current ? [current] : []), ...(extras || [])];
           return (
             <div key={id} className="flex items-center justify-between gap-4 px-4 py-2.5">
@@ -510,7 +516,7 @@ function ShortcutsSection() {
         {rows.length === 0 && <div className="px-4 py-3 text-[12px] text-(--fg-faint)">No matching shortcuts</div>}
       </Card>
       <div className="px-1 text-[11px] text-(--fg-faint)">
-        Click a shortcut to remap it. Non-editable: Enter (send), Shift+Enter (new line), Ctrl+Shift+Space (hotkey window), Ctrl+Alt+N (quick chat).
+        Click a shortcut to remap it. Non-editable: Enter (send), Shift+Enter (new line), ⌘⇧Space (hotkey window), ⌘⌥N (quick chat).
       </div>
     </>
   );
@@ -742,22 +748,22 @@ function ArchivedSection() {
     // exact root, or nested under a project root
     for (const p of Object.values(local)) {
       for (const rp of p.rootPaths || []) {
-        if (isPathInside(cwd, rp)) return p.name || basename(cwd);
+        if (cwd === rp || cwd.startsWith(rp + "/")) return p.name || cwd.split("/").pop();
       }
     }
     // codex worktrees map back to the project whose root basename matches
-    const m = cwd.match(/[\\/]\.codex[\\/]worktrees[\\/](?:[^\\/]+[\\/])?([^\\/]+)$/);
+    const m = cwd.match(/\/\.codex\/worktrees\/(?:[^/]+\/)?([^/]+)$/);
     const leaf = m ? m[1] : null;
     if (leaf) {
       for (const p of Object.values(local)) {
         for (const rp of p.rootPaths || []) {
-          const base = basename(rp);
+          const base = rp.split("/").filter(Boolean).pop();
           if (base && (leaf === base || leaf.startsWith(base))) return p.name || base;
         }
       }
       return leaf;
     }
-    return basename(cwd) || "Other";
+    return cwd.split("/").filter(Boolean).pop() || "Other";
   };
 
   const q = query.trim().toLowerCase();

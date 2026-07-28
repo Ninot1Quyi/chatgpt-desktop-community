@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import * as api from "../../api.js";
 import { useStore, normalizePermission } from "../../store.js";
-import { basename } from "../../lib/time.js";
 import { cx } from "../../lib/cx.js";
 import { Card, Row, Toggle, Dropdown, Btn, lsGet, lsSet } from "./shared.jsx";
 import { IconChevronDown, IconCheck } from "../icons.jsx";
@@ -55,8 +54,8 @@ export default function ConfigurationSection() {
     return () => { live = false; };
   }, []);
 
-  const projectCfg = cwd ? `${cwd.replace(/[\\/]+$/, "")}\\.codex\\config.toml` : null;
-  const projectName = basename(cwd);
+  const projectCfg = cwd ? `${cwd}/.codex/config.toml` : null;
+  const projectName = cwd ? cwd.split("/").filter(Boolean).pop() : null;
   // Settings show the config defaults (the composer may carry a runtime override).
   const approval = cfgApproval == null || cfgApproval === "on-request" ? "ask" : cfgApproval === "untrusted" ? "approve" : "full";
   const sandbox = cfgSandbox === "danger-full-access" ? "full" : "workspace";
@@ -104,7 +103,7 @@ export default function ConfigurationSection() {
       </div>
       <Card title="Custom config.toml settings">
         <Row title="User config">
-          <Btn onClick={() => api.openPath(`${appInfo?.home || "%USERPROFILE%"}\\.codex\\config.toml`)}>Open config.toml</Btn>
+          <Btn onClick={() => api.openPath(`${appInfo?.home || "~"}/.codex/config.toml`)}>Open config.toml</Btn>
         </Row>
         {projectCfg && (
           <Row title={projectName}>

@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store.js";
 import { cx } from "../lib/cx.js";
 import * as api from "../api.js";
-import { basename, formatDuration, joinPath } from "../lib/time.js";
+import { basename, formatDuration } from "../lib/time.js";
 import { commandActivity } from "../lib/commandActivity.mjs";
 import vscodeIcon from "../assets/vscode.png";
 import Composer from "./Composer.jsx";
@@ -188,7 +188,7 @@ function OpenInEditorButton() {
         align="end"
         items={[
           { id: "vscode", label: "Open in VS Code", onSelect: openVSCode },
-          { id: "explorer", label: "Show in File Explorer", onSelect: () => cwd && api.showItemInFolder(cwd) },
+          { id: "finder", label: "Reveal in Finder", onSelect: () => cwd && api.showItemInFolder(cwd) },
           { id: "copy", label: "Copy path", onSelect: () => cwd && navigator.clipboard.writeText(cwd) },
         ]}
       />
@@ -213,7 +213,7 @@ function ThreadMenu({ thread }) {
   const [worktreeOpen, setWorktreeOpen] = useState(false);
   const [name, setName] = useState("");
 
-  // Ctrl+R (Rename chat command) opens the same dialog.
+  // ⌃R (Rename chat command) opens the same dialog.
   useEffect(() => {
     if (!renameRequest || !activeThreadId) return;
     setName(thread?.name || "");
@@ -263,24 +263,24 @@ function ThreadMenu({ thread }) {
           {
             id: "pin",
             label: pinned ? "Unpin chat" : "Pin chat",
-            hint: "Ctrl+Alt+P",
+            hint: "⌥⌘P",
             onSelect: () => useStore.getState().togglePinnedThread(activeThreadId),
           },
           {
             id: "rename",
             label: "Rename chat",
-            hint: "Ctrl+R",
+            hint: "⌥⌘R",
             onSelect: () => {
               setName(thread?.name || "");
               setRenameOpen(true);
             },
           },
-          { id: "archive", label: "Archive chat", hint: "Ctrl+Shift+A", onSelect: () => setArchiveOpen(true) },
+          { id: "archive", label: "Archive chat", hint: "⇧⌘A", onSelect: () => setArchiveOpen(true) },
           { sep: true },
           {
             id: "sidechat",
             label: "Open side chat",
-            hint: "Ctrl+Alt+S",
+            hint: "⌥⌘S",
             onSelect: () => panelHook.open?.("sidechat"),
           },
           {
@@ -421,11 +421,8 @@ function WorktreeDialog({ open, thread, activeThreadId, onClose }) {
     if (!cwd || !b) return;
     setBusy(true);
     try {
-      const repo = basename(thread?.cwd) || "repo";
-      const wtDir = joinPath(
-        joinPath(codexHome, "worktrees"),
-        `${repo}-${b.replace(/[^\w\u4e00-\u9fff-]+/g, "-")}`,
-      );
+      const repo = (thread?.cwd || "").replace(/\/+$/, "").split("/").pop() || "repo";
+      const wtDir = `${codexHome || ""}/worktrees/${repo}-${b.replace(/[^\w\u4e00-\u9fff-]+/g, "-")}`;
       const r = await api.rpc("command/exec", {
         command: ["git", "worktree", "add", wtDir, "-b", b],
         cwd,
@@ -475,7 +472,7 @@ function WorktreeDialog({ open, thread, activeThreadId, onClose }) {
 // scroll-to-bottom button, top fade gradient.
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
-// Find-in-thread bar (Ctrl+F): query + match navigation with item highlighting.
+// Find-in-thread bar (⌘F): query + match navigation with item highlighting.
 // ---------------------------------------------------------------------------
 function FindBar({ conv }) {
   const setUi = useStore((s) => s.setUi);
