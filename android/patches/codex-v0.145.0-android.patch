@@ -1,0 +1,213 @@
+diff --git a/codex-rs/code-mode/Cargo.toml b/codex-rs/code-mode/Cargo.toml
+index be14424..003f820 100644
+--- a/codex-rs/code-mode/Cargo.toml
++++ b/codex-rs/code-mode/Cargo.toml
+@@ -18,12 +18,14 @@ workspace = true
+ [dependencies]
+ codex-code-mode-protocol = { workspace = true }
+ codex-protocol = { workspace = true }
+-deno_core_icudata = { workspace = true }
+ futures = { workspace = true }
+ serde_json = { workspace = true }
+ tokio = { workspace = true, features = ["io-util", "macros", "process", "rt", "sync", "time"] }
+ tokio-util = { workspace = true, features = ["rt"] }
+ tracing = { workspace = true }
++
++[target.'cfg(not(target_os = "android"))'.dependencies]
++deno_core_icudata = { workspace = true }
+ v8 = { workspace = true }
+ 
+ [dev-dependencies]
+diff --git a/codex-rs/code-mode/src/lib.rs b/codex-rs/code-mode/src/lib.rs
+index 6d332bf..47ed6ee 100644
+--- a/codex-rs/code-mode/src/lib.rs
++++ b/codex-rs/code-mode/src/lib.rs
+@@ -1,17 +1,34 @@
++#[cfg(not(target_os = "android"))]
+ mod cell_actor;
++#[cfg(not(target_os = "android"))]
+ mod remote_session;
++#[cfg(not(target_os = "android"))]
+ mod runtime;
++#[cfg(not(target_os = "android"))]
+ mod service;
++#[cfg(not(target_os = "android"))]
+ mod session_runtime;
++#[cfg(target_os = "android")]
++mod unsupported;
++#[cfg(not(target_os = "android"))]
+ mod v8_init;
+ 
+ pub(crate) type TaskFailureHandler = std::sync::Arc<dyn Fn(String) + Send + Sync>;
+ 
+ pub use codex_code_mode_protocol::*;
++#[cfg(not(target_os = "android"))]
+ pub use remote_session::ProcessOwnedCodeModeSession;
++#[cfg(not(target_os = "android"))]
+ pub use remote_session::ProcessOwnedCodeModeSessionProvider;
++#[cfg(not(target_os = "android"))]
+ pub use service::InProcessCodeModeSession;
++#[cfg(not(target_os = "android"))]
+ pub use service::InProcessCodeModeSessionProvider;
++#[cfg(not(target_os = "android"))]
+ pub use service::NoopCodeModeSessionDelegate;
++#[cfg(target_os = "android")]
++pub use unsupported::*;
++#[cfg(not(target_os = "android"))]
+ pub use v8_init::V8JitMode;
++#[cfg(not(target_os = "android"))]
+ pub use v8_init::initialize_v8;
+diff --git a/codex-rs/code-mode/src/unsupported.rs b/codex-rs/code-mode/src/unsupported.rs
+new file mode 100644
+index 0000000..fd63ff9
+--- /dev/null
++++ b/codex-rs/code-mode/src/unsupported.rs
+@@ -0,0 +1,72 @@
++use std::path::PathBuf;
++use std::sync::Arc;
++
++use codex_code_mode_protocol::CellId;
++use codex_code_mode_protocol::CodeModeNestedToolCall;
++use codex_code_mode_protocol::CodeModeSessionDelegate;
++use codex_code_mode_protocol::CodeModeSessionProvider;
++use codex_code_mode_protocol::CodeModeSessionProviderFuture;
++use codex_code_mode_protocol::NotificationFuture;
++use codex_code_mode_protocol::ToolInvocationFuture;
++use tokio_util::sync::CancellationToken;
++
++const UNAVAILABLE: &str = "code mode is unavailable on Android";
++
++pub struct NoopCodeModeSessionDelegate;
++
++impl CodeModeSessionDelegate for NoopCodeModeSessionDelegate {
++    fn invoke_tool<'a>(
++        &'a self,
++        _invocation: CodeModeNestedToolCall,
++        _cancellation_token: CancellationToken,
++    ) -> ToolInvocationFuture<'a> {
++        Box::pin(async { Err(UNAVAILABLE.to_string()) })
++    }
++
++    fn notify<'a>(
++        &'a self,
++        _call_id: String,
++        _cell_id: CellId,
++        _text: String,
++        _cancellation_token: CancellationToken,
++    ) -> NotificationFuture<'a> {
++        Box::pin(async { Ok(()) })
++    }
++
++    fn cell_closed(&self, _cell_id: &CellId) {}
++}
++
++pub struct InProcessCodeModeSession;
++
++#[derive(Default)]
++pub struct InProcessCodeModeSessionProvider;
++
++impl CodeModeSessionProvider for InProcessCodeModeSessionProvider {
++    fn create_session<'a>(
++        &'a self,
++        _delegate: Arc<dyn CodeModeSessionDelegate>,
++    ) -> CodeModeSessionProviderFuture<'a> {
++        Box::pin(async { Err(UNAVAILABLE.to_string()) })
++    }
++}
++
++pub struct ProcessOwnedCodeModeSession;
++
++#[derive(Default)]
++pub struct ProcessOwnedCodeModeSessionProvider;
++
++impl ProcessOwnedCodeModeSessionProvider {
++    pub fn with_host_program(_host_program: PathBuf) -> Self {
++        Self
++    }
++}
++
++impl CodeModeSessionProvider for ProcessOwnedCodeModeSessionProvider {
++    fn create_session<'a>(
++        &'a self,
++        _delegate: Arc<dyn CodeModeSessionDelegate>,
++    ) -> CodeModeSessionProviderFuture<'a> {
++        Box::pin(async { Err(UNAVAILABLE.to_string()) })
++    }
++}
++
++#[derive(Clone, Copy)]
++pub enum V8JitMode {
++    Enabled,
++    Disabled,
++}
++
++pub fn initialize_v8(_jit_mode: V8JitMode) -> Result<(), String> {
++    Err(UNAVAILABLE.to_string())
++}
+diff --git a/codex-rs/core/Cargo.toml b/codex-rs/core/Cargo.toml
+index 4ca914e..0a9392f 100644
+--- a/codex-rs/core/Cargo.toml
++++ b/codex-rs/core/Cargo.toml
+@@ -132,6 +132,9 @@ openssl-sys = { workspace = true, features = ["vendored"] }
+ [target.aarch64-unknown-linux-musl.dependencies]
+ openssl-sys = { workspace = true, features = ["vendored"] }
+ 
++[target.aarch64-linux-android.dependencies]
++openssl-sys = { workspace = true, features = ["vendored"] }
++
+ [target.'cfg(unix)'.dependencies]
+ codex-shell-escalation = { workspace = true }
+ [dev-dependencies]
+diff --git a/codex-rs/core/src/installation_id.rs b/codex-rs/core/src/installation_id.rs
+index a42e6b6..cc1fb33 100644
+--- a/codex-rs/core/src/installation_id.rs
++++ b/codex-rs/core/src/installation_id.rs
+@@ -29,6 +29,7 @@ pub async fn resolve_installation_id(codex_home: &AbsolutePathBuf) -> Result<Str
+         }
+ 
+         let mut file = options.open(&path)?;
++        #[cfg(not(target_os = "android"))]
+         file.lock()?;
+ 
+         #[cfg(unix)]
+diff --git a/codex-rs/http-client/Cargo.toml b/codex-rs/http-client/Cargo.toml
+index d6a67d1..3c30913 100644
+--- a/codex-rs/http-client/Cargo.toml
++++ b/codex-rs/http-client/Cargo.toml
+@@ -10,7 +10,7 @@ codex-utils-rustls-provider = { workspace = true }
+ futures = { workspace = true }
+ http = { workspace = true }
+ opentelemetry = { workspace = true }
+-reqwest = { workspace = true, features = ["json", "rustls-tls-native-roots", "stream"] }
++reqwest = { workspace = true, features = ["json", "rustls-tls-native-roots", "rustls-tls-webpki-roots", "stream"] }
+ rustls = { workspace = true }
+ rustls-native-certs = { workspace = true }
+ rustls-pki-types = { workspace = true }
+diff --git a/codex-rs/http-client/src/outbound_proxy.rs b/codex-rs/http-client/src/outbound_proxy.rs
+index d3b8a81..7dfabfb 100644
+--- a/codex-rs/http-client/src/outbound_proxy.rs
++++ b/codex-rs/http-client/src/outbound_proxy.rs
+@@ -382,6 +382,11 @@ fn build_reqwest_client_for_route(
+     route_class: ClientRouteClass,
+     outbound_proxy_policy: OutboundProxyPolicy,
+ ) -> Result<reqwest::Client, BuildRouteAwareHttpClientError> {
++    #[cfg(target_os = "android")]
++    let builder = builder
++        .use_rustls_tls()
++        .tls_built_in_native_certs(false)
++        .tls_built_in_webpki_certs(true);
+     let builder = configure_proxy_for_route(
+         &ProcessEnv,
+         builder,
+diff --git a/codex-rs/login/src/server.rs b/codex-rs/login/src/server.rs
+index 804d054..e8880ff 100644
+--- a/codex-rs/login/src/server.rs
++++ b/codex-rs/login/src/server.rs
+@@ -827,6 +827,7 @@ pub(crate) async fn exchange_code_for_tokens(
+                 is_connect = error.is_connect(),
+                 is_request = error.is_request(),
+                 error = %error,
++                error_debug = ?error,
+                 "oauth token exchange transport failure"
+             );
+             return Err(io::Error::other(error));

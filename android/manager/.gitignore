@@ -1,0 +1,6 @@
+/build
+/signing.properties
+/.cxx
+/src/main/assets/codex
+/src/main/assets/rish_shizuku.dex
+/src/main/jniLibs/arm64-v8a/libcodex_app_server.so

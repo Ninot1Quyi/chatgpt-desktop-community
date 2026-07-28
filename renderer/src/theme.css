@@ -172,6 +172,25 @@ body,
   -webkit-font-smoothing: antialiased;
 }
 
+.android .app-drag {
+  -webkit-app-region: no-drag;
+}
+
+@media (max-width: 700px) {
+  .android .app-drag {
+    padding-left: 8px;
+  }
+
+  .android .app-no-drag,
+  .android .fade-in {
+    max-width: calc(100vw - 24px);
+  }
+
+  .android .app-sidebar {
+    background: var(--surface);
+  }
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: rgb(128 128 128 / 0.35) transparent;

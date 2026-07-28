@@ -739,7 +739,7 @@ export default function Composer({ centered = false, quick = false }) {
           onPaste={onPasteFiles}
         />
 
-        <div className="flex items-center gap-[5px]">
+        <div className="flex flex-wrap items-center gap-[5px]">
           <AttachButton
             onPickImages={() => imageFileRef.current?.click()}
             onPickFiles={() => anyFileRef.current?.click()}
@@ -749,7 +749,7 @@ export default function Composer({ centered = false, quick = false }) {
           <PermissionChip />
           <div className="h-4 w-px bg-(--border-light)" />
           <PlanChip />
-          <div className="ms-auto flex min-w-0 items-center justify-end">
+          <div className="ms-auto flex shrink-0 items-center justify-end">
             <ModelChip />
             <div className="flex shrink-0 items-center gap-2">
               <VoiceButton />
@@ -1086,6 +1086,7 @@ function PlanChip() {
     try { await api.rpc("thread/goal/clear", { threadId: activeThreadId }); } catch {}
     useStore.getState()._mutateConv(activeThreadId, (c) => ({ ...c, goal: null }));
   };
+  if (!planMode && !goal?.objective) return null;
   if (!planMode) {
     return (
       <button
@@ -1170,14 +1171,14 @@ function ModelChip() {
         aria-haspopup="menu"
         aria-expanded={open}
         data-state={open ? "open" : "closed"}
-        className="composer-model-button flex h-7 min-w-0 items-center justify-center gap-1 rounded-full border border-transparent py-0 pl-2 pr-2.5 text-[13px] leading-[18px] font-[445]"
+        className="composer-model-button flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-transparent py-0 pl-2 pr-2.5 text-[13px] leading-[18px] font-[445]"
         style={{
           width: open ? 225.15625 : closedWidth ?? undefined,
           transition: "width 320ms cubic-bezier(.23,1,.32,1)",
         }}
       >
-        <span className="tabular-nums font-normal text-(--fg)">{modelName}</span>
-        {effLabel && <span className="font-normal text-(--fg-tertiary)">{effLabel}</span>}
+        <span className="whitespace-nowrap tabular-nums font-normal text-(--fg)">{modelName}</span>
+        {effLabel && !window.CodexNative && <span className="whitespace-nowrap font-normal text-(--fg-tertiary)">{effLabel}</span>}
         <IconComposerChevronDown className="me-0.5 size-3.5 shrink-0 text-(--fg-tertiary)" />
       </button>
       {open && (

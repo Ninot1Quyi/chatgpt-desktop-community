@@ -138,7 +138,10 @@ export const useStore = create((set, get) => ({
       navFwd: activeThreadId ? [...get().navFwd, activeThreadId] : get().navFwd,
       _navigating: true,
     });
-    get().setUi({ navView: "chats" });
+    get().setUi({
+      navView: "chats",
+      ...(window.CodexNative ? { sidebarOpen: false } : {}),
+    });
     get().openThread(prev);
     set({ _navigating: false });
   },
@@ -152,7 +155,10 @@ export const useStore = create((set, get) => ({
       navBack: activeThreadId ? [...get().navBack, activeThreadId] : get().navBack,
       _navigating: true,
     });
-    get().setUi({ navView: "chats" });
+    get().setUi({
+      navView: "chats",
+      ...(window.CodexNative ? { sidebarOpen: false } : {}),
+    });
     get().openThread(next);
     set({ _navigating: false });
   },
@@ -351,7 +357,10 @@ export const useStore = create((set, get) => ({
       set((s) => ({ navBack: [...s.navBack, cur], navFwd: [] }));
     }
     // opening a thread always lands on the chat view (reference behavior)
-    get().setUi({ navView: "chats" });
+    get().setUi({
+      navView: "chats",
+      ...(window.CodexNative ? { sidebarOpen: false } : {}),
+    });
     set({ activeThreadId: threadId });
     const conv = get().conversations[threadId];
     if (conv?.loaded) return;
@@ -409,6 +418,7 @@ export const useStore = create((set, get) => ({
 
   newChat() {
     set({ activeThreadId: null, pendingNewThread: false, draftAt: Date.now() / 1000 });
+    if (window.CodexNative) get().setUi({ sidebarOpen: false });
   },
 
   // Open a fresh draft with the composer prefilled (e.g. skill "Try now").
