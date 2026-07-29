@@ -15,3 +15,4 @@ export {
   codexRemainingPercent,
   codexResetDate,
 } from "./codexUsage.js";
+export { KimiAccountPanel } from "./KimiAccountPanel.jsx";

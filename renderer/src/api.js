@@ -28,6 +28,7 @@ export const agentRuntimeCatalog = () => b.agentRuntimeCatalog();
 export const agentRuntimeSend = (request) => b.agentRuntimeSend(request);
 export const agentRuntimeCancel = (runId) => b.agentRuntimeCancel(runId);
 export const agentRuntimeAuthStatus = () => b.agentRuntimeAuthStatus();
+export const agentRuntimeAccount = (runtime, refresh = false) => b.agentRuntimeAccount(runtime, refresh);
 export const agentRuntimeLogin = (runtime) => b.agentRuntimeLogin(runtime);
 export const rolloutActivity = (file) => b.rolloutActivity(file);
 export const captureWebview = (id) => b.captureWebview(id);

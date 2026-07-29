@@ -13,5 +13,8 @@ export function createAgentRuntimeState() {
     kimiConfigDir: null,
     externalAuth: {},
     externalAuthChecked: false,
+    externalAccounts: {},
+    externalAccountLoading: {},
+    externalAccountErrors: {},
   };
 }

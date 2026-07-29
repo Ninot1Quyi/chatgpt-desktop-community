@@ -65,6 +65,11 @@ contextBridge.exposeInMainWorld("codexBridge", {
     if (r && r.ok === false) throw new Error(r.error);
     return r?.result;
   },
+  agentRuntimeAccount: async (runtime, refresh = false) => {
+    const r = await ipcRenderer.invoke("agent-runtime:account", { runtime, refresh });
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
   agentRuntimeLogin: async (runtime) => {
     const r = await ipcRenderer.invoke("agent-runtime:login", { runtime });
     if (r && r.ok === false) throw new Error(r.error);

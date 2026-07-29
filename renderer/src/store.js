@@ -338,13 +338,45 @@ export const useStore = create((set, get) => ({
 
   async refreshExternalAuth() {
     const status = await api.agentRuntimeAuthStatus().catch(() => null);
-    set({
+    set((state) => ({
       externalAuth: {
         claude: status?.claude || null,
         kimi: status?.kimi || null,
       },
       externalAuthChecked: true,
-    });
+      ...(!status?.kimi?.loggedIn
+        ? {
+          externalAccounts: { ...state.externalAccounts, kimi: null },
+          externalAccountErrors: { ...state.externalAccountErrors, kimi: null },
+        }
+        : {}),
+    }));
+  },
+
+  async refreshExternalAccount(runtime, { refresh = false } = {}) {
+    set((state) => ({
+      externalAccountLoading: { ...state.externalAccountLoading, [runtime]: true },
+      externalAccountErrors: { ...state.externalAccountErrors, [runtime]: null },
+    }));
+    try {
+      const account = await api.agentRuntimeAccount(runtime, refresh);
+      set((state) => ({
+        externalAccounts: { ...state.externalAccounts, [runtime]: account },
+      }));
+      return account;
+    } catch (error) {
+      set((state) => ({
+        externalAccountErrors: {
+          ...state.externalAccountErrors,
+          [runtime]: String(error?.message || error),
+        },
+      }));
+      return null;
+    } finally {
+      set((state) => ({
+        externalAccountLoading: { ...state.externalAccountLoading, [runtime]: false },
+      }));
+    }
   },
 
   async startChatgptLogin() {
