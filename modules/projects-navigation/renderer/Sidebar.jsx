@@ -36,8 +36,8 @@ import {
 
 const NAV_ITEMS = [
   { id: "pull-requests", label: "Pull requests", icon: <IconNavPullRequests size={16} /> },
-  { id: "sites", label: "Sites", icon: <IconNavSites size={16} /> },
   { id: "scheduled", label: "Scheduled", icon: <IconNavScheduled size={16} /> },
+  { id: "sites", label: "Sites", icon: <IconNavSites size={16} /> },
   { id: "plugins", label: "Plugins", icon: <IconNavPlugins size={16} /> },
 ];
 
