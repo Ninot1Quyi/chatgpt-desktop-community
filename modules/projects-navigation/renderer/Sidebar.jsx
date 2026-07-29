@@ -12,7 +12,7 @@ import {
   codexRemainingPercent,
   codexResetDate,
 } from "@modules/agent-runtimes";
-import { openExternal, toggleQuickChat, showItemInFolder, rpc, logout } from "@app/api.js";
+import { openExternal, toggleQuickChat, showItemInFolder, rpc, gsPatch, logout } from "@app/api.js";
 import { Menu, Dialog, Spinner, IconButton } from "@app/components/ui.jsx";
 import { EXTERNAL_RUNTIMES, RUNTIMES, runtimeMeta } from "@modules/agent-runtimes";
 import {
@@ -27,10 +27,15 @@ import {
   showInFileManager,
 } from "@modules/host-copy";
 import { isSidebarEmpty } from "./sidebar-empty.mjs";
+import {
+  createProjectOrderPatch,
+  createThreadProjectAssignmentPatch,
+} from "./state.js";
 
 const NAV_ITEMS = [
   { id: "pull-requests", label: "Pull requests", icon: <IconNavPullRequests size={16} /> },
   { id: "scheduled", label: "Scheduled", icon: <IconNavScheduled size={16} /> },
+  { id: "sites", label: "Sites", icon: <IconGlobe size={16} /> },
   { id: "plugins", label: "Plugins", icon: <IconNavPlugins size={16} /> },
 ];
 
@@ -129,6 +134,16 @@ export default function Sidebar() {
   };
 
   const onRename = (t) => setRenaming({ id: t.id, name: t.name || t.preview || "" });
+  const applyGsPatch = (patch) => {
+    useStore.setState((state) => ({ gs: { ...(state.gs || {}), ...patch } }));
+    gsPatch(patch).catch(() => useStore.getState().toast("Could not save sidebar order", "error"));
+  };
+  const moveProject = (sourceProjectId, targetProjectId) => {
+    applyGsPatch(createProjectOrderPatch(useStore.getState().gs, sourceProjectId, targetProjectId));
+  };
+  const assignThreadToProject = (threadId, projectId) => {
+    applyGsPatch(createThreadProjectAssignmentPatch(useStore.getState().gs, threadId, projectId));
+  };
   const empty = isSidebarEmpty({
     archivedView,
     externalSections,
@@ -228,6 +243,8 @@ export default function Sidebar() {
                 onToggle={() => toggleOpen(`pin:${p.id}`, isOpen(`pin:${p.id}`))}
                 archived={false}
                 onRename={onRename}
+                onMoveProject={moveProject}
+                onAssignThread={assignThreadToProject}
               />
             ))}
             {pinnedExternalProjects.map((project) => (
@@ -268,6 +285,8 @@ export default function Sidebar() {
                         onToggle={() => toggleOpen(`proj:${p.id}`, isOpen(`proj:${p.id}`))}
                         archived={archivedView}
                         onRename={onRename}
+                        onMoveProject={moveProject}
+                        onAssignThread={assignThreadToProject}
                       />
                     ))}
                     {!archivedView && codexProjects.length === 0 && !threadsLoading && (
@@ -344,8 +363,20 @@ function SectionLabel({ children }) {
 // Shows at most 5 threads, then a "Show more" row — like the reference app.
 // ---------------------------------------------------------------------------
 const THREAD_CAP = 5;
+const DRAG_PROJECT = "application/x-chatgpt-project-id";
+const DRAG_THREAD = "application/x-chatgpt-thread-id";
 
-function ProjectSection({ project, runtime = "codex", nested = false, open, onToggle, archived, onRename }) {
+function ProjectSection({
+  project,
+  runtime = "codex",
+  nested = false,
+  open,
+  onToggle,
+  archived,
+  onRename,
+  onMoveProject,
+  onAssignThread,
+}) {
   const activeThreadId = useStore((s) => s.activeThreadId);
   const draftAt = useStore((s) => s.draftAt);
   const navView = useStore((s) => s.ui.navView);
@@ -409,6 +440,30 @@ function ProjectSection({ project, runtime = "codex", nested = false, open, onTo
           "group/proj relative mx-2 flex h-[30px] cursor-pointer select-none items-center gap-2 rounded-[12.5px] pr-2 hover:bg-(--surface-hover)",
           nested ? "pl-6" : "pl-2",
         )}
+        draggable={runtime === "codex" && project.kind !== "virtual"}
+        onDragStart={(event) => {
+          if (runtime !== "codex" || project.kind === "virtual") return;
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData(DRAG_PROJECT, project.id);
+        }}
+        onDragOver={(event) => {
+          const types = Array.from(event.dataTransfer.types || []);
+          if (types.includes(DRAG_PROJECT) || types.includes(DRAG_THREAD)) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+          }
+        }}
+        onDrop={(event) => {
+          const sourceProjectId = event.dataTransfer.getData(DRAG_PROJECT);
+          const threadId = event.dataTransfer.getData(DRAG_THREAD);
+          if (sourceProjectId && sourceProjectId !== project.id) {
+            event.preventDefault();
+            onMoveProject?.(sourceProjectId, project.id);
+          } else if (threadId && runtime === "codex" && project.kind === "local") {
+            event.preventDefault();
+            onAssignThread?.(threadId, project.id);
+          }
+        }}
         onClick={onToggle}
         onMouseEnter={() => { clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHoverCard(true), 550); }}
         onMouseLeave={() => { clearTimeout(hoverTimer.current); setHoverCard(false); }}
@@ -506,6 +561,7 @@ function ProjectSection({ project, runtime = "codex", nested = false, open, onTo
                       active={row.t.id === activeThreadId}
                       archived={archived}
                       onRename={() => onRename(row.t)}
+                      draggable={!archived && runtime === "codex"}
                     />
                   ) : (
                     <ExternalThreadRow key={row.t.id} thread={row.t} runtime={runtime} />
@@ -552,6 +608,7 @@ function ChatList({ threads, archived, onRename }) {
           active={t.id === activeThreadId}
           archived={archived}
           onRename={() => onRename(t)}
+          draggable={!archived}
         />
       ))}
       {hidden > 0 && (
@@ -766,7 +823,7 @@ function WordmarkMenu() {
   );
 }
 
-function ThreadRow({ thread, active, archived, onRename }) {  const needsInput = useStore((s) => s.approvals.some((a) => a.threadId === thread.id));
+function ThreadRow({ thread, active, archived, onRename, draggable = false }) {  const needsInput = useStore((s) => s.approvals.some((a) => a.threadId === thread.id));
   const pinned = useStore((s) => s.pinnedThreadIds.includes(thread.id));
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoverCard, setHoverCard] = useState(false);
@@ -805,6 +862,12 @@ function ThreadRow({ thread, active, archived, onRename }) {  const needsInput =
         "group/thr relative mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] pl-8 pr-1",
         active ? "bg-(--sidebar-row-active) text-(--fg)" : "hover:bg-(--surface-hover)"
       )}
+      draggable={draggable}
+      onDragStart={(event) => {
+        if (!draggable) return;
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(DRAG_THREAD, thread.id);
+      }}
       onClick={open}
       onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true); }}
       onMouseEnter={() => { clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHoverCard(true), 550); }}

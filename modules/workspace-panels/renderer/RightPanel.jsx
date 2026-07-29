@@ -10,15 +10,15 @@ import { cx } from "@app/lib/cx.js";
 import { basename } from "@app/lib/time.js";
 import { Menu, IconButton } from "@app/components/ui.jsx";
 import {
-  IconPlus, IconBranch, IconFolder, IconTerminal, IconChat, IconGlobe,
+  IconPlus, IconFolder, IconTerminal, IconChat, IconGlobe,
   IconFile, IconX, LucideIcon,
 } from "@app/components/icons.jsx";
+import { bindingFor } from "@modules/shortcuts";
 import ReviewTab from "./panel/ReviewTab.jsx";
 import FilesTab from "./panel/FilesTab.jsx";
 import TerminalTab from "./panel/TerminalTab.jsx";
 import SideChatTab from "./panel/SideChatTab.jsx";
 import BrowserTab from "./panel/BrowserTab.jsx";
-import EnvironmentPanel from "./panel/EnvironmentPanel.jsx";
 import { FileIcon } from "./panel/FileIcon.jsx";
 import { openFileInPanel, usePanelStore } from "./state.js";
 import { shellTitleCommand } from "@modules/terminal";
@@ -31,14 +31,14 @@ import { shellTitleCommand } from "@modules/terminal";
 //   terminal — multi-instance
 //   review / browser / sidechat — singletons (opening focuses the existing one)
 export const TAB_KINDS = {
-  review: { title: "Review", icon: IconBranch, component: ReviewTab, hint: "Ctrl+Shift+G" },
-  terminal: { title: "Terminal", icon: IconTerminal, component: TerminalTab, hint: "" },
-  browser: { title: "Browser", icon: IconGlobe, component: BrowserTab, hint: "Ctrl+T" },
-  files: { title: "Files", icon: IconFolder, component: FilesTab, hint: "Ctrl+P" },
-  sidechat: { title: "Side chat", icon: IconChat, component: SideChatTab, hint: "Ctrl+Alt+S" },
+  review: { title: "Review", icon: IconReview, component: ReviewTab, commandId: "openReviewTab" },
+  terminal: { title: "Terminal", icon: IconTerminal, component: TerminalTab },
+  browser: { title: "Browser", icon: IconGlobe, component: BrowserTab, commandId: "openBrowserTab" },
+  files: { title: "Files", icon: IconFolder, component: FilesTab, commandId: "openFilesTab" },
+  sidechat: { title: "Side chat", icon: IconChat, component: SideChatTab, commandId: "openSideChatTab" },
 };
 // order shown in the empty state (matches the reference app)
-const MENU_ORDER = ["sidechat", "browser", "terminal"];
+const MENU_ORDER = ["review", "terminal", "browser", "files", "sidechat"];
 // order shown in the "+" dropdown (reference uses a different fixed order)
 const PLUS_MENU_ORDER = ["review", "files", "sidechat", "browser", "terminal"];
 
@@ -88,15 +88,13 @@ export function RightPanelHeader() {
   const setUi = useStore((s) => s.setUi);
   const [menuOpen, setMenuOpen] = useState(false);
   const plusRef = useRef(null);
-  const hasGit = useHasGit(usePanelCwd());
 
   const suggested = useSuggestedFiles();
-  const kinds = PLUS_MENU_ORDER.filter((k) => k !== "review" || hasGit);
   const menuItems = [
-    ...kinds.map((k) => ({
+    ...PLUS_MENU_ORDER.map((k) => ({
       id: k,
       label: TAB_KINDS[k].title,
-      hint: TAB_KINDS[k].hint || undefined,
+      hint: shortcutHint(TAB_KINDS[k]),
       icon: React.createElement(TAB_KINDS[k].icon, { size: 14 }),
       onSelect: () => usePanelStore.getState().open(k),
     })),
@@ -115,10 +113,10 @@ export function RightPanelHeader() {
   ];
 
   return (
-    <div className="app-no-drag flex h-full min-w-0 items-center">
+    <div className="app-drag flex h-full min-w-0 items-center">
       {/* tab strip: scrollable, "+" pinned at its end (like the reference) */}
       <div
-        className="hide-scrollbar flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pl-1"
+        className="app-no-drag hide-scrollbar flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pl-1"
         onDragOver={(e) => {
           if (draggedTabId == null) return;
           // dragging over strip background (not a tab) → move to the end
@@ -141,7 +139,7 @@ export function RightPanelHeader() {
         <button
           ref={plusRef}
           title="Open side panel tab"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-(--fg-secondary) hover:bg-(--tab-active-bg) hover:text-(--fg)"
+          className="app-no-drag flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-(--fg-secondary) hover:bg-(--tab-active-bg) hover:text-(--fg)"
           onClick={() => setMenuOpen(true)}
         >
           <IconPlus size={14} />
@@ -152,6 +150,7 @@ export function RightPanelHeader() {
         title={expanded ? "Collapse panel" : "Expand panel"}
         onClick={() => setUi({ rightExpanded: !expanded })}
       />
+      <div className="app-drag h-full min-w-4 flex-1" data-testid="right-panel-header-drag-region" />
       <Menu open={menuOpen} anchor={() => plusRef.current?.getBoundingClientRect()} items={menuItems} onClose={() => setMenuOpen(false)} width={248} align="start" />
     </div>
   );
@@ -167,7 +166,7 @@ function PanelTab({ tab, active, showSep, onActivate, onClose }) {
   const title = tab.kind === "terminal" && shellTitle ? shellTitle : tabTitle(tab);
   return (
     <div
-      className="group/tab relative flex h-7 max-w-39 shrink-0 items-center rounded-lg"
+      className="app-no-drag group/tab relative flex h-7 max-w-39 shrink-0 items-center rounded-lg"
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", String(tab.id));
@@ -195,7 +194,7 @@ function PanelTab({ tab, active, showSep, onActivate, onClose }) {
       />
       <button
         className={cx(
-          "relative z-10 flex h-full min-w-0 flex-1 items-center gap-2 pr-1 pl-2.5 text-[13px]",
+          "app-no-drag relative z-10 flex h-full min-w-0 flex-1 items-center gap-2 pr-1 pl-2.5 text-[13px]",
           active ? "text-(--fg)" : "text-(--fg-secondary)"
         )}
         onClick={onActivate}
@@ -211,7 +210,7 @@ function PanelTab({ tab, active, showSep, onActivate, onClose }) {
       <button
         aria-label={`Close ${title} tab`}
         className={cx(
-          "relative z-10 mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg)",
+          "app-no-drag relative z-10 mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg)",
           active ? "opacity-100" : "opacity-0 group-hover/tab:opacity-100"
         )}
         onClick={(e) => { e.stopPropagation(); onClose(); }}
@@ -231,6 +230,14 @@ function IconCompress({ size = 15 }) {
   return <LucideIcon name="Minimize2" size={size} />;
 }
 
+function IconReview({ size = 15, className }) {
+  return <LucideIcon name="ListChecks" size={size} className={className} />;
+}
+
+function shortcutHint(definition) {
+  return definition.commandId ? bindingFor(definition.commandId) : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Panel body: active tab content (all tabs stay mounted to preserve terminal
 // sessions / tree state), or the empty state when no tabs exist.
@@ -238,25 +245,22 @@ function IconCompress({ size = 15 }) {
 export default function RightPanel() {
   const tabs = usePanelStore((s) => s.tabs);
   const activeId = usePanelStore((s) => s.activeId);
-  const cwd = usePanelCwd();
-  const hasGit = useHasGit(cwd);
-  if (!tabs.length) {
-    // reference behavior: a git-backed project context shows the Environment
-    // panel; anything else gets the tab-type menu empty state.
-    return hasGit ? <EnvironmentPanel cwd={cwd} hasGit={hasGit} /> : <PanelEmptyState />;
-  }
   return (
     <div className="right-panel-root flex h-full w-full flex-col">
-      <div className="min-h-0 flex-1">
-        {tabs.map((t) => {
-          const C = TAB_KINDS[t.kind].component;
-          return (
-            <div key={t.id} className={cx("h-full", t.id !== activeId && "hidden")}>
-              {t.kind === "files" ? <C tab={t} /> : <C />}
-            </div>
-          );
-        })}
-      </div>
+      {!tabs.length ? (
+        <PanelEmptyState />
+      ) : (
+        <div className="min-h-0 flex-1">
+          {tabs.map((t) => {
+            const C = TAB_KINDS[t.kind].component;
+            return (
+              <div key={t.id} className={cx("h-full", t.id !== activeId && "hidden")}>
+                {t.kind === "files" ? <C tab={t} /> : <C />}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -332,6 +336,7 @@ function PanelEmptyState() {
           {MENU_ORDER.map((k) => {
             const def = TAB_KINDS[k];
             const Icon = def.icon;
+            const hint = shortcutHint(def);
             return (
               <button
                 key={k}
@@ -340,8 +345,8 @@ function PanelEmptyState() {
               >
                 <Icon size={16} className="shrink-0 text-(--fg-tertiary)" />
                 <span className="min-w-0 flex-1 truncate text-[13px] text-(--fg)">{def.title}</span>
-                {def.hint && (
-                  <kbd className="shrink-0 rounded-md bg-(--surface-active) px-1.5 py-0.5 text-xs text-(--fg-secondary)">{def.hint}</kbd>
+                {hint && (
+                  <kbd className="shrink-0 rounded-md bg-(--surface-active) px-1.5 py-0.5 text-xs text-(--fg-secondary)">{hint}</kbd>
                 )}
               </button>
             );
