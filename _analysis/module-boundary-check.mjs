@@ -61,6 +61,7 @@ const requiredModules = [
   "agent-runtimes",
   "conversations",
   "desktop-shell",
+  "diagnostics",
   "distribution",
   "preferences",
   "projects-navigation",

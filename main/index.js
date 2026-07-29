@@ -31,6 +31,7 @@ const { registerPreferenceHandlers } = require("@modules/preferences");
 const {
   registerGlobalStateHandlers,
 } = require("@modules/projects-navigation");
+const { createDiagnostics } = require("@modules/diagnostics");
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 const communityIconPath = path.join(__dirname, "..", "assets", "community-icon.png");
@@ -40,6 +41,20 @@ const { legacyPreferencePaths } = configureApplicationStorage({
   env: process.env,
   fs,
   isDev,
+});
+const diagnostics = createDiagnostics({ app, ipcMain, shell });
+diagnostics.captureConsole();
+diagnostics.log("info", "main", "app_start", {
+  appVersion: app.getVersion(),
+  buildTarget: __BUILD_TARGET__,
+  isDev,
+  isPackaged: app.isPackaged,
+  versions: {
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+  },
+  userDataPath: app.getPath("userData"),
 });
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -120,7 +135,11 @@ class AppServerBridge {
     this.proc.stdout.on("data", (d) => this.onStdout(d));
     this.proc.stderr.on("data", (d) => {
       const line = d.toString("utf8").trim();
-      if (line) console.log(`[app-server] ${line.slice(0, 500)}`);
+      if (!line) return;
+      const message = `[app-server] ${line.slice(0, 500)}`;
+      if (/"level"\s*:\s*"ERROR"/i.test(line)) console.error(message);
+      else if (/"level"\s*:\s*"WARN"/i.test(line)) console.warn(message);
+      else console.log(message);
     });
     this.proc.on("error", (err) => {
       console.error("[bridge] spawn error:", err.message);
@@ -363,6 +382,7 @@ function createHotkeyWindow() {
       sandbox: true,
     },
   });
+  diagnostics.attachWindow(hotkeyWindow, "hotkey");
   setHotkeyAlwaysOnTop(hotkeyWindow, true);
   bridge.addListener(hotkeyWindow.webContents);
   const url = isDev
@@ -432,6 +452,7 @@ function createQuickChatWindow() {
       sandbox: true,
     },
   });
+  diagnostics.attachWindow(quickChatWindow, "quickchat");
   quickChatWindow.on("page-title-updated", (e) => e.preventDefault());
   bridge.addListener(quickChatWindow.webContents);
   if (isDev) quickChatWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}?window=quickchat`);
@@ -514,6 +535,7 @@ function createMainWindow(query) {
       webviewTag: true,
     },
   });
+  diagnostics.attachWindow(win, query?.threadId ? "thread" : "main");
   if (query?.threadId) threadWindows.add(win);
   else mainWindow = win;
 
@@ -607,6 +629,10 @@ ipcMain.handle("rpc:request", async (_e, { method, params }) => {
     if (method === "model/list") rememberCodexModels(result);
     return { ok: true, result };
   } catch (err) {
+    diagnostics.log("error", "app-server", "rpc_failed", {
+      error: err,
+      method,
+    });
     return { ok: false, error: String((err && err.message) || err) };
   }
 });
@@ -774,6 +800,9 @@ ipcMain.handle("save-temp-file", (_e, { dataUrl, prefix = "codex-annotate", ext 
 // ---------------------------------------------------------------------------
 app.whenReady().then(() => {
   if (!hasSingleInstanceLock) return;
+  diagnostics.log("info", "main", "app_ready", {
+    gpuFeatureStatus: app.getGPUFeatureStatus(),
+  });
   protocol.handle("codex-file", (request) => {
     try {
       const url = new URL(request.url);
@@ -798,6 +827,7 @@ app.whenReady().then(() => {
     bridge.broadcast("theme:updated", nativeTheme.shouldUseDarkColors ? "dark" : "light");
   });
 
+  diagnostics.log("info", "app-server", "starting");
   bridge.start();
   initUpdater({ broadcast: (channel, payload) => bridge.broadcast(channel, payload) });
   createMainWindow();

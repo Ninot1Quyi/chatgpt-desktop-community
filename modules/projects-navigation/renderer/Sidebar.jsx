@@ -6,6 +6,7 @@ import { cx } from "@app/lib/cx.js";
 import { isPathInside } from "@app/lib/time.js";
 import { externalProjectId, normalizeProjectPath } from "@modules/agent-runtimes";
 import {
+  KimiAccountPanel,
   codexRateLimitSections,
   codexRateLimitWindows,
   codexRemainingPercent,
@@ -25,6 +26,7 @@ import {
   formatHomePath,
   showInFileManager,
 } from "@modules/host-copy";
+import { isSidebarEmpty } from "./sidebar-empty.mjs";
 
 const NAV_ITEMS = [
   { id: "pull-requests", label: "Pull requests", icon: <IconNavPullRequests size={16} /> },
@@ -127,11 +129,13 @@ export default function Sidebar() {
   };
 
   const onRename = (t) => setRenaming({ id: t.id, name: t.name || t.preview || "" });
-  const empty = model.projects.length === 0
-    && model.chats.length === 0
-    && model.pinned.length === 0
-    && pinnedThreads.length === 0
-    && (archivedView || (filteredClaudeThreads.length === 0 && filteredKimiThreads.length === 0));
+  const empty = isSidebarEmpty({
+    archivedView,
+    externalSections,
+    model,
+    pinnedExternalProjects,
+    pinnedThreads,
+  });
 
   return (
     <div className="app-sidebar flex h-full w-full flex-col">
@@ -1028,8 +1032,8 @@ function Footer() {
   );
 }
 
-// Provider popup: one tab per vendor. Codex shows its account and limits;
-// CLI vendors only show their locally detected credential state.
+// Provider popup: one tab per vendor. Account-capable runtimes show their
+// profile and usage; credential-only runtimes keep a compact status card.
 function ProviderDialog({ open, onClose }) {
   const account = useStore((s) => s.account);
   const externalAuth = useStore((s) => s.externalAuth);
@@ -1102,23 +1106,41 @@ function ProviderLogin({ runtime, meta }) {
   );
 }
 
-// Account card for a connected vendor. Kimi intentionally stays credential-
-// only here: the CLI owns token refresh and the client does not fetch web profile or
-// quota data.
 function ProviderAccount({ runtime, meta }) {
   const account = useStore((s) => s.account);
   const profile = useStore((s) => s.profile);
   const externalAuth = useStore((s) => s.externalAuth);
+  const externalAccount = useStore((s) => s.externalAccounts?.[runtime]);
+  const externalAccountLoading = useStore((s) => s.externalAccountLoading?.[runtime]);
+  const externalAccountError = useStore((s) => s.externalAccountErrors?.[runtime]);
   const codex = runtime === "codex";
+  const kimi = runtime === "kimi";
 
-  const name = codex
-    ? profile?.name || account?.email || "Codex account"
-    : meta?.label;
+  useEffect(() => {
+    if (kimi && !externalAccount) {
+      useStore.getState().refreshExternalAccount("kimi");
+    }
+  }, [kimi, externalAccount]);
+
+  if (kimi) {
+    return (
+      <KimiAccountPanel
+        account={externalAccount}
+        credentialLabel={externalAuth?.kimi?.detail === "oauth_credentials" ? "OAuth credentials" : "Saved credentials"}
+        error={externalAccountError}
+        fallbackIcon={meta?.icon(22)}
+        loading={externalAccountLoading}
+        onRefresh={(refresh) => useStore.getState().refreshExternalAccount("kimi", { refresh })}
+      />
+    );
+  }
+
+  const name = codex ? profile?.name || account?.email || "Codex account" : meta?.label;
   const accountLine = codex
     ? account?.email || "Signed in"
-    : runtime === "claude"
-      ? externalAuth?.claude?.detail === "oauth_token" ? "OAuth token" : externalAuth?.claude?.detail || "Signed in"
-      : externalAuth?.kimi?.detail === "oauth_credentials" ? "OAuth credentials" : "Saved credentials";
+    : externalAuth?.claude?.detail === "oauth_token"
+      ? "OAuth token"
+      : externalAuth?.claude?.detail || "Signed in";
   const plan = codex ? planLabel(account?.planType) : null;
 
   return (
@@ -1139,9 +1161,7 @@ function ProviderAccount({ runtime, meta }) {
       </div>
       {codex
         ? <CodexUsage />
-        : runtime === "claude"
-          ? <UsageUnavailable label="Claude Code" />
-          : null}
+        : <UsageUnavailable label="Claude Code" />}
     </div>
   );
 }

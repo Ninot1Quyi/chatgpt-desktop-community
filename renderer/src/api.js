@@ -20,6 +20,10 @@ export const showItemInFolder = (p) => b.showItemInFolder(p);
 export const openPath = (p) => b.openPath(p);
 export const openExternal = (url) => b.openExternal(url);
 export const getAppInfo = () => b.getAppInfo();
+export const reportDiagnostic = (event, context = {}, level = "info") =>
+  b.diagnosticsReport({ event, context, level });
+export const getDiagnosticsInfo = () => b.diagnosticsInfo();
+export const openDiagnosticsLogs = () => b.diagnosticsOpenLogs();
 export const claudeHistoryList = () => b.claudeHistoryList();
 export const claudeHistoryRead = (sessionId) => b.claudeHistoryRead(sessionId);
 export const kimiHistoryList = () => b.kimiHistoryList();
@@ -28,6 +32,7 @@ export const agentRuntimeCatalog = () => b.agentRuntimeCatalog();
 export const agentRuntimeSend = (request) => b.agentRuntimeSend(request);
 export const agentRuntimeCancel = (runId) => b.agentRuntimeCancel(runId);
 export const agentRuntimeAuthStatus = () => b.agentRuntimeAuthStatus();
+export const agentRuntimeAccount = (runtime, refresh = false) => b.agentRuntimeAccount(runtime, refresh);
 export const agentRuntimeLogin = (runtime) => b.agentRuntimeLogin(runtime);
 export const rolloutActivity = (file) => b.rolloutActivity(file);
 export const captureWebview = (id) => b.captureWebview(id);

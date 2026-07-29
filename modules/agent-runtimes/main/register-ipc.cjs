@@ -1,6 +1,7 @@
 const {
   getClaudeConfigDir,
   getExternalAuthStatus,
+  getKimiAccount,
   getKimiConfigDir,
   getRuntimeCatalog,
   listClaudeSessions,
@@ -54,6 +55,15 @@ function registerAgentRuntimeHandlers({
       homePath: app.getPath("home"),
       host,
     })));
+  ipcMain.handle("agent-runtime:account", (_event, { runtime, refresh } = {}) =>
+    resultOrError(() => {
+      if (runtime !== "kimi") throw new Error(`Account details are not available for "${runtime || "unknown"}"`);
+      return getKimiAccount({
+        homePath: app.getPath("home"),
+        forceRefresh: refresh === true,
+        host,
+      });
+    }));
   ipcMain.handle("agent-runtime:login", (_event, { runtime } = {}) =>
     resultOrError(() => startExternalLogin(String(runtime || ""), {
       homePath: app.getPath("home"),
