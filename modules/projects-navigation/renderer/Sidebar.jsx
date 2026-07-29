@@ -26,6 +26,7 @@ import {
   formatHomePath,
   showInFileManager,
 } from "@modules/host-copy";
+import { isSidebarEmpty } from "./sidebar-empty.mjs";
 
 const NAV_ITEMS = [
   { id: "pull-requests", label: "Pull requests", icon: <IconNavPullRequests size={16} /> },
@@ -128,11 +129,13 @@ export default function Sidebar() {
   };
 
   const onRename = (t) => setRenaming({ id: t.id, name: t.name || t.preview || "" });
-  const empty = model.projects.length === 0
-    && model.chats.length === 0
-    && model.pinned.length === 0
-    && pinnedThreads.length === 0
-    && (archivedView || (filteredClaudeThreads.length === 0 && filteredKimiThreads.length === 0));
+  const empty = isSidebarEmpty({
+    archivedView,
+    externalSections,
+    model,
+    pinnedExternalProjects,
+    pinnedThreads,
+  });
 
   return (
     <div className="app-sidebar flex h-full w-full flex-col">
