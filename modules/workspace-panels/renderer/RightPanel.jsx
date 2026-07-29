@@ -10,18 +10,22 @@ import { cx } from "@app/lib/cx.js";
 import { basename } from "@app/lib/time.js";
 import { Menu, IconButton } from "@app/components/ui.jsx";
 import {
-  IconPlus, IconBranch, IconFolder, IconTerminal, IconChat, IconGlobe,
-  IconFile, IconX, LucideIcon,
+  IconPlus, IconReview, IconPanelFiles, IconPanelTerminal, IconPanelBrowser,
+  IconSideChat, IconFile, IconX, LucideIcon,
 } from "@app/components/icons.jsx";
+import { bindingFor } from "@modules/shortcuts";
 import ReviewTab from "./panel/ReviewTab.jsx";
 import FilesTab from "./panel/FilesTab.jsx";
 import TerminalTab from "./panel/TerminalTab.jsx";
 import SideChatTab from "./panel/SideChatTab.jsx";
 import BrowserTab from "./panel/BrowserTab.jsx";
-import EnvironmentPanel from "./panel/EnvironmentPanel.jsx";
 import { FileIcon } from "./panel/FileIcon.jsx";
 import { openFileInPanel, usePanelStore } from "./state.js";
 import { shellTitleCommand } from "@modules/terminal";
+import {
+  PANEL_ACTION_COMMANDS,
+  PANEL_ACTION_ORDER,
+} from "./panel-actions.mjs";
 
 // ---------------------------------------------------------------------------
 // Tab model
@@ -31,16 +35,19 @@ import { shellTitleCommand } from "@modules/terminal";
 //   terminal — multi-instance
 //   review / browser / sidechat — singletons (opening focuses the existing one)
 export const TAB_KINDS = {
-  review: { title: "Review", icon: IconBranch, component: ReviewTab, hint: "Ctrl+Shift+G" },
-  terminal: { title: "Terminal", icon: IconTerminal, component: TerminalTab, hint: "" },
-  browser: { title: "Browser", icon: IconGlobe, component: BrowserTab, hint: "Ctrl+T" },
-  files: { title: "Files", icon: IconFolder, component: FilesTab, hint: "Ctrl+P" },
-  sidechat: { title: "Side chat", icon: IconChat, component: SideChatTab, hint: "Ctrl+Alt+S" },
+  review: { title: "Review", icon: IconReview, component: ReviewTab },
+  terminal: { title: "Terminal", icon: IconPanelTerminal, component: TerminalTab },
+  browser: { title: "Browser", icon: IconPanelBrowser, component: BrowserTab },
+  files: { title: "Files", icon: IconPanelFiles, component: FilesTab },
+  sidechat: { title: "Side chat", icon: IconSideChat, component: SideChatTab },
 };
-// order shown in the empty state (matches the reference app)
-const MENU_ORDER = ["sidechat", "browser", "terminal"];
 // order shown in the "+" dropdown (reference uses a different fixed order)
 const PLUS_MENU_ORDER = ["review", "files", "sidechat", "browser", "terminal"];
+
+function actionHint(kind, keybindings) {
+  const command = PANEL_ACTION_COMMANDS[kind];
+  return command ? bindingFor(command, keybindings) : null;
+}
 
 export function tabTitle(tab) {
   if (tab.kind === "files") return tab.filePath ? basename(tab.filePath) : "Open file";
@@ -89,6 +96,7 @@ export function RightPanelHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const plusRef = useRef(null);
   const hasGit = useHasGit(usePanelCwd());
+  const keybindings = useStore((s) => s.ui.keybindings);
 
   const suggested = useSuggestedFiles();
   const kinds = PLUS_MENU_ORDER.filter((k) => k !== "review" || hasGit);
@@ -96,7 +104,7 @@ export function RightPanelHeader() {
     ...kinds.map((k) => ({
       id: k,
       label: TAB_KINDS[k].title,
-      hint: TAB_KINDS[k].hint || undefined,
+      hint: actionHint(k, keybindings) || undefined,
       icon: React.createElement(TAB_KINDS[k].icon, { size: 14 }),
       onSelect: () => usePanelStore.getState().open(k),
     })),
@@ -238,12 +246,8 @@ function IconCompress({ size = 15 }) {
 export default function RightPanel() {
   const tabs = usePanelStore((s) => s.tabs);
   const activeId = usePanelStore((s) => s.activeId);
-  const cwd = usePanelCwd();
-  const hasGit = useHasGit(cwd);
   if (!tabs.length) {
-    // reference behavior: a git-backed project context shows the Environment
-    // panel; anything else gets the tab-type menu empty state.
-    return hasGit ? <EnvironmentPanel cwd={cwd} hasGit={hasGit} /> : <PanelEmptyState />;
+    return <PanelEmptyState />;
   }
   return (
     <div className="right-panel-root flex h-full w-full flex-col">
@@ -321,17 +325,19 @@ function useSuggestedFiles() {
 }
 
 // ---------------------------------------------------------------------------
-// Empty state: the reference app's tab-type menu (side chat / browser /
-// terminal) in a centered max-w-xl column.
+// Empty state: the reference app's five tab-type actions in a centered
+// max-w-xl column.
 // ---------------------------------------------------------------------------
 function PanelEmptyState() {
+  const keybindings = useStore((s) => s.ui.keybindings);
   return (
     <div className="flex h-full w-full flex-col bg-(--surface)">
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="m-auto flex w-full max-w-xl flex-col gap-1 px-4 py-6">
-          {MENU_ORDER.map((k) => {
+          {PANEL_ACTION_ORDER.map((k) => {
             const def = TAB_KINDS[k];
             const Icon = def.icon;
+            const hint = actionHint(k, keybindings);
             return (
               <button
                 key={k}
@@ -340,8 +346,8 @@ function PanelEmptyState() {
               >
                 <Icon size={16} className="shrink-0 text-(--fg-tertiary)" />
                 <span className="min-w-0 flex-1 truncate text-[13px] text-(--fg)">{def.title}</span>
-                {def.hint && (
-                  <kbd className="shrink-0 rounded-md bg-(--surface-active) px-1.5 py-0.5 text-xs text-(--fg-secondary)">{def.hint}</kbd>
+                {hint && (
+                  <kbd className="shrink-0 rounded-md bg-(--surface-active) px-1.5 py-0.5 text-xs text-(--fg-secondary)">{hint}</kbd>
                 )}
               </button>
             );
