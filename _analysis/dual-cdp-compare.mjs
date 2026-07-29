@@ -25,7 +25,10 @@ const settleMs = Number(option("settle", 500));
 mkdirSync(outputDir, { recursive: true });
 
 function processIdForPort(port) {
-  const lines = execFileSync("ps", ["-axo", "pid=,command="], { encoding: "utf8" }).split("\n");
+  const lines = execFileSync("ps", ["-axo", "pid=,command="], {
+    encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
+  }).split("\n");
   const candidates = lines.filter((line) =>
     line.includes(`--remote-debugging-port=${port}`)
     && !line.includes(" Helper ")

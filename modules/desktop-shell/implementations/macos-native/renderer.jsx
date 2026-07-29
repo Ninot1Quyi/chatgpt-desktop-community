@@ -55,7 +55,7 @@ export default function DesktopShell({ overlays }) {
             {!ui.rightExpanded && <RightPanelDragHandle />}
             <div
               className={cx(
-                "slide-in-right shrink-0 border-l border-(--border-light)",
+                "pointer-events-none slide-in-right shrink-0 border-l border-(--border)",
                 ui.rightExpanded && "min-w-0 flex-1",
               )}
               style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
@@ -119,7 +119,7 @@ function MacHeader() {
   const ui = useStore((state) => state.ui);
   const setUi = useStore((state) => state.setUi);
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pl-[88px]">
+    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pr-3 pl-[88px]">
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
@@ -142,7 +142,7 @@ function MacHeader() {
               <div className="w-2 shrink-0" />
               <div
                 className={cx(
-                  "flex h-full shrink-0 items-center",
+                  "app-drag flex h-full shrink-0 items-center",
                   ui.rightExpanded && "min-w-0 flex-1",
                 )}
                 style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}

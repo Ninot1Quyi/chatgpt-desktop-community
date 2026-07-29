@@ -11,3 +11,20 @@ export const TOKEN_COLOR = {"default": "gray", "astro": "purple", "babel": "yell
 export const PALETTE_DARK = {"gray": "#adadb1", "red": "#ff6762", "vermilion": "#d5512f", "orange": "#ffa359", "yellow": "#ffd452", "green": "#5ecc71", "teal": "#64d1db", "cyan": "#68cdf2", "blue": "#69b1ff", "indigo": "#9d6afb", "purple": "#d568ea", "pink": "#ff678d", "mauve": "#79697b"};
 
 export const PALETTE_LIGHT = {"gray": "#84848a", "red": "#d52c36", "vermilion": "#ff8c5b", "orange": "#d47628", "yellow": "#d5a910", "green": "#199f43", "teal": "#17a5af", "cyan": "#1ca1c7", "blue": "#1a85d4", "indigo": "#693acf", "purple": "#a631be", "pink": "#d32a61", "mauve": "#594c5b"};
+
+export function iconTokenFor(fileName) {
+  const normalized = String(fileName || "").toLowerCase();
+  if (EXACT[normalized]) return EXACT[normalized];
+  const dot = normalized.lastIndexOf(".");
+  if (dot > 0) {
+    const ext = normalized.slice(dot + 1);
+    if (COMPLETE_OVERRIDES[ext]) return COMPLETE_OVERRIDES[ext];
+    if (EXT[ext]) return EXT[ext];
+  }
+  return "default";
+}
+
+export function iconColorFor(token, theme = "dark") {
+  const pal = theme === "light" ? PALETTE_LIGHT : PALETTE_DARK;
+  return pal[TOKEN_COLOR[token] || "gray"] || pal.gray;
+}

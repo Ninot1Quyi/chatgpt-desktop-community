@@ -16,7 +16,14 @@ import {
   prefValue,
   stored,
 } from "@modules/preferences/state";
-import { createConversationState } from "@modules/conversations/state";
+import {
+  allocateExternalTextSegment,
+  createConversationState,
+  enqueueConversationMessage,
+  markExternalToolSegment,
+  reconcileExternalTurns,
+  removeConversationQueueItem,
+} from "@modules/conversations/state";
 import { createProjectsNavigationState } from "@modules/projects-navigation/state";
 import { createAgentRuntimeState } from "@modules/agent-runtimes/state";
 
@@ -157,6 +164,7 @@ export const useStore = create((set, get) => ({
           runtime: "composer.runtime" in prefs ? prefs["composer.runtime"] : s.runtime,
           modelSelections: "composer.models" in prefs ? prefs["composer.models"] : s.modelSelections,
           model: "composer.model" in prefs ? prefs["composer.model"] : s.model,
+          mode: "composer.mode" in prefs ? prefs["composer.mode"] : s.mode,
           effort: "composer.effort" in prefs ? prefs["composer.effort"] : s.effort,
           serviceTier: "composer.serviceTier" in prefs ? prefs["composer.serviceTier"] : s.serviceTier,
           permission: "composer.permission" in prefs ? prefs["composer.permission"] : s.permission,
@@ -195,6 +203,7 @@ export const useStore = create((set, get) => ({
     });
     api.onNotification(({ method, params }) => get().handleNotification(method, params));
     api.onServerRequest((req) => get().handleServerRequest(req));
+    api.onAgentRuntimeEvent?.((event) => get().handleAgentRuntimeEvent(event));
     api.onThemeUpdated(() => get().applyTheme());
     // App updates: surface a toast when a new version is ready to install.
     api.onUpdateStatus?.((s) => {
@@ -556,8 +565,8 @@ export const useStore = create((set, get) => ({
   // =======================================================================
   async openThread(threadId) {
     const cur = get().activeThreadId;
-    if (cur && cur !== threadId && !get()._navigating) {
-      set((s) => ({ navBack: [...s.navBack, cur], navFwd: [] }));
+    if (cur !== threadId && get().ui.navView === "chats" && !get()._navigating) {
+      get().pushNavLocation({ type: "thread", threadId });
     }
     // opening a thread always lands on the chat view (reference behavior)
     get().setUi({ navView: "chats" });
@@ -837,7 +846,13 @@ export const useStore = create((set, get) => ({
 
     // Queue while a turn is running on this thread (unless steering).
     if (activeThreadId && get().isTurnActive(activeThreadId) && !steer) {
-      set((s) => ({ queue: [...s.queue, { threadId: activeThreadId, text, images, mentions }] }));
+      set((s) => ({
+        queue: enqueueConversationMessage(
+          s.queue,
+          { threadId: activeThreadId, text, images, mentions },
+          crypto.randomUUID(),
+        ),
+      }));
       return;
     }
 
@@ -886,7 +901,12 @@ export const useStore = create((set, get) => ({
         activeThreadId: shownId,
         conversations: {
           ...s.conversations,
-          [shownId]: { ...conv, activeTurnId: localTurnId, turns: upsertTurn(conv.turns, optimisticTurn) },
+          [shownId]: {
+            ...conv,
+            renderKey: conv.renderKey || shownId,
+            activeTurnId: localTurnId,
+            turns: upsertTurn(conv.turns, optimisticTurn),
+          },
         },
       };
     });
@@ -900,7 +920,22 @@ export const useStore = create((set, get) => ({
           promptParts.push(`Referenced paths:\n${mentions.map((mention) => mention.path || mention.name).filter(Boolean).join("\n")}`);
         }
         if (images.length) promptParts.push(`Attached local images:\n${images.join("\n")}`);
-        set({ pendingNewThread: !threadId, externalRunId: runId });
+        set((s) => ({
+          pendingNewThread: !threadId,
+          externalRunContexts: {
+            ...s.externalRunContexts,
+            [runId]: {
+              runId,
+              runtime,
+              threadId: shownId,
+              turnId: localTurnId,
+              streamSegmentIndex: 0,
+              activeTextKind: null,
+              activeTextItemId: null,
+              seenToolCallIds: [],
+            },
+          },
+        }));
         const result = await api.agentRuntimeSend({
           runId,
           runtime,
@@ -925,11 +960,19 @@ export const useStore = create((set, get) => ({
         set((s) => {
           const conv = s.conversations[shownId] || {};
           const conversations = { ...s.conversations };
+          const externalRunContexts = { ...s.externalRunContexts };
+          delete externalRunContexts[runId];
+          const parsedTurns = normalizeTurns(result?.turns);
+          const turns = reconcileExternalTurns(
+            parsedTurns,
+            conv.turns,
+            localTurnId,
+          );
           if (shownId !== realThreadId) delete conversations[shownId];
           conversations[realThreadId] = {
             ...conv,
             thread,
-            turns: normalizeTurns(result?.turns),
+            turns,
             activeTurnId: null,
             source: runtime,
             runtime,
@@ -939,10 +982,11 @@ export const useStore = create((set, get) => ({
             error: null,
           };
           return {
-            activeThreadId: realThreadId,
+            activeThreadId: s.activeThreadId === shownId ? realThreadId : s.activeThreadId,
             conversations,
             pendingNewThread: false,
-            externalRunId: null,
+            externalRunContexts,
+            approvals: s.approvals.filter((approval) => approval.runId !== runId),
             queue: s.queue.map((queued) => queued.threadId === shownId ? { ...queued, threadId: realThreadId } : queued),
             ...(runtime === "claude"
               ? {
@@ -966,6 +1010,8 @@ export const useStore = create((set, get) => ({
           model: model || undefined,
           cwd: get().cwd || undefined,
           serviceTier: get().serviceTier || undefined,
+          serviceName: `chatgpt-desktop-${get().mode === "chatgpt" ? "chatgpt" : "codex"}`,
+          threadSource: get().mode === "chatgpt" ? "chatgpt" : "codex",
         };
         if (perm.approvalPolicy) startParams.approvalPolicy = perm.approvalPolicy;
         if (perm.approvalsReviewer) startParams.approvalsReviewer = perm.approvalsReviewer;
@@ -994,6 +1040,9 @@ export const useStore = create((set, get) => ({
         effort: effort || undefined,
         serviceTier: get().serviceTier || undefined,
         clientUserMessageId: crypto.randomUUID(),
+        responsesapiClientMetadata: {
+          desktop_mode: get().mode === "chatgpt" ? "chatgpt" : "codex",
+        },
       };
       if (perm.approvalPolicy) turnParams.approvalPolicy = perm.approvalPolicy;
       if (perm.approvalsReviewer) turnParams.approvalsReviewer = perm.approvalsReviewer;
@@ -1015,7 +1064,20 @@ export const useStore = create((set, get) => ({
         await api.rpc("turn/start", turnParams);
       }
     } catch (e) {
-      set({ pendingNewThread: false, externalRunId: null });
+      set((s) => {
+        const externalRunContexts = { ...s.externalRunContexts };
+        const failedRunId = Object.values(externalRunContexts)
+          .find((context) => context.threadId === shownId && context.turnId === localTurnId)
+          ?.runId;
+        if (failedRunId) delete externalRunContexts[failedRunId];
+        return {
+          pendingNewThread: false,
+          externalRunContexts,
+          approvals: failedRunId
+            ? s.approvals.filter((approval) => approval.runId !== failedRunId)
+            : s.approvals,
+        };
+      });
       // roll back the optimistic turn (and the temp draft conversation)
       set((s) => {
         const conversations = { ...s.conversations };
@@ -1043,8 +1105,15 @@ export const useStore = create((set, get) => ({
       const runtime = runtimeForThread(conv.thread, threadId);
       if (runtime === "codex") {
         await api.rpc("turn/interrupt", { threadId, turnId: conv.activeTurnId });
-      } else if (get().externalRunId) {
-        await api.agentRuntimeCancel(get().externalRunId);
+      } else {
+        const context = Object.values(get().externalRunContexts || {})
+          .find((candidate) => candidate.threadId === threadId);
+        if (context?.runId) {
+          await api.agentRuntimeCancel(context.runId);
+          set((s) => ({
+            approvals: s.approvals.filter((approval) => approval.runId !== context.runId),
+          }));
+        }
       }
     } catch (e) {
       get().toast(`Stop failed: ${e.message}`, "error");
@@ -1062,6 +1131,12 @@ export const useStore = create((set, get) => ({
 
   clearQueue(threadId) {
     set((s) => ({ queue: s.queue.filter((q) => q.threadId !== threadId) }));
+  },
+
+  removeQueuedMessage(threadId, id) {
+    set((s) => ({
+      queue: removeConversationQueueItem(s.queue, threadId, id),
+    }));
   },
 
   // =======================================================================
@@ -1318,8 +1393,22 @@ export const useStore = create((set, get) => ({
         break;
       }
       case "item/tool/call": {
-        // Dynamic tools are not supported by this client.
-        api.respond(id, null, "Dynamic tool calls are not supported by this client");
+        const message = "Dynamic tool calls are not supported by this client";
+        const contentItems = [{ type: "inputText", text: message }];
+        if (params.threadId && params.turnId && params.callId) {
+          get()._upsertItem(params.threadId, params.turnId, {
+            id: `dynamic-tool:${params.callId}`,
+            type: "dynamicToolCall",
+            tool: params.tool || "tool",
+            namespace: params.namespace ?? null,
+            arguments: params.arguments,
+            status: "failed",
+            success: false,
+            contentItems,
+            error: { message },
+          }, true);
+        }
+        api.respond(id, { success: false, contentItems });
         return;
       }
       default: {
@@ -1333,6 +1422,13 @@ export const useStore = create((set, get) => ({
   answerApproval(reqId, decision, extra) {
     const a = get().approvals.find((x) => x.reqId === reqId);
     if (!a) return;
+    if (a.kind === "externalPermission") {
+      api.agentRuntimePermissionResponse(a.permissionId, decision).catch((error) => {
+        get().toast(`Approval failed: ${error.message}`, "error");
+      });
+      set((s) => ({ approvals: s.approvals.filter((x) => x.reqId !== reqId) }));
+      return;
+    }
     let result;
     if (a.kind === "userInput") {
       result = { answers: extra?.answers ?? {} };
@@ -1363,6 +1459,156 @@ export const useStore = create((set, get) => ({
   // =======================================================================
   // notifications
   // =======================================================================
+  handleAgentRuntimeEvent(event) {
+    const context = get().externalRunContexts?.[event?.runId];
+    if (
+      !context ||
+      !event ||
+      event.runId !== context.runId ||
+      event.runtime !== context.runtime
+    ) {
+      return;
+    }
+    if (event.permissionRequest?.id) {
+      const request = event.permissionRequest;
+      set((s) => {
+        const reqId = `external-permission:${request.id}`;
+        if (s.approvals.some((approval) => approval.reqId === reqId)) return {};
+        return {
+          approvals: [...s.approvals, {
+            reqId,
+            permissionId: request.id,
+            runId: context.runId,
+            kind: "externalPermission",
+            title: request.toolCall?.title
+              ? `Allow ${request.toolCall.title}?`
+              : `${runtimeLabel(context.runtime)} requests permission`,
+            threadId: context.threadId,
+            turnId: context.turnId,
+            itemId: request.toolCall?.toolCallId || null,
+            options: request.options || [],
+            toolCall: request.toolCall || null,
+          }],
+        };
+      });
+      return;
+    }
+    const update = event.update;
+    if (!update?.sessionUpdate) return;
+    const { threadId, turnId } = context;
+
+    switch (update.sessionUpdate) {
+      case "agent_message_chunk": {
+        const delta = acpText(update.content);
+        if (!delta) return;
+        const segment = allocateExternalTextSegment(
+          get().externalRunContexts[event.runId],
+          "message",
+        );
+        if (segment.context !== context) {
+          set((s) => ({
+            externalRunContexts: {
+              ...s.externalRunContexts,
+              [event.runId]: segment.context,
+            },
+          }));
+        }
+        get()._appendToItem(
+          threadId,
+          turnId,
+          segment.itemId,
+          "agentMessage",
+          (item) => ({ ...item, text: (item.text || "") + delta }),
+        );
+        break;
+      }
+      case "agent_thought_chunk": {
+        const delta = acpText(update.content);
+        if (!delta) return;
+        const segment = allocateExternalTextSegment(
+          get().externalRunContexts[event.runId],
+          "reasoning",
+        );
+        if (segment.context !== context) {
+          set((s) => ({
+            externalRunContexts: {
+              ...s.externalRunContexts,
+              [event.runId]: segment.context,
+            },
+          }));
+        }
+        get()._appendToItem(
+          threadId,
+          turnId,
+          segment.itemId,
+          "reasoning",
+          (item) => {
+            const content = [...(item.content || [])];
+            content[0] = (content[0] || "") + delta;
+            return { ...item, summary: item.summary || [], content };
+          },
+        );
+        break;
+      }
+      case "tool_call":
+      case "tool_call_update": {
+        if (!update.toolCallId) return;
+        const latestContext = get().externalRunContexts[event.runId];
+        const nextContext = markExternalToolSegment(latestContext, update.toolCallId);
+        if (nextContext !== latestContext) {
+          set((s) => ({
+            externalRunContexts: {
+              ...s.externalRunContexts,
+              [event.runId]: nextContext,
+            },
+          }));
+        }
+        const itemId = `external-tool:${context.runId}:${update.toolCallId}`;
+        const status = acpToolStatus(update.status);
+        const item = {
+          id: itemId,
+          type: "dynamicToolCall",
+          status,
+        };
+        if (update.namespace !== undefined) item.namespace = update.namespace;
+        const argumentsValue = acpToolArguments(update);
+        if (argumentsValue !== undefined) item.arguments = argumentsValue;
+        if (update.sessionUpdate === "tool_call" || update.rawInput !== undefined) {
+          item.tool = update.title || update.tool || update.name || "tool";
+        }
+        const completed = status === "completed" || status === "failed";
+        if (completed) {
+          const output = update.rawOutput !== undefined
+            ? update.rawOutput
+            : acpToolOutput(update.content);
+          item.success = status === "completed";
+          item.contentItems = dynamicToolContentItems(output);
+          item.result = { content: output ?? "" };
+          if (status === "failed") {
+            item.error = {
+              message: typeof output === "string" ? output : "Kimi tool call failed",
+            };
+          }
+        }
+        get()._upsertItem(threadId, turnId, item, completed);
+        break;
+      }
+      case "plan": {
+        const steps = (update.entries || []).map((entry) => ({
+          step: entry.content || "",
+          status: entry.status === "completed" ? "completed" : entry.status || "pending",
+        }));
+        get()._mutateConv(threadId, (conversation) => ({
+          ...conversation,
+          plan: { steps, explanation: null },
+        }));
+        break;
+      }
+      default:
+        break;
+    }
+  },
+
   handleNotification(method, params) {
     const s = get();
     switch (method) {
@@ -1489,6 +1735,13 @@ export const useStore = create((set, get) => ({
           changes: params.changes,
         }));
         break;
+      case "item/mcpToolCall/progress":
+        s._appendToItem(params.threadId, params.turnId, params.itemId, "mcpToolCall", (it) => ({
+          ...it,
+          progressMessage: params.message,
+          status: it.status || "inProgress",
+        }));
+        break;
       case "error":
         s.toast(params.error?.message || "Unknown error", "error");
         s._mutateConv(params.threadId, (c) => ({ ...c, activeTurnId: params.willRetry ? c.activeTurnId : null }));
@@ -1608,6 +1861,17 @@ export const useStore = create((set, get) => ({
       const { rightTab, ...rest } = patch;
       patch = { ...rest, rightOpen: true };
     }
+    if (
+      "navView" in patch
+      && patch.navView !== get().ui.navView
+      && !get()._navigating
+      && typeof get().pushNavLocation === "function"
+    ) {
+      const nextLocation = patch.navView === "chats" && get().activeThreadId
+        ? { type: "thread", threadId: get().activeThreadId }
+        : { type: "view", navView: patch.navView };
+      get().pushNavLocation(nextLocation);
+    }
     set((s) => {
       const ui = { ...s.ui, ...patch };
       for (const k of ["sidebarOpen", "sidebarWidth", "rightOpen", "rightTab", "rightWidth", "rightExpanded", "terminalLocation", "suggestedPrompts", "theme"]) {
@@ -1652,6 +1916,63 @@ function runtimeForThread(thread, threadId) {
 
 function runtimeLabel(runtime) {
   return runtime === "claude" ? "Claude Code" : runtime === "kimi" ? "Kimi Code" : "Codex";
+}
+
+function acpText(content) {
+  if (typeof content === "string") return content;
+  if (content?.type === "text") return String(content.text || "");
+  if (content?.type === "inputText") return String(content.text || "");
+  if (content?.text != null) return String(content.text);
+  return "";
+}
+
+function acpContentText(content) {
+  if (!Array.isArray(content)) return acpText(content);
+  return content
+    .map((entry) => acpText(entry?.content ?? entry))
+    .filter(Boolean)
+    .join("\n");
+}
+
+function acpToolArguments(update) {
+  if (update.rawInput !== undefined) return update.rawInput;
+  if (
+    update.sessionUpdate !== "tool_call" &&
+    update.status !== "pending" &&
+    update.status !== "in_progress"
+  ) {
+    return undefined;
+  }
+  const text = acpContentText(update.content).trim();
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function acpToolOutput(content) {
+  const text = acpContentText(content);
+  return text || null;
+}
+
+function dynamicToolContentItems(output) {
+  if (Array.isArray(output)) {
+    const contentItems = output.filter((item) => item?.type === "inputText" || item?.type === "inputImage");
+    if (contentItems.length) return contentItems;
+  }
+  return [{ type: "inputText", text: safeJson(output ?? "") }];
+}
+
+function safeJson(value) {
+  try { return typeof value === "string" ? value : JSON.stringify(value); } catch { return String(value); }
+}
+
+function acpToolStatus(status) {
+  if (status === "completed") return "completed";
+  if (status === "failed") return "failed";
+  return "inProgress";
 }
 
 function samePath(left, right) {

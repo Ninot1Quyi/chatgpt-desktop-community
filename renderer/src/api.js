@@ -30,7 +30,10 @@ export const kimiHistoryList = () => b.kimiHistoryList();
 export const kimiHistoryRead = (sessionId) => b.kimiHistoryRead(sessionId);
 export const agentRuntimeCatalog = () => b.agentRuntimeCatalog();
 export const agentRuntimeSend = (request) => b.agentRuntimeSend(request);
+export const onAgentRuntimeEvent = (cb) => b.onAgentRuntimeEvent(cb);
 export const agentRuntimeCancel = (runId) => b.agentRuntimeCancel(runId);
+export const agentRuntimePermissionResponse = (permissionId, optionId) =>
+  b.agentRuntimePermissionResponse(permissionId, optionId);
 export const agentRuntimeAuthStatus = () => b.agentRuntimeAuthStatus();
 export const agentRuntimeAccount = (runtime, refresh = false) => b.agentRuntimeAccount(runtime, refresh);
 export const agentRuntimeLogin = (runtime) => b.agentRuntimeLogin(runtime);

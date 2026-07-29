@@ -12,21 +12,27 @@ import {
   codexRemainingPercent,
   codexResetDate,
 } from "@modules/agent-runtimes";
-import { openExternal, toggleQuickChat, showItemInFolder, rpc, logout } from "@app/api.js";
+import { openExternal, toggleQuickChat, showItemInFolder, rpc, logout, gsPatch } from "@app/api.js";
 import { Menu, Dialog, Spinner, IconButton } from "@app/components/ui.jsx";
 import { EXTERNAL_RUNTIMES, RUNTIMES, runtimeMeta } from "@modules/agent-runtimes";
 import {
   IconPlus, IconSearch, IconMore, IconGear, IconArchive, IconPencil,
-  IconTrash, IconUndo, IconChevronDown, IconChevronRight, IconFolder, IconFolderFilled, IconClock,
+  IconTrash, IconUndo, IconChevronDown, IconChevronRight, IconFolder, IconClock,
   IconUsage, IconInvite, IconLogout, IconBranch, IconX, IconGlobe,
   IconHelpCircle, IconNavNewChat, IconNavPullRequests, IconNavSites, IconNavScheduled, IconNavPlugins,
-  IconCircleAlert, IconPin, IconPinFilled, IconQuickChat, IconRefresh,
+  IconCircleAlert, IconPin, IconPinFilled, IconQuickChat, IconRefresh, IconHeaderChevronDown,
 } from "@app/components/icons.jsx";
 import {
   formatHomePath,
   showInFileManager,
 } from "@modules/host-copy";
 import { isSidebarEmpty } from "./sidebar-empty.mjs";
+import {
+  createPinnedPatch,
+  createProjectOrderPatch,
+  createReorderedIdsPatch,
+  createThreadProjectAssignmentPatch,
+} from "./state.js";
 
 const NAV_ITEMS = [
   { id: "pull-requests", label: "Pull requests", icon: <IconNavPullRequests size={16} /> },
@@ -36,6 +42,72 @@ const NAV_ITEMS = [
 ];
 
 const HELP_URL = "https://developers.openai.com/codex/";
+const SIDEBAR_DRAG_TYPE = "application/x-chatgpt-desktop-sidebar";
+
+function commitGlobalStatePatch(patch, localPatch = {}) {
+  if (!patch) return false;
+  const state = useStore.getState();
+  const nextGs = { ...(state.gs || {}), ...patch };
+  useStore.setState({ ...localPatch, gs: nextGs });
+  gsPatch(patch).then((ok) => {
+    if (!ok) useStore.getState().toast("Could not update sidebar order", "error");
+  }).catch((error) => {
+    useStore.getState().toast(error?.message || "Could not update sidebar order", "error");
+  });
+  return true;
+}
+
+function pinProject(projectId) {
+  const state = useStore.getState();
+  const patch = createPinnedPatch(state.gs, "pinned-project-ids", projectId);
+  commitGlobalStatePatch(patch, { pinnedProjectIds: patch["pinned-project-ids"] });
+}
+
+function pinThread(threadId) {
+  const state = useStore.getState();
+  const patch = createPinnedPatch(state.gs, "pinned-thread-ids", threadId);
+  commitGlobalStatePatch(patch, { pinnedThreadIds: patch["pinned-thread-ids"] });
+}
+
+function readSidebarDrag(event) {
+  try {
+    return JSON.parse(event.dataTransfer.getData(SIDEBAR_DRAG_TYPE) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function hasSidebarDrag(event) {
+  return Array.from(event.dataTransfer?.types || []).includes(SIDEBAR_DRAG_TYPE);
+}
+
+function writeSidebarDrag(event, payload) {
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData(SIDEBAR_DRAG_TYPE, JSON.stringify(payload));
+}
+
+function moveProjectBefore(draggedProjectId, targetProjectId, pinnedTarget) {
+  const state = useStore.getState();
+  const patch = pinnedTarget
+    ? createReorderedIdsPatch(state.gs, "pinned-project-ids", draggedProjectId, targetProjectId)
+    : createProjectOrderPatch(state.gs, draggedProjectId, targetProjectId);
+  const localPatch = patch?.["pinned-project-ids"]
+    ? { pinnedProjectIds: patch["pinned-project-ids"] }
+    : {};
+  return commitGlobalStatePatch(patch, localPatch);
+}
+
+function moveThreadBefore(draggedThreadId, targetThreadId) {
+  const state = useStore.getState();
+  const patch = createReorderedIdsPatch(state.gs, "pinned-thread-ids", draggedThreadId, targetThreadId);
+  return commitGlobalStatePatch(patch, patch ? { pinnedThreadIds: patch["pinned-thread-ids"] } : {});
+}
+
+function moveThreadToProject(threadId, project) {
+  if (!project || project.kind === "remote" || project.kind === "external") return false;
+  const projectId = project.kind === "virtual" ? null : project.id;
+  return commitGlobalStatePatch(createThreadProjectAssignmentPatch(useStore.getState().gs, threadId, projectId));
+}
 
 // ---------------------------------------------------------------------------
 export default function Sidebar() {
@@ -406,17 +478,36 @@ function ProjectSection({ project, runtime = "codex", nested = false, open, onTo
     <div>
       <div
         ref={rowRef}
+        draggable={project.kind !== "virtual"}
         className={cx(
           "group/proj relative mx-2 flex h-[30px] cursor-pointer select-none items-center gap-2 rounded-[12.5px] pr-2 hover:bg-(--surface-hover)",
           nested ? "pl-6" : "pl-2",
         )}
+        onDragStart={(event) => writeSidebarDrag(event, { type: "project", projectId: project.id })}
+        onDragOver={(event) => {
+          if (hasSidebarDrag(event)) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+          }
+        }}
+        onDrop={(event) => {
+          const payload = readSidebarDrag(event);
+          if (!payload) return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (payload.type === "project") {
+            moveProjectBefore(payload.projectId, project.id, pinned);
+          } else if (payload.type === "thread") {
+            moveThreadToProject(payload.threadId, project);
+          }
+        }}
         onClick={onToggle}
         onMouseEnter={() => { clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHoverCard(true), 550); }}
         onMouseLeave={() => { clearTimeout(hoverTimer.current); setHoverCard(false); }}
       >
         <span className="flex h-4 w-4 shrink-0 items-center justify-center text-(--fg-secondary)">
           <span className="group-hover/proj:hidden">
-            <IconFolderFilled size={16} />
+            <IconFolder size={16} />
           </span>
           <span className="hidden group-hover/proj:block">
             <IconChevronRight
@@ -464,7 +555,7 @@ function ProjectSection({ project, runtime = "codex", nested = false, open, onTo
               id: "pin",
               label: pinned ? "Unpin project" : "Pin project",
               icon: <IconPin size={14} />,
-              onSelect: () => useStore.getState().togglePinnedProjectId(project.id),
+              onSelect: () => pinProject(project.id),
             },
             ...(project.path && project.kind !== "remote"
               ? [{ id: "explorer", label: showInFileManager, icon: <IconFolder size={14} />, onSelect: () => showItemInFolder(project.path) }]
@@ -569,7 +660,7 @@ function ChatList({ threads, archived, onRename }) {
 
 function RuntimeHeader({ runtime, label, loading, configDir, open, onToggle, onRefresh }) {
   return (
-    <div className={cx("px-2", open ? "pt-4 pb-1" : "pt-1 pb-1")}>
+    <div className="px-2 pt-4 pb-1">
       <div
         role="button"
         tabIndex={0}
@@ -731,7 +822,7 @@ function ExternalThreadRow({ thread, runtime }) {
             id: "pin",
             label: pinned ? "Unpin chat" : "Pin chat",
             icon: <IconPin size={14} />,
-            onSelect: () => useStore.getState().togglePinnedThread(thread.id),
+            onSelect: () => pinThread(thread.id),
           },
           { sep: true },
           {
@@ -758,12 +849,60 @@ function ExternalThreadRow({ thread, runtime }) {
 }
 
 // ---------------------------------------------------------------------------
-// Product wordmark (product switching dropdown was removed).
+// Product switcher (ChatGPT / Codex), like the reference wordmark menu.
 function WordmarkMenu() {
+  const mode = useStore((s) => s.mode);
+  const setMode = useStore((s) => s.setMode);
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const label = mode === "chatgpt" ? "ChatGPT" : "Codex";
   return (
-    <div className="-ml-2 flex h-8 items-center rounded-xl px-2 py-0.5 text-[17px] leading-6">
-      <span className="truncate font-openai-sans font-semibold">ChatGPT</span>
-    </div>
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="-ml-2 flex h-8 items-center gap-1 rounded-xl border border-transparent px-2 py-0.5 text-[17px] leading-6 hover:bg-(--surface-hover)"
+        title="Switch product"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="truncate font-openai-sans font-semibold">{label}</span>
+        <IconHeaderChevronDown size={14} className="shrink-0 text-(--fg-tertiary)" />
+      </button>
+      <Menu
+        open={open}
+        anchor={() => btnRef.current?.getBoundingClientRect()}
+        onClose={() => setOpen(false)}
+        width={240}
+        items={[
+          {
+            id: "chatgpt",
+            tall: true,
+            label: (
+              <span>
+                <span className="block text-[13px] font-medium">ChatGPT</span>
+                <span className="block text-xs text-(--fg-tertiary)">Create, learn, and explore</span>
+              </span>
+            ),
+            checked: mode === "chatgpt",
+            onSelect: () => setMode("chatgpt"),
+          },
+          {
+            id: "codex",
+            tall: true,
+            label: (
+              <span>
+                <span className="block text-[13px] font-medium">Codex</span>
+                <span className="block text-xs text-(--fg-tertiary)">Build, debug, and ship</span>
+              </span>
+            ),
+            checked: mode !== "chatgpt",
+            onSelect: () => setMode("codex"),
+          },
+        ]}
+      />
+    </>
   );
 }
 
@@ -784,7 +923,7 @@ function ThreadRow({ thread, active, archived, onRename }) {  const needsInput =
       id: "pin",
       label: pinned ? "Unpin chat" : "Pin chat",
       icon: <IconPin size={14} />,
-      onSelect: () => useStore.getState().togglePinnedThread(thread.id),
+      onSelect: () => pinThread(thread.id),
     },
     { sep: true },
     archived
@@ -802,10 +941,25 @@ function ThreadRow({ thread, active, archived, onRename }) {  const needsInput =
   return (
     <div
       ref={rowRef}
+      draggable
       className={cx(
         "group/thr relative mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] pl-8 pr-1",
         active ? "bg-(--sidebar-row-active) text-(--fg)" : "hover:bg-(--surface-hover)"
       )}
+      onDragStart={(event) => writeSidebarDrag(event, { type: "thread", threadId: thread.id })}
+      onDragOver={(event) => {
+        if (pinned && hasSidebarDrag(event)) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }
+      }}
+      onDrop={(event) => {
+        const payload = readSidebarDrag(event);
+        if (!pinned || payload?.type !== "thread") return;
+        event.preventDefault();
+        event.stopPropagation();
+        moveThreadBefore(payload.threadId, thread.id);
+      }}
       onClick={open}
       onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true); }}
       onMouseEnter={() => { clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHoverCard(true), 550); }}
@@ -823,7 +977,7 @@ function ThreadRow({ thread, active, archived, onRename }) {  const needsInput =
         <button
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg)"
           title={pinned ? "Unpin chat" : "Pin chat"}
-          onClick={(e) => { e.stopPropagation(); useStore.getState().togglePinnedThread(thread.id); }}
+          onClick={(e) => { e.stopPropagation(); pinThread(thread.id); }}
         >
           {pinned ? <IconPinFilled size={13} /> : <IconPin size={13} />}
         </button>
@@ -1129,6 +1283,7 @@ function ProviderAccount({ runtime, meta }) {
         account={externalAccount}
         credentialLabel={externalAuth?.kimi?.detail === "oauth_credentials" ? "OAuth credentials" : "Saved credentials"}
         error={externalAccountError}
+        fallbackAvatar={profile?.photo}
         fallbackIcon={meta?.icon(22)}
         loading={externalAccountLoading}
         onRefresh={(refresh) => useStore.getState().refreshExternalAccount("kimi", { refresh })}

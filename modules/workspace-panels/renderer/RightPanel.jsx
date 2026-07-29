@@ -23,8 +23,10 @@ import { FileIcon } from "./panel/FileIcon.jsx";
 import { openFileInPanel, usePanelStore } from "./state.js";
 import { shellTitleCommand } from "@modules/terminal";
 import {
+  emptyPanelActionOrder,
   PANEL_ACTION_COMMANDS,
   PANEL_ACTION_ORDER,
+  panelActionAvailable,
 } from "./panel-actions.mjs";
 
 // ---------------------------------------------------------------------------
@@ -96,10 +98,12 @@ export function RightPanelHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const plusRef = useRef(null);
   const hasGit = useHasGit(usePanelCwd());
+  const runtime = usePanelRuntime();
   const keybindings = useStore((s) => s.ui.keybindings);
 
   const suggested = useSuggestedFiles();
-  const kinds = PLUS_MENU_ORDER.filter((k) => k !== "review" || hasGit);
+  const kinds = PLUS_MENU_ORDER.filter((k) =>
+    panelActionAvailable(k, { runtime, hasGit, hasActiveThread: true }));
   const menuItems = [
     ...kinds.map((k) => ({
       id: k,
@@ -123,42 +127,45 @@ export function RightPanelHeader() {
   ];
 
   return (
-    <div className="app-drag flex h-full min-w-0 items-center">
+    <div className="app-drag pointer-events-auto flex h-full min-w-0 items-center">
       {/* tab strip: scrollable, "+" pinned at its end (like the reference) */}
-      <div
-        className="app-no-drag hide-scrollbar flex h-full min-w-0 max-w-[calc(100%-44px)] shrink items-center gap-1.5 overflow-x-auto pl-1"
-        onDragOver={(e) => {
-          if (draggedTabId == null) return;
-          // dragging over strip background (not a tab) → move to the end
-          if (e.target === e.currentTarget) {
-            e.preventDefault();
-            usePanelStore.getState().move(draggedTabId, null);
-          }
-        }}
-      >
-        {tabs.map((t, i) => (
-          <PanelTab
-            key={t.id}
-            tab={t}
-            active={t.id === activeId}
-            showSep={i < tabs.length - 1 && tabs[i + 1].id !== activeId && t.id !== activeId}
-            onActivate={() => activate(t.id)}
-            onClose={() => close(t.id)}
-          />
-        ))}
-        <button
-          ref={plusRef}
-          title="Open side panel tab"
-          className="app-no-drag flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-(--fg-secondary) hover:bg-(--tab-active-bg) hover:text-(--fg)"
-          onClick={() => setMenuOpen(true)}
+      {tabs.length > 0 && (
+        <div
+          className="app-drag hide-scrollbar flex h-full min-w-0 max-w-[calc(100%-44px)] shrink items-center gap-1.5 overflow-x-auto pl-1"
+          onDragOver={(e) => {
+            if (draggedTabId == null) return;
+            // dragging over strip background (not a tab) → move to the end
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              usePanelStore.getState().move(draggedTabId, null);
+            }
+          }}
         >
-          <IconPlus size={14} />
-        </button>
-      </div>
+          {tabs.map((t, i) => (
+            <PanelTab
+              key={t.id}
+              tab={t}
+              active={t.id === activeId}
+              showSep={i < tabs.length - 1 && tabs[i + 1].id !== activeId && t.id !== activeId}
+              onActivate={() => activate(t.id)}
+              onClose={() => close(t.id)}
+            />
+          ))}
+          <button
+            ref={plusRef}
+            title="Open side panel tab"
+            className="app-no-drag flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-(--fg-secondary) hover:bg-(--tab-active-bg) hover:text-(--fg)"
+            onClick={() => setMenuOpen(true)}
+          >
+            <IconPlus size={14} />
+          </button>
+        </div>
+      )}
       <div className="app-drag h-full min-w-4 flex-1" />
       <IconButton
         icon={expanded ? <IconCompress /> : <IconExpand />}
         title={expanded ? "Collapse panel" : "Expand panel"}
+        className="mr-1"
         onClick={() => setUi({ rightExpanded: !expanded })}
       />
       <Menu open={menuOpen} anchor={() => plusRef.current?.getBoundingClientRect()} items={menuItems} onClose={() => setMenuOpen(false)} width={248} align="start" />
@@ -171,11 +178,17 @@ export function RightPanelHeader() {
 let draggedTabId = null;
 
 function PanelTab({ tab, active, showSep, onActivate, onClose }) {
+  const tabRef = useRef(null);
   const Icon = tabIcon(tab);
   const shellTitle = useShellTitle();
   const title = tab.kind === "terminal" && shellTitle ? shellTitle : tabTitle(tab);
+  useEffect(() => {
+    if (!active) return;
+    tabRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
   return (
     <div
+      ref={tabRef}
       className="app-no-drag group/tab relative flex h-7 max-w-39 shrink-0 items-center rounded-lg"
       draggable
       onDragStart={(e) => {
@@ -249,14 +262,16 @@ export default function RightPanel() {
   const activeId = usePanelStore((s) => s.activeId);
   if (!tabs.length) {
     return (
-      <div className="h-full w-full pt-[46px]">
-        <PanelEmptyState />
+      <div className="right-panel-root pointer-events-none h-full w-full pt-[46px]">
+        <div className="pointer-events-auto h-full">
+          <PanelEmptyState />
+        </div>
       </div>
     );
   }
   return (
-    <div className="right-panel-root flex h-full w-full flex-col pt-[46px]">
-      <div className="min-h-0 flex-1">
+    <div className="right-panel-root pointer-events-none flex h-full w-full flex-col pt-[46px]">
+      <div className="pointer-events-auto min-h-0 flex-1">
         {tabs.map((t) => {
           const C = TAB_KINDS[t.kind].component;
           return (
@@ -275,6 +290,18 @@ function usePanelCwd() {
   return useStore((s) => {
     const conv = s.activeThreadId ? s.conversations[s.activeThreadId] : null;
     return conv?.thread?.cwd || s.cwd || "";
+  });
+}
+
+function usePanelRuntime() {
+  return useStore((s) => {
+    const threadId = s.activeThreadId;
+    const conv = threadId ? s.conversations[threadId] : null;
+    const thread = conv?.thread;
+    if (thread?.runtime) return thread.runtime;
+    if (thread?.source === "claude" || threadId?.startsWith("claude:")) return "claude";
+    if (thread?.source === "kimi" || threadId?.startsWith("kimi:")) return "kimi";
+    return s.runtime || "codex";
   });
 }
 
@@ -335,11 +362,16 @@ function useSuggestedFiles() {
 // ---------------------------------------------------------------------------
 function PanelEmptyState() {
   const keybindings = useStore((s) => s.ui.keybindings);
+  const mode = useStore((s) => s.mode);
+  const hasActiveThread = useStore((s) => !!s.activeThreadId);
+  const hasGit = useHasGit(usePanelCwd());
+  const runtime = usePanelRuntime();
+  const actions = emptyPanelActionOrder({ mode, runtime, hasActiveThread, hasGit });
   return (
     <div className="flex h-full w-full flex-col overflow-x-hidden overflow-y-auto bg-(--surface) p-2 select-none">
       <div className="flex min-h-0 flex-1 flex-col justify-center">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-1 px-5">
-          {PANEL_ACTION_ORDER.map((k) => {
+          {actions.map((k) => {
             const def = TAB_KINDS[k];
             const Icon = def.icon;
             const hint = actionHint(k, keybindings);

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
+  emptyPanelActionOrder,
   PANEL_ACTION_COMMANDS,
   PANEL_ACTION_ORDER,
+  panelActionAvailable,
 } from "../modules/workspace-panels/renderer/panel-actions.mjs";
 import {
   bindingFor as macBindingFor,
@@ -38,6 +40,32 @@ test("right-panel actions keep the reference order and platform labels", () => {
   );
 });
 
+test("right-panel empty actions follow product and thread context", () => {
+  assert.deepEqual(
+    emptyPanelActionOrder({ mode: "codex", hasGit: true }),
+    ["review", "terminal", "browser", "files"],
+  );
+  assert.deepEqual(
+    emptyPanelActionOrder({ mode: "codex", hasGit: true, hasActiveThread: true }),
+    ["review", "terminal", "browser", "files", "sidechat"],
+  );
+  assert.deepEqual(
+    emptyPanelActionOrder({ mode: "codex", hasActiveThread: true }),
+    ["terminal", "browser", "files", "sidechat"],
+  );
+  assert.deepEqual(
+    emptyPanelActionOrder({ mode: "codex", runtime: "kimi", hasActiveThread: true }),
+    ["review", "terminal", "browser", "files", "sidechat"],
+  );
+  assert.equal(panelActionAvailable("review", { runtime: "kimi" }), true);
+  assert.equal(panelActionAvailable("review", { runtime: "claude" }), false);
+  assert.equal(panelActionAvailable("review", { runtime: "claude", hasGit: true }), true);
+  assert.deepEqual(
+    emptyPanelActionOrder({ mode: "chatgpt", hasGit: true, hasActiveThread: true }),
+    ["sidechat", "browser", "terminal"],
+  );
+});
+
 test("dark center and right-panel surfaces keep the measured reference colors", () => {
   const theme = readFileSync(new URL("../renderer/src/theme.css", import.meta.url), "utf8");
   assert.match(theme, /\.dark\s*\{[\s\S]*?--surface:\s*#111111;/);
@@ -52,10 +80,39 @@ test("mac right-panel header keeps blank title-bar space draggable", () => {
     new URL("../modules/workspace-panels/renderer/RightPanel.jsx", import.meta.url),
     "utf8",
   );
-  assert.match(panel, /className="app-drag flex h-full min-w-0 items-center"/);
+  const sharedParts = readFileSync(
+    new URL("../modules/desktop-shell/shared/parts.jsx", import.meta.url),
+    "utf8",
+  );
+  const sharedStyles = readFileSync(
+    new URL("../modules/desktop-shell/shared/styles.css", import.meta.url),
+    "utf8",
+  );
+  const macShell = readFileSync(
+    new URL("../modules/desktop-shell/implementations/macos-native/renderer.jsx", import.meta.url),
+    "utf8",
+  );
+  const conversation = readFileSync(
+    new URL("../modules/conversations/renderer/Conversation.jsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(panel, /className="app-drag pointer-events-auto flex h-full min-w-0 items-center"/);
   assert.match(panel, /className="app-drag h-full min-w-4 flex-1"/);
+  assert.match(panel, /className="right-panel-root pointer-events-none h-full w-full pt-\[46px\]"/);
+  assert.match(panel, /\{tabs\.length > 0 && \(/);
+  assert.match(panel, /tabRef\.current\?\.scrollIntoView\(\{ block: "nearest", inline: "nearest" \}\);/);
   assert.match(panel, /ref=\{plusRef\}[\s\S]*?className="app-no-drag /);
   assert.match(panel, /className="app-no-drag group\/tab /);
+  assert.match(panel, /title=\{expanded \? "Collapse panel" : "Expand panel"\}[\s\S]*?className="mr-1"/);
+  assert.match(sharedParts, /import "\.\/styles\.css";/);
+  assert.match(sharedStyles, /\.app-drag\s*\{\s*-webkit-app-region:\s*drag;/);
+  assert.match(sharedStyles, /\.app-no-drag\s*\{\s*-webkit-app-region:\s*no-drag;/);
+  assert.match(
+    macShell,
+    /pointer-events-none slide-in-right shrink-0 border-l border-\(--border\)/,
+  );
+  assert.match(macShell, /items-center gap-1 pr-3 pl-\[88px\]/);
+  assert.match(conversation, /className="app-no-drag flex h-7 w-\[52px\]/);
 });
 
 test("right-panel shortcuts match native modifiers on both platforms", () => {

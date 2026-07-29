@@ -7,7 +7,6 @@ import { IconX } from "./icons.jsx";
 
 export function ActivityDisclosure({ open, children }) {
   const ref = useRef(null);
-  const firstRender = useRef(true);
   const frame = useRef(null);
   const timer = useRef(null);
   const [rendered, setRendered] = useState(open);
@@ -22,14 +21,6 @@ export function ActivityDisclosure({ open, children }) {
 
     cancelAnimationFrame(frame.current);
     clearTimeout(timer.current);
-
-    if (firstRender.current) {
-      firstRender.current = false;
-      element.style.height = open ? "auto" : "0px";
-      element.style.opacity = open ? "1" : "0";
-      if (!open) setRendered(false);
-      return undefined;
-    }
 
     const duration = 300;
     const easing = "cubic-bezier(0.19, 1, 0.22, 1)";
@@ -96,7 +87,7 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
       items.reduce((height, item) => {
         if (item.sep) return height + 9;
         if (item.header) return height + 31;
-        return height + 28.57;
+        return height + (item.tall ? 56 : 28.57);
       }, 8),
     );
     if (top + estH > window.innerHeight - 8) top = Math.max(8, r.top - estH - 1);
@@ -159,13 +150,14 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
             onMouseEnter={(e) => openSub(it, e)}
             onMouseLeave={closeSubSoon}
             className={cx(
-              "flex h-[28.57px] w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
+              "flex w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
+              it.tall ? "min-h-14 py-2" : "h-[28.57px]",
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
           >
             {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
-            <span className="min-w-0 flex-1 truncate">{it.label}</span>
+            <span className={cx("min-w-0 flex-1", !it.tall && "truncate")}>{it.label}</span>
           </button>
         ) : (
           <button
@@ -175,13 +167,14 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
             onClick={() => { it.onSelect?.(); if (!it.keepOpen) onClose(); }}
             onMouseEnter={closeSubSoon}
             className={cx(
-              "flex h-[28.57px] w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
+              "flex w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
+              it.tall ? "min-h-14 py-2" : "h-[28.57px]",
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
           >
             {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
-            <span className="min-w-0 flex-1 truncate">{it.label}</span>
+            <span className={cx("min-w-0 flex-1", !it.tall && "truncate")}>{it.label}</span>
             {it.hint && <span className="shrink-0 text-xs text-(--fg-tertiary)">{it.hint}</span>}
             {it.checked && <span className="shrink-0 text-(--accent)">✓</span>}
           </button>

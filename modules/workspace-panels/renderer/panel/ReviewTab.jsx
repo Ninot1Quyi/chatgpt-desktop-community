@@ -17,10 +17,16 @@ import {
   IconRefresh,
   LucideIcon,
 } from "@app/components/icons.jsx";
-import { usePanelStore } from "../state.js";
+import { openFileInPanel, usePanelStore } from "../state.js";
 import { EmptyState } from "./common.jsx";
 
 const out = (r) => r?.stdout ?? r?.output ?? "";
+const isAbsolutePath = (p) => /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(String(p || ""));
+const joinWorkspacePath = (root, child) => {
+  if (!child || isAbsolutePath(child)) return child;
+  const separator = String(root || "").includes("\\") ? "\\" : "/";
+  return `${String(root || "").replace(/[\\/]+$/, "")}${separator}${child}`;
+};
 
 export default function ReviewTab() {
   const activeThreadId = useStore((s) => s.activeThreadId);
@@ -133,6 +139,18 @@ export default function ReviewTab() {
       useStore.getState().toast(`Copy failed: ${e.message}`, "error");
     }
   };
+  const openFile = (name) => {
+    const target = joinWorkspacePath(cwd, name);
+    if (target) openFileInPanel(target);
+  };
+  const askForReview = () => {
+    useStore.getState().sendMessage(
+      "Review the current workspace changes. Focus on correctness, regressions, and user-visible issues. Do not expose hidden reasoning; summarize only actionable findings.",
+      [],
+      [],
+      { steer: !!activeThreadId && useStore.getState().isTurnActive(activeThreadId) },
+    );
+  };
 
   // Revert a single hunk by reverse-applying it via `git apply -R`.
   const revertHunk = async (file, hunk) => {
@@ -227,6 +245,7 @@ export default function ReviewTab() {
             <ReviewToolButton icon="FileSearch" title="Jump to file" onClick={jumpToFirstFile} />
             <ReviewToolButton icon="Columns2" title="Switch to split diff" active={split} onClick={() => setSplit((value) => !value)} />
             <ReviewToolButton icon="FolderOpen" title="Show files" onClick={() => usePanelStore.getState().open("files")} />
+            <ReviewToolButton icon="Sparkles" title="Review changes" onClick={askForReview} />
             <div className="flex h-7 w-[51px] items-center overflow-hidden rounded-[10px] ring-1 ring-inset ring-(--border)">
               <span ref={commitButtonRef}>
                 <ReviewToolButton icon="GitCommitHorizontal" title="Commit or push" onClick={() => openMenu("commit")} />
@@ -337,8 +356,10 @@ export default function ReviewTab() {
                 onRevertHunk={revertHunk}
                 collapseSignal={collapseSignal}
                 split={split}
+                onOpenFile={openFile}
                 actions={
                   <>
+                    <FileAction label="Open" onClick={(e) => { e.stopPropagation(); openFile(diffFileName(f)); }} />
                     <FileAction label="Stage" onClick={(e) => { e.stopPropagation(); stageFile(diffFileName(f)); }} />
                     <FileAction label="Revert" danger onClick={(e) => { e.stopPropagation(); revertFile(diffFileName(f)); }} />
                   </>
@@ -360,7 +381,13 @@ export default function ReviewTab() {
                 defaultOpen={staged.length <= 3}
                 collapseSignal={collapseSignal}
                 split={split}
-                actions={<FileAction label="Unstage" onClick={(e) => { e.stopPropagation(); unstageFile(diffFileName(f)); }} />}
+                onOpenFile={openFile}
+                actions={
+                  <>
+                    <FileAction label="Open" onClick={(e) => { e.stopPropagation(); openFile(diffFileName(f)); }} />
+                    <FileAction label="Unstage" onClick={(e) => { e.stopPropagation(); unstageFile(diffFileName(f)); }} />
+                  </>
+                }
               />
             ))}
           </Section>
@@ -372,6 +399,7 @@ export default function ReviewTab() {
               <div key={i} data-review-file className="group flex min-h-9 items-center gap-2 px-4 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)">
                 <FileKindIcon name={p} />
                 <span className="min-w-0 flex-1 truncate font-mono" title={p}>{p}</span>
+                <FileAction label="Open" onClick={() => openFile(p)} />
                 <FileAction label="Stage" onClick={() => stageFile(p)} />
               </div>
             ))}
@@ -395,6 +423,8 @@ export default function ReviewTab() {
                 defaultOpen={threadChanges.length <= 3}
                 collapseSignal={collapseSignal}
                 split={split}
+                onOpenFile={openFile}
+                actions={<FileAction label="Open" onClick={(e) => { e.stopPropagation(); openFile(c.path); }} />}
               />
             ))}
           </Section>
@@ -510,7 +540,7 @@ function FileKindIcon({ name }) {
   );
 }
 
-function DiffFile({ file, defaultOpen = false, actions, onRevertHunk, collapseSignal = 0, split = false }) {
+function DiffFile({ file, defaultOpen = false, actions, onRevertHunk, collapseSignal = 0, split = false, onOpenFile }) {
   const [open, setOpen] = useState(defaultOpen);
   const name = diffFileName(file);
   useEffect(() => {
@@ -518,9 +548,18 @@ function DiffFile({ file, defaultOpen = false, actions, onRevertHunk, collapseSi
   }, [collapseSignal]);
   return (
     <div data-review-file className="group border-b border-(--border-light)">
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         className="flex min-h-11 w-full items-center gap-2 px-4 py-2 text-left hover:bg-(--surface-hover)"
         onClick={() => setOpen(!open)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen(!open);
+          }
+        }}
+        onDoubleClick={() => onOpenFile?.(name)}
       >
         <IconChevronRight size={12} className={cx("shrink-0 text-(--fg-tertiary) transition-transform", open && "rotate-90")} />
         <FileKindIcon name={name} />
@@ -532,7 +571,7 @@ function DiffFile({ file, defaultOpen = false, actions, onRevertHunk, collapseSi
           {file.added > 0 && <span className="text-(--diff-add-fg)">+{file.added} </span>}
           {file.deleted > 0 && <span className="text-(--diff-del-fg)">−{file.deleted}</span>}
         </span>
-      </button>
+      </div>
       {open && (
         <div className="overflow-x-auto border-t border-(--border-light) py-1">
           {file.hunks.map((h, hi) => (

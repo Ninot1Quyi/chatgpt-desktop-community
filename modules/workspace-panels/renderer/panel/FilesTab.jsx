@@ -19,6 +19,30 @@ import { revealInFileManager } from "@modules/host-copy";
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|ico)$/i;
 const MD_EXT = /\.(md|markdown|mdx)$/i;
+const SAVE_HINT = "Ctrl/⌘S";
+
+function encodeTextBase64(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function decodeTextBase64(value) {
+  const binary = atob(value);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function fileContentFromRpcResult(result) {
+  if (typeof result === "string") return result;
+  if (typeof result?.dataBase64 === "string") return decodeTextBase64(result.dataBase64);
+  return result?.content ?? result?.data ?? "";
+}
+
+function directoryEntriesFromRpcResult(result) {
+  return Array.isArray(result) ? result : result?.entries || [];
+}
 
 export default function FilesTab({ tab }) {
   const conv = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId] : null));
@@ -45,10 +69,7 @@ export default function FilesTab({ tab }) {
     api.rpc("fs/readFile", { path })
       .then((r) => {
         if (!live) return;
-        let content = "";
-        if (typeof r === "string") content = r;
-        else if (typeof r?.dataBase64 === "string") { try { content = decodeURIComponent(escape(atob(r.dataBase64))); } catch { try { content = atob(r.dataBase64); } catch { content = ""; } } }
-        else content = r?.content ?? r?.data ?? "";
+        const content = fileContentFromRpcResult(r);
         setFile({ path, content: String(content), loading: false });
       })
       .catch((e) => live && setFile({ path, content: null, loading: false, error: e.message }));
@@ -62,7 +83,11 @@ export default function FilesTab({ tab }) {
     if (!file || text === null || saving) return;
     setSaving(true);
     try {
-      await api.rpc("fs/writeFile", { path: file.path, dataBase64: btoa(unescape(encodeURIComponent(text))) });
+      await api.rpc("fs/writeFile", {
+        path: file.path,
+        content: text,
+        dataBase64: encodeTextBase64(text),
+      });
       setFile({ ...file, content: text });
       setText(null);
       toast(`Saved ${basename(file.path)}`);
@@ -105,10 +130,10 @@ export default function FilesTab({ tab }) {
             className="mr-1 flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-(--border) px-2.5 text-[13px] text-(--fg) hover:bg-(--surface-hover)"
             onClick={save}
             disabled={saving}
-            title="Save (⌘S)"
+            title={`Save (${SAVE_HINT})`}
           >
             {saving ? "Saving…" : "Save"}
-            <kbd className="rounded bg-(--surface-hover) px-1 py-px text-[10px] text-(--fg-tertiary)">⌘S</kbd>
+            <kbd className="rounded bg-(--surface-hover) px-1 py-px text-[10px] text-(--fg-tertiary)">{SAVE_HINT}</kbd>
           </button>
         )}
         <IconBtn title="Toggle file tree" active={treeOpen} onClick={() => setTreeOpen(!treeOpen)}>
@@ -496,7 +521,7 @@ function DirNode({ path, depth, selected, onSelect, gitMap }) {
     api.rpc("fs/readDirectory", { path })
       .then((r) => {
         if (!live) return;
-        const sorted = [...(r?.entries || [])].sort((a, b) =>
+        const sorted = [...directoryEntriesFromRpcResult(r)].sort((a, b) =>
           a.isDirectory === b.isDirectory ? a.fileName.localeCompare(b.fileName) : a.isDirectory ? -1 : 1
         );
         setEntries(sorted);
@@ -553,10 +578,13 @@ function TreeRow({ depth, name, full, isDir, open, selected, git, onToggle, onSe
       onClick={() => (isDir ? onToggle?.() : onSelect(full))}
     >
       {isDir ? (
-        <IconChevronRight
-          size={12}
-          className={cx("shrink-0 text-(--fg-tertiary) transition-transform duration-150", open && "rotate-90")}
-        />
+        <>
+          <IconChevronRight
+            size={12}
+            className={cx("shrink-0 text-(--fg-tertiary) transition-transform duration-150", open && "rotate-90")}
+          />
+          <IconFolder size={13} className="shrink-0 text-(--fg-tertiary)" />
+        </>
       ) : (
         <FileIcon name={name} size={13} />
       )}

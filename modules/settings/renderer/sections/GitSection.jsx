@@ -13,7 +13,7 @@ export default function GitSection() {
   const savePrefix = (value) => {
     setPrefix(value);
     lsSet("git.branchPrefix", value);
-    api.rpc("config/value/write", { key: "git.branchPrefix", value }).catch(() => {});
+    api.rpc("config/value/write", { keyPath: "git.branchPrefix", value, mergeStrategy: "replace" }).catch(() => {});
   };
 
   return (

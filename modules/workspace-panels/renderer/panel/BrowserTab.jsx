@@ -6,12 +6,20 @@ import { openExternal, captureWebview, saveTempFile } from "@app/api.js";
 import { useStore } from "@app/store.js";
 import { Menu } from "@app/components/ui.jsx";
 import { IconChevronLeft, IconChevronRight, IconRefresh, IconGlobe, IconX, IconExternal, IconPencil, IconCheck, IconMore } from "@app/components/icons.jsx";
-
-const HOME_URL = "https://www.google.com";
+import {
+  browserStateFromWebview,
+  normalizeBrowserUrl,
+} from "./bus.js";
 
 export default function BrowserTab() {
   const wvRef = useRef(null);
-  const [url, setUrl] = useState(() => localStorage.getItem("browser.url") || "");
+  const [url, setUrl] = useState(() => {
+    const stored = localStorage.getItem("browser.url") || "";
+    const normalized = normalizeBrowserUrl(stored);
+    if (normalized) localStorage.setItem("browser.url", normalized);
+    else if (stored) localStorage.removeItem("browser.url");
+    return normalized;
+  });
   const [input, setInput] = useState(url);
   const [canBack, setCanBack] = useState(false);
   const [canFwd, setCanFwd] = useState(false);
@@ -26,49 +34,69 @@ export default function BrowserTab() {
   const optionsRef = useRef(null);
 
   useEffect(() => {
+    const onOpenUrl = (e) => {
+      const u = normalizeBrowserUrl(e.detail?.url);
+      if (!u) return;
+      const wv = wvRef.current;
+      if (wv) wv.loadURL(u).catch(() => {});
+      setUrl(u);
+      setInput(u);
+      localStorage.setItem("browser.url", u);
+    };
+    window.addEventListener("codex:open-url", onOpenUrl);
+    return () => {
+      window.removeEventListener("codex:open-url", onOpenUrl);
+    };
+  }, []);
+
+  useEffect(() => {
     const wv = wvRef.current;
     if (!wv) return;
     const sync = () => {
       try {
-        setCanBack(wv.canGoBack());
-        setCanFwd(wv.canGoForward());
-        setInput(wv.getURL());
-        setUrl(wv.getURL());
-        localStorage.setItem("browser.url", wv.getURL());
+        const next = browserStateFromWebview(wv);
+        setCanBack(next.canBack);
+        setCanFwd(next.canForward);
+        setInput(next.url);
+        setUrl(next.url);
+        localStorage.setItem("browser.url", next.url);
       } catch {}
     };
     const onStart = () => setLoading(true);
     const onStop = () => { setLoading(false); sync(); };
+    const onFail = () => { setLoading(false); sync(); };
     const onTitle = (e) => setTitle(e.title || "");
-    const onOpenUrl = (e) => {
-      const u = e.detail?.url;
-      if (u) { wv.loadURL(u).catch(() => {}); setInput(u); }
+    const onWillNavigate = (e) => {
+      const nextUrl = normalizeBrowserUrl(e.url);
+      if (!nextUrl || nextUrl !== String(e.url || "").trim()) e.preventDefault();
     };
-    window.addEventListener("codex:open-url", onOpenUrl);
     wv.addEventListener("did-start-loading", onStart);
     wv.addEventListener("did-stop-loading", onStop);
+    wv.addEventListener("did-fail-load", onFail);
+    wv.addEventListener("will-navigate", onWillNavigate);
     wv.addEventListener("did-navigate", sync);
     wv.addEventListener("did-navigate-in-page", sync);
     wv.addEventListener("page-title-updated", onTitle);
+    sync();
     return () => {
-      window.removeEventListener("codex:open-url", onOpenUrl);
       wv.removeEventListener("did-start-loading", onStart);
       wv.removeEventListener("did-stop-loading", onStop);
+      wv.removeEventListener("did-fail-load", onFail);
+      wv.removeEventListener("will-navigate", onWillNavigate);
       wv.removeEventListener("did-navigate", sync);
       wv.removeEventListener("did-navigate-in-page", sync);
       wv.removeEventListener("page-title-updated", onTitle);
     };
-  }, []);
+  }, [url]);
 
   const navigate = (raw) => {
-    let u = raw.trim();
+    const u = normalizeBrowserUrl(raw);
     if (!u) return;
-    if (!/^[a-z]+:\/\//i.test(u)) {
-      u = u.includes(".") && !u.includes(" ") ? `https://${u}` : `https://www.google.com/search?q=${encodeURIComponent(u)}`;
-    }
     const wv = wvRef.current;
     if (wv) wv.loadURL(u).catch(() => {});
+    setUrl(u);
     setInput(u);
+    localStorage.setItem("browser.url", u);
   };
 
   const applyZoom = (next) => {
@@ -143,7 +171,10 @@ export default function BrowserTab() {
             placeholder="Enter a URL"
             spellCheck={false}
           />
-          <NavBtn title="Open in external browser" onClick={() => openExternal(input)}>
+          <NavBtn title="Open in external browser" onClick={() => {
+            const u = normalizeBrowserUrl(input);
+            if (u) openExternal(u);
+          }}>
             <IconExternal size={14} />
           </NavBtn>
         </div>
@@ -182,7 +213,10 @@ export default function BrowserTab() {
           { id: "zoom-reset", label: "Reset zoom", hint: "100%", onSelect: () => applyZoom(100) },
           { id: "zoom-in", label: "Zoom in", onSelect: () => applyZoom(zoom + 10) },
           { sep: true },
-          { id: "external", label: "Open in external browser", icon: <IconExternal size={14} />, onSelect: () => openExternal(input) },
+          { id: "external", label: "Open in external browser", icon: <IconExternal size={14} />, onSelect: () => {
+            const u = normalizeBrowserUrl(input);
+            if (u) openExternal(u);
+          } },
         ]}
       />
       {/* page */}

@@ -33,6 +33,55 @@ function createSiteDraft() {
 
 function SitesView() {
   const [query, setQuery] = useState("");
+  const [plugins, setPlugins] = useState(null);
+  const [error, setError] = useState(null);
+  const sitesPlugin = useMemo(
+    () => (plugins || []).find((plugin) => pluginSlug(plugin) === "sites" || pluginName(plugin).toLowerCase() === "sites"),
+    [plugins],
+  );
+  const visibleSitesPlugin = sitesPlugin
+    && (!query.trim() || pluginName(sitesPlugin).toLowerCase().includes(query.trim().toLowerCase()));
+
+  useEffect(() => {
+    let live = true;
+    const load = () =>
+      api.rpc("plugin/list", {})
+        .then((result) => {
+          if (!live) return;
+          setPlugins(flattenPluginList(result));
+          setError(null);
+        })
+        .catch((err) => {
+          if (!live) return;
+          setPlugins([]);
+          setError(err.message);
+        });
+    load();
+    window.addEventListener("sites:reload", load);
+    return () => {
+      live = false;
+      window.removeEventListener("sites:reload", load);
+    };
+  }, []);
+
+  const openSitesPlugin = () => {
+    if (!sitesPlugin) {
+      createSiteDraft();
+      return;
+    }
+    const iface = sitesPlugin.interface || {};
+    if (iface.websiteUrl) {
+      api.openExternal(iface.websiteUrl);
+      return;
+    }
+    const prompts = Array.isArray(iface.defaultPrompt) ? iface.defaultPrompt : [iface.defaultPrompt];
+    useStore.getState().newChatWithPrefill(
+      (prompts.find(Boolean) || "Create a website that ") + " ",
+      sitesPlugin.installed
+        ? [{ kind: "skill", name: pluginSlug(sitesPlugin), displayName: pluginName(sitesPlugin), path: sitesPlugin.source?.path || "", icon: iface.composerIcon || iface.logo || null }]
+        : [{ kind: "site", name: "Sites", displayName: "Sites" }],
+    );
+  };
 
   return (
     <PageShell title="Sites">
@@ -72,6 +121,16 @@ function SitesView() {
                 <div className="text-[16px] leading-6 font-medium text-(--fg)">No sites yet</div>
               </div>
               <div className="flex w-full flex-wrap items-center justify-center gap-2">
+                {visibleSitesPlugin && (
+                  <button
+                    type="button"
+                    className="app-no-drag flex h-8 items-center gap-2 rounded-[12.5px] border border-(--border) bg-(--surface-under) px-3 text-[14px] leading-[18px] text-(--fg) hover:bg-(--surface-hover)"
+                    onClick={openSitesPlugin}
+                  >
+                    <PluginIcon plugin={sitesPlugin} size={18} />
+                    Open Sites
+                  </button>
+                )}
                 <button
                   type="button"
                   className="app-no-drag flex h-8 items-center rounded-[12.5px] border border-(--border) bg-(--surface-hover) px-4 text-[14px] leading-[18px] text-(--fg) hover:bg-(--surface-active)"
@@ -80,12 +139,27 @@ function SitesView() {
                   Create new site
                 </button>
               </div>
+              {error && (
+                <div className="max-w-md text-[12px] leading-5 text-(--fg-faint)">
+                  Sites plugin status unavailable: {error}
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
     </PageShell>
   );
+}
+
+function flattenPluginList(result) {
+  const flat = [];
+  for (const marketplace of result?.marketplaces || []) {
+    for (const plugin of marketplace.plugins || []) {
+      flat.push({ ...plugin, _marketplace: marketplace.name, _marketplacePath: marketplace.path });
+    }
+  }
+  return flat;
 }
 
 function PageShell({ title, children }) {

@@ -22,7 +22,7 @@ export default function PersonalizationSection() {
 
   const saveInstructions = () => {
     lsSet("customInstructions", instructions);
-    api.rpc("config/value/write", { key: "instructions", value: instructions }).catch(() => {});
+    api.rpc("config/value/write", { keyPath: "instructions", value: instructions, mergeStrategy: "replace" }).catch(() => {});
     toast("Custom instructions saved", "info");
   };
 

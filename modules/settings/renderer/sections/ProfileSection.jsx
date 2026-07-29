@@ -6,6 +6,7 @@ import { useStore, planLabel } from "@app/store.js";
 import { cx } from "@app/lib/cx.js";
 import { Card, Segmented } from "./shared.jsx";
 import { Spinner } from "@app/components/ui.jsx";
+import { buildTokenSeries, recentUsageRows } from "./profile-usage.mjs";
 
 function fmtTokens(n) {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -29,6 +30,8 @@ export default function ProfileSection() {
   const account = useStore((s) => s.account);
   const home = useStore((s) => s.appInfo?.home) || "";
   const [usage, setUsage] = useState(null);
+  const [usageLoading, setUsageLoading] = useState(true);
+  const [usageError, setUsageError] = useState(null);
   const [skillsCount, setSkillsCount] = useState(null);
   const [chatCount, setChatCount] = useState(null);
   const [topReasoning, setTopReasoning] = useState(null);
@@ -36,7 +39,21 @@ export default function ProfileSection() {
 
   useEffect(() => {
     let live = true;
-    api.rpc("account/usage/read", {}).then((r) => live && setUsage(r)).catch(() => {});
+    setUsageLoading(true);
+    setUsageError(null);
+    api
+      .rpc("account/usage/read", null)
+      .then((r) => {
+        if (!live) return;
+        setUsage(r);
+      })
+      .catch((e) => {
+        if (!live) return;
+        setUsageError(e.message || "Usage data is not available");
+      })
+      .finally(() => {
+        if (live) setUsageLoading(false);
+      });
     api
       .rpc("skills/list", {})
       .then((r) => {
@@ -94,33 +111,9 @@ export default function ProfileSection() {
   const summary = usage?.summary || {};
   const plan = planLabel(account?.planType);
 
-  // Last ~12 months, aggregated from the daily buckets.
-  const months = useMemo(() => {
-    const buckets = usage?.dailyUsageBuckets || [];
-    const byMonth = new Map();
-    for (const b of buckets) {
-      const d = new Date(b.startDate || b.date || b.day);
-      if (isNaN(d)) continue;
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      byMonth.set(key, (byMonth.get(key) || 0) + (b.tokens || 0));
-    }
-    const out = [];
-    const now = new Date();
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      out.push({ key, label: d.toLocaleString("en", { month: "short" }), tokens: byMonth.get(key) || 0 });
-    }
-    // Chart series per mode: monthly totals, weekly average, or cumulative.
-    let run = 0;
-    return out.map((m) => {
-      run += m.tokens;
-      const value = mode === "cumulative" ? run : mode === "weekly" ? m.tokens / 4.3 : m.tokens;
-      return { ...m, value };
-    });
-  }, [usage, mode]);
-
-  const maxVal = Math.max(1, ...months.map((m) => m.value));
+  const series = useMemo(() => buildTokenSeries(usage, mode), [usage, mode]);
+  const rows = useMemo(() => recentUsageRows(usage), [usage]);
+  const maxVal = Math.max(1, ...series.map((m) => m.value));
 
   const stats = [
     [fmtTokens(summary.lifetimeTokens), "Lifetime tokens"],
@@ -200,14 +193,18 @@ export default function ProfileSection() {
               onChange={setMode}
             />
           </div>
-          {!usage ? (
+          {usageLoading ? (
             <div className="flex justify-center py-6 text-(--fg-tertiary)">
               <Spinner />
+            </div>
+          ) : usageError ? (
+            <div className="py-6 text-center text-[12px] text-(--fg-tertiary)">
+              Usage data is not available: {usageError}
             </div>
           ) : (
             <>
               <div className="flex h-[120px] items-end gap-1.5">
-                {months.map((m) => (
+                {series.map((m) => (
                   <div key={m.key} className="flex min-w-0 flex-1 flex-col items-center justify-end self-stretch">
                     <div
                       className={cx("w-full rounded-t-sm", m.value > 0 ? "bg-(--accent)" : "bg-(--surface-active)")}
@@ -218,11 +215,27 @@ export default function ProfileSection() {
                 ))}
               </div>
               <div className="mt-1 flex gap-1.5">
-                {months.map((m) => (
+                {series.map((m) => (
                   <div key={m.key} className="min-w-0 flex-1 text-center text-[10px] text-(--fg-faint)">
                     {m.label}
                   </div>
                 ))}
+              </div>
+              <div className="mt-4 rounded-xl border border-(--border-light)">
+                <div className="flex items-center justify-between px-3 py-2 text-[11px] text-(--fg-tertiary)">
+                  <span>Recent daily records</span>
+                  <span>Tokens</span>
+                </div>
+                {rows.length === 0 ? (
+                  <div className="px-3 py-2 text-[12px] text-(--fg-faint)">No token records yet.</div>
+                ) : (
+                  rows.map((row) => (
+                    <div key={row.key} className="flex items-center justify-between border-t border-(--border-light) px-3 py-2 text-[12px]">
+                      <span className="text-(--fg-secondary)">{row.label}</span>
+                      <span className="font-medium">{fmtTokens(row.tokens)}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </>
           )}

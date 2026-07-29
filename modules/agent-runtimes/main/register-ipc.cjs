@@ -1,3 +1,5 @@
+const crypto = require("node:crypto");
+
 const {
   getClaudeConfigDir,
   getExternalAuthStatus,
@@ -71,7 +73,22 @@ function registerAgentRuntimeHandlers({
     })));
 
   const externalRuns = new Map();
-  ipcMain.handle("agent-runtime:send", (_event, request = {}) =>
+  const externalPermissions = new Map();
+  const settlePermission = (permissionId, result) => {
+    const pending = externalPermissions.get(permissionId);
+    if (!pending) return false;
+    externalPermissions.delete(permissionId);
+    pending.sender.removeListener?.("destroyed", pending.onDestroyed);
+    pending.resolve(result);
+    return true;
+  };
+  const cancelPermissionsForRun = (runId) => {
+    for (const [permissionId, pending] of externalPermissions) {
+      if (pending.runId !== runId) continue;
+      settlePermission(permissionId, { outcome: { outcome: "cancelled" } });
+    }
+  };
+  ipcMain.handle("agent-runtime:send", (event, request = {}) =>
     resultOrError(async () => {
       const runId = String(request.runId || "");
       try {
@@ -88,8 +105,49 @@ function registerAgentRuntimeHandlers({
         const result = await runExternalAgent(request, {
           homePath,
           host,
-          kimiConfigDir: getKimiConfigDir(homePath),
-          onSpawn: (child) => externalRuns.set(runId, child),
+          onSpawn: (child, controller) => {
+            externalRuns.set(runId, { child, controller });
+          },
+          onUpdate: (payload) => {
+            if (event.sender.isDestroyed?.()) return;
+            event.sender.send("agent-runtime:event", {
+              runId,
+              runtime: request.runtime,
+              ...payload,
+            });
+          },
+          onPermissionRequest: (params) => new Promise((resolve) => {
+            if (event.sender.isDestroyed?.()) {
+              resolve({ outcome: { outcome: "cancelled" } });
+              return;
+            }
+            const permissionId = crypto.randomUUID();
+            const onDestroyed = () => {
+              settlePermission(permissionId, { outcome: { outcome: "cancelled" } });
+            };
+            externalPermissions.set(permissionId, {
+              runId,
+              sender: event.sender,
+              senderId: event.sender.id,
+              options: Array.isArray(params.options) ? params.options : [],
+              onDestroyed,
+              resolve,
+            });
+            event.sender.once?.("destroyed", onDestroyed);
+            try {
+              event.sender.send("agent-runtime:event", {
+                runId,
+                runtime: request.runtime,
+                permissionRequest: {
+                  id: permissionId,
+                  options: Array.isArray(params.options) ? params.options : [],
+                  toolCall: params.toolCall || null,
+                },
+              });
+            } catch {
+              settlePermission(permissionId, { outcome: { outcome: "cancelled" } });
+            }
+          }),
         });
         return result.runtime === "claude"
           ? readClaudeSession({
@@ -101,15 +159,33 @@ function registerAgentRuntimeHandlers({
             sessionId: result.sessionId,
           });
       } finally {
+        cancelPermissionsForRun(runId);
         externalRuns.delete(runId);
       }
     }));
-  ipcMain.handle("agent-runtime:cancel", (_event, { runId } = {}) => {
+  ipcMain.handle("agent-runtime:permission-response", (event, {
+    permissionId,
+    optionId,
+  } = {}) => {
+    const id = String(permissionId || "");
+    const pending = externalPermissions.get(id);
+    if (!pending || pending.senderId !== event.sender.id) return false;
+    const selected = pending.options.find((option) => option.optionId === optionId);
+    settlePermission(id, selected
+      ? { outcome: { outcome: "selected", optionId: selected.optionId } }
+      : { outcome: { outcome: "cancelled" } });
+    return true;
+  });
+  ipcMain.handle("agent-runtime:cancel", async (_event, { runId } = {}) => {
     const id = String(runId || "");
-    const child = externalRuns.get(id);
-    if (!child) return false;
-    child.kill();
-    externalRuns.delete(id);
+    const active = externalRuns.get(id);
+    if (!active) return false;
+    cancelPermissionsForRun(id);
+    if (typeof active.controller?.cancel === "function") {
+      await active.controller.cancel();
+      return true;
+    }
+    active.child.kill();
     return true;
   });
 }
