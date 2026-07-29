@@ -22,6 +22,7 @@ import {
   IconCmdInit, IconCmdMcp, IconCmdMemories, IconCmdModel, IconCmdPlan,
   IconCmdReasoning, IconCmdSide, IconCmdStatus,
   IconComposerPlus, IconComposerMic, IconComposerChevronDown, IconComposerChevronRight, IconGoalChevron, IconSkillCheck, IconModelPower, IconCircleXFill,
+  IconNavSites,
 } from "@app/components/icons.jsx";
 import { panelHook } from "@app/lib/panelHook.js";
 
@@ -368,7 +369,7 @@ export default function Composer({ centered = false, quick = false }) {
     // Strip mention display names back out of the text (they go as mention inputs).
     let outText = text;
     for (const m of mentions) {
-      if (m.kind === "skill") continue;
+      if (m.kind === "skill" || m.kind === "site") continue;
       outText = outText.split(m.name).join(`@${m.name}`);
     }
     // Skill mentions serialize as inline $slug at the end (reference behavior).
@@ -378,7 +379,10 @@ export default function Composer({ centered = false, quick = false }) {
       if (!outText.includes(tag)) outText = `${outText.replace(/\s+$/, "")}${outText.trim() ? " " : ""}${tag} `;
     }
     // Attached (non-image) files ride along as mention inputs with absolute paths.
-    const allMentions = [...mentions, ...files.map((f) => ({ name: basename(f), path: f, kind: "file" }))];
+    const allMentions = [
+      ...mentions.filter((mention) => mention.kind !== "site"),
+      ...files.map((f) => ({ name: basename(f), path: f, kind: "file" })),
+    ];
     sendMessage(outText, images, allMentions, opts); // the store queues it when a turn is running
     setText("");
     setImages([]);
@@ -618,9 +622,10 @@ export default function Composer({ centered = false, quick = false }) {
           </div>
         )}
 
-        {mentions.length > 0 && (
+        {mentions.some((mention) => mention.kind !== "site") && (
           <div className="flex flex-wrap gap-1.5 px-1 pt-1 pb-1.5">
             {mentions.map((m, i) =>
+              m.kind === "site" ? null :
               m.kind === "skill" ? (
                 <span
                   key={i}
@@ -792,17 +797,25 @@ export default function Composer({ centered = false, quick = false }) {
           </div>
         )}
 
-        <textarea
-          ref={taRef}
-          rows={1}
-          value={text}
-          placeholder={useStore((s) => s.mode) === "chatgpt" ? "Message ChatGPT" : "Do anything"}
-          className="mx-1 mt-1.5 mb-1 block min-h-11 w-[calc(100%-8px)] resize-none bg-transparent p-0 text-[14px] leading-5 font-[445] text-(--fg) outline-none placeholder:text-(--fg-faint)"
-          onChange={(e) => { setText(e.target.value); detectMenu(e.target.value, e.target.selectionStart); }}
-          onKeyDown={onKeyDown}
-          onClick={(e) => detectMenu(e.target.value, e.target.selectionStart)}
-          onPaste={onPasteFiles}
-        />
+        <div className="mx-1 mt-1.5 mb-1 flex min-h-11 items-start gap-2">
+          {mentions.some((mention) => mention.kind === "site") && (
+            <span className="mt-px flex shrink-0 items-center gap-1.5 py-0 text-[14px] leading-5 font-medium text-(--accent)">
+              <IconNavSites size={16} />
+              Sites
+            </span>
+          )}
+          <textarea
+            ref={taRef}
+            rows={1}
+            value={text}
+            placeholder={useStore((s) => s.mode) === "chatgpt" ? "Message ChatGPT" : "Do anything"}
+            className="block min-h-11 min-w-0 flex-1 resize-none bg-transparent p-0 text-[14px] leading-5 font-[445] text-(--fg) outline-none placeholder:text-(--fg-faint)"
+            onChange={(e) => { setText(e.target.value); detectMenu(e.target.value, e.target.selectionStart); }}
+            onKeyDown={onKeyDown}
+            onClick={(e) => detectMenu(e.target.value, e.target.selectionStart)}
+            onPaste={onPasteFiles}
+          />
+        </div>
 
         <div className="flex items-center gap-[5px]">
           <AttachButton

@@ -8,7 +8,7 @@ import { basename, formatDuration } from "@app/lib/time.js";
 import { commandActivity } from "@app/lib/commandActivity.mjs";
 import vscodeIcon from "@app/assets/vscode.png";
 import Composer from "./Composer.jsx";
-import { ItemView, PlanWidget, ApprovalCard, TurnActionRow } from "./items.jsx";
+import { ItemView, PlanWidget, ApprovalCard, TurnActionRow, TurnDiffCard } from "./items.jsx";
 import { ActivityDisclosure, Menu, Dialog, IconButton, Spinner } from "@app/components/ui.jsx";
 import { IconBranch, IconFolder, IconMore, IconChevronRight, IconChevronDown, IconX, IconFile, IconTerminal, IconGlobe, IconSparkle, IconFolderFilled, IconDots21, IconHeaderOutputs, IconHeaderPanelBottom, IconHeaderPanelSide, IconHeaderChevronDown, IconCmdGoal, IconBookOpen, IconCodeSearching, IconEditFiles, IconGoalEdit, IconGoalPause, IconGoalResume, IconGoalTrash, IconGoalChevron, IconListFiles, IconMcpSource, IconRunCommand, IconWebSearch, IconClaude, IconKimi, LucideIcon } from "@app/components/icons.jsx";
 import { panelHook } from "@app/lib/panelHook.js";
@@ -681,6 +681,7 @@ function MessageList({ conv }) {
   const [stickBottom, setStickBottom] = useState(true);
   const [externalActivity, setExternalActivity] = useState(null);
   const turns = conv?.turns || [];
+  const showReasoning = conv?.thread?.source === "kimi";
   const activeTurnId = conv?.activeTurnId;
   const activeItems = turns.find((turn) => turn.id === activeTurnId)?.items || [];
   const nativeLiveActivity = [...activeItems].reverse().find((item) => item.status === "inProgress");
@@ -692,8 +693,13 @@ function MessageList({ conv }) {
 
   // The active TurnView renders its own "Working for Xs" header once the turn
   // has work items; until then the standalone WorkingRow fills in.
-  const hasActiveWork = turns.some(
-    (t) => t.id === activeTurnId && (t.items || []).some((it) => it.type !== "userMessage")
+  const hasActiveWork = turns.some((turn) =>
+    turn.id === activeTurnId
+    && (turn.items || []).some((item) =>
+      item.type !== "userMessage"
+      && (showReasoning || item.type !== "reasoning")
+      && !(item.type === "agentMessage" && !item.text),
+    ),
   );
 
   useEffect(() => {
@@ -746,8 +752,14 @@ function MessageList({ conv }) {
         <div ref={contentRef} className="flex min-h-full shrink-0 flex-col justify-start">
           <div className="mx-auto flex w-full max-w-(--thread-content-max-width) flex-col gap-(--conversation-item-gap) px-4 pt-4 pb-6">
             {conv?.thread?.forkedFromId && <ForkedFromCard forkedFromId={conv.thread.forkedFromId} />}
-            {turns.map((turn) => (
-              <TurnView key={turn.id} turn={turn} streaming={turn.id === activeTurnId} />
+            {turns.map((turn, turnIndex) => (
+              <TurnView
+                key={turn.id}
+                turn={turn}
+                streaming={turn.id === activeTurnId}
+                showReasoning={showReasoning}
+                turnDiff={turnIndex === turns.length - 1 ? conv.diff : null}
+              />
             ))}
             {activeTurnId && !hasActiveWork && <WorkingRow conv={conv} />}
             {showExternalActivity && <WorklogActionRow item={externalActivity} live />}
@@ -777,7 +789,7 @@ function MessageList({ conv }) {
   );
 }
 
-function TurnView({ turn, streaming }) {
+function TurnView({ turn, streaming, showReasoning, turnDiff }) {
   const items = turn.items || [];
   const lastAgent = items.reduce((acc, it, i) => (it.type === "agentMessage" ? i : acc), -1);
   const showActions = !streaming && turn.status === "completed" && lastAgent >= 0;
@@ -786,6 +798,12 @@ function TurnView({ turn, streaming }) {
   // one when the reply points at a local preview server).
   const agentText = items.filter((it) => it.type === "agentMessage").map((it) => it.text || "").join("\n");
   const previewUrl = (agentText.match(/https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/[^\s)\]>"']*)?/) || [])[0];
+  const fileChanges = useMemo(
+    () => items
+      .filter((item) => item.type === "fileChange" && item.status !== "inProgress")
+      .flatMap((item) => item.changes || []),
+    [items],
+  );
 
   // Commentary remains visible. Only consecutive work items collapse into
   // the reference activity summary row.
@@ -798,6 +816,7 @@ function TurnView({ turn, streaming }) {
       buf = [];
     };
     items.forEach((item, index) => {
+      if (item.type === "reasoning" && !showReasoning) return;
       const emptyReasoning = item.type === "reasoning"
         && !(item.summary?.length || item.content?.length);
       if (emptyReasoning && !(streaming && index === items.length - 1)) return;
@@ -815,7 +834,12 @@ function TurnView({ turn, streaming }) {
   const renderItem = (item, index, streamLast) => {
     const body = (
       <React.Fragment key={item.id ?? `i${index}`}>
-        <ItemView item={item} streaming={streamLast} turnId={turn.id} />
+        <ItemView
+          item={item}
+          streaming={streamLast}
+          turnId={turn.id}
+          showReasoning={showReasoning}
+        />
         {showActions && index === lastAgent && <TurnActionRow turn={turn} />}
       </React.Fragment>
     );
@@ -838,6 +862,11 @@ function TurnView({ turn, streaming }) {
         )
       )}
       {!streaming && previewUrl && <WebPreviewCard url={previewUrl} />}
+      {!streaming && fileChanges.length > 0 && (
+        <div className="-mt-1">
+          <TurnDiffCard diff={turnDiff} changes={fileChanges} />
+        </div>
+      )}
       {turn.status === "failed" && turn.error && (
         <div className="rounded-[12.5px] border border-(--danger) bg-(--danger-soft) px-3 py-2 text-[13px] text-(--danger)">
           {turn.error.message || String(turn.error)}
@@ -1000,6 +1029,11 @@ function MessageRail({ turns, scrollRef }) {
 function WorklogGroup({ items, live }) {
   const [open, setOpen] = useState(false);
   const activityKind = worklogActivityKind(items);
+  if (items.length === 1
+    && items[0].type === "fileChange"
+    && (items[0].changes || []).length === 1) {
+    return <ItemView item={items[0]} streaming={live} turnId={undefined} />;
+  }
   if (items.length === 1 && items[0].type !== "fileChange") {
     return <WorklogActionRow item={items[0]} live={live} />;
   }
@@ -1078,7 +1112,7 @@ function worklogLabel(items) {
     if (isReadAction(it)) reads++;
     else if (it.type === "commandExecution" && commandActivity(it).category === "exploration") reads++;
     else if (isCommandAction(it)) cmds++;
-    else if (it.type === "fileChange") edits++;
+    else if (it.type === "fileChange") edits += Math.max(1, (it.changes || []).length);
     else if (it.type === "webSearch") webs++;
     else tools++;
   }
@@ -1123,13 +1157,7 @@ function readActionPath(it) {
 function WorklogActionRow({ item, live }) {
   const [open, setOpen] = useState(false);
   if (item.type === "fileChange") {
-    return (
-      <div data-activity-icon="edit-files" className={cx("inline-flex items-center gap-1.5 text-[13px] leading-[21px]", live ? "text-(--fg)" : "text-(--fg-tertiary)")}>
-        <IconEditFiles size={16} className="activity-edit-files shrink-0" />
-        <span>{worklogLabel([item])}</span>
-        {live && <Spinner size={11} className="shrink-0" />}
-      </div>
-    );
+    return <ItemView item={item} streaming={live} turnId={undefined} />;
   }
   if (isReadAction(item)) {
     const name = readActionPath(item) || item.title || "file";
@@ -1434,21 +1462,34 @@ function Home() {
   const title = !project
     ? "What should we build?"
     : hasGit
-      ? <>What should we build in <span className="underline decoration-dotted decoration-2 underline-offset-8">{project}</span>?</>
-      : <>What should we work on in <span className="underline decoration-dotted decoration-2 underline-offset-8">{project}</span>?</>;
+      ? <>What should we build in <span className="inline-block max-w-full break-words whitespace-normal underline decoration-(--fg-tertiary) decoration-dotted decoration-[1px] underline-offset-4">{project}?</span></>
+      : <>What should we work on in <span className="inline-block max-w-full break-words whitespace-normal underline decoration-(--fg-tertiary) decoration-dotted decoration-[1px] underline-offset-4">{project}?</span></>;
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center">
-      <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto">
-        <div className="my-auto flex w-full flex-col items-center px-4 py-6">
-          <CodexMark size={56} className="text-(--fg) opacity-[0.24]" />
-          <div className="mt-5 mb-7 max-w-[720px] text-center text-[28px] leading-9 font-medium">
-            {title}
+    <div className="relative flex min-h-0 w-full flex-1 flex-col overflow-y-auto">
+      <div className="flex min-h-0 w-full flex-1 flex-col pt-6">
+        <div className="flex min-h-fit grow basis-0 items-end justify-center pb-24">
+          <div className="relative mx-auto flex w-full min-w-0 justify-center px-5">
+            <div className="flex min-h-28 w-full items-end justify-center">
+              <div className="flex w-full flex-col items-center gap-6">
+                <CodexMark size={56} className="text-(--fg) opacity-[0.24]" />
+                <div className="flex max-w-full min-w-0 items-end justify-center whitespace-pre-wrap text-center text-[28px] leading-[33.6px] font-normal select-none">
+                  <span className="inline-block max-w-full">{title}</span>
+                </div>
+              </div>
+            </div>
+            <div
+              className="absolute inset-x-[29px] top-full mt-8 min-w-0"
+              style={{ containerType: "inline-size" }}
+            >
+              <HomeSuggestions />
+            </div>
           </div>
-          <HomeSuggestions />
         </div>
-      </div>
-      <div className="w-full max-w-[768px] shrink-0 px-4 pb-4">
-        <Composer centered />
+        <div className="flex min-h-fit min-w-0 shrink-0 grow basis-0 flex-col justify-end">
+          <div className="mx-auto w-full max-w-[768px] px-4 pb-4">
+            <Composer centered />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1464,21 +1505,27 @@ function HomeSuggestions() {
 function SuggestionCards() {
   const sendMessage = useStore((s) => s.sendMessage);
   const cards = [
-    { icon: <IconTelescope />, color: "#339cff", text: "Explore and understand code", prompt: "Explore this repository and explain how it works: architecture, key modules, and entry points." },
-    { icon: <IconHammer />, color: "#ad7bf9", text: "Build a new feature, app, or tool", prompt: "Help me build something new in this project. Ask what I want to make, then plan and implement it." },
+    { icon: <IconTelescope />, color: "#0169cc", text: "Explore and understand code", prompt: "Explore this repository and explain how it works: architecture, key modules, and entry points." },
+    { icon: <IconHammer />, color: "#b06dff", text: "Build a new feature, app, or tool", prompt: "Help me build something new in this project. Ask what I want to make, then plan and implement it." },
     { icon: <IconReviewCheck />, color: "#40c977", text: "Review code and suggest changes", prompt: "Review the recent changes and the most important files in this project. Suggest concrete improvements." },
-    { icon: <IconBug />, color: "#ff8549", text: "Fix issues and failures", prompt: "Find likely bugs in this project (failing tests, obvious defects, error-prone code) and propose minimal fixes." },
+    { icon: <IconBug />, color: "#fb6a22", text: "Fix issues and failures", prompt: "Find likely bugs in this project (failing tests, obvious defects, error-prone code) and propose minimal fixes." },
   ];
   return (
-    <div className="grid w-full max-w-[708px] gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+    <div className="home-suggestion-grid mt-1 grid gap-3">
       {cards.map((c) => (
         <button
           key={c.text}
-          className="flex min-h-[104px] flex-col items-start gap-2 rounded-2xl border border-(--border-light) bg-(--surface-under) px-4 py-3 text-left transition-colors hover:border-(--border) hover:bg-(--surface-hover)"
+          className="flex h-full min-h-[104px] w-full min-w-0 flex-col rounded-[20px] bg-(--surface) px-4 py-3 text-left shadow-[0_0_0_0.5px_var(--border-heavy),0_2px_4px_-1px_rgb(0_0_0/0.1)] outline-none transition-colors hover:bg-(--surface-hover)"
           onClick={() => sendMessage(c.prompt)}
         >
-          <span style={{ color: c.color }}>{c.icon}</span>
-          <span className="text-[13px] leading-5 text-(--fg)">{c.text}</span>
+          <span className="flex h-6 w-full items-center justify-between gap-2">
+            <span className="flex size-6 shrink-0 items-center justify-start" style={{ color: c.color }}>
+              {c.icon}
+            </span>
+          </span>
+          <span className="mt-auto flex min-h-10 w-full flex-col justify-end">
+            <span className="text-[13px] leading-5 font-medium text-(--fg)">{c.text}</span>
+          </span>
         </button>
       ))}
     </div>

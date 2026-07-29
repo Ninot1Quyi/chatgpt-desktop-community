@@ -1,9 +1,8 @@
-// Evaluate a JavaScript expression in the main renderer target.
+// Call the preload bridge inside an original or replica app target.
 //
-// Examples:
-//   node _analysis/cdp-eval.mjs --port 9222 --expression "innerWidth"
-//   node _analysis/cdp-eval.mjs --port 9222 \
-//     --expression "localStorage.setItem('ui.sidebarWidth', '320'); location.reload(); true"
+// Example:
+//   node _analysis/cdp-rpc.mjs --port 9223 --method thread/read \
+//     --params '{"threadId":"...","includeTurns":true}'
 
 function option(name, fallback = "") {
   const index = process.argv.indexOf(`--${name}`);
@@ -11,8 +10,9 @@ function option(name, fallback = "") {
 }
 
 const port = Number(option("port", 9222));
-const expression = option("expression");
-if (!expression) throw new Error("Provide --expression");
+const method = option("method");
+const params = JSON.parse(option("params", "{}"));
+if (!method) throw new Error("Provide --method");
 
 const targets = await fetch(`http://127.0.0.1:${port}/json`).then((response) => response.json());
 const pages = targets.filter((target) => target.type === "page");
@@ -38,12 +38,13 @@ socket.onmessage = (event) => {
   else operation.resolve(message.result);
 };
 
-const call = (method, params = {}) => new Promise((resolveCall, rejectCall) => {
+const call = (cdpMethod, cdpParams = {}) => new Promise((resolveCall, rejectCall) => {
   const id = ++sequence;
   pending.set(id, { resolve: resolveCall, reject: rejectCall });
-  socket.send(JSON.stringify({ id, method, params }));
+  socket.send(JSON.stringify({ id, method: cdpMethod, params: cdpParams }));
 });
 
+const expression = `window.codexBridge.request(${JSON.stringify(method)}, ${JSON.stringify(params)})`;
 const evaluated = await call("Runtime.evaluate", {
   expression,
   awaitPromise: true,

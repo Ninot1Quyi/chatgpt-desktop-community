@@ -32,12 +32,13 @@ import "./styles.css";
 
 export default function DesktopShell({ overlays }) {
   const ui = useStore((state) => state.ui);
+  const rightVisible = ui.navView === "chats" && ui.rightOpen;
   return (
     <div className="app-shell-root win-shell desktop-shell-windows relative h-full w-full overflow-hidden">
       <div className="flex h-full w-full">
         <SidebarColumn />
         <div className="mt-[46px] ml-2 flex min-w-0 flex-1 overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)">
-          <div className={cx("flex min-w-[360px] flex-1 flex-col", ui.rightOpen && ui.rightExpanded && "hidden")}>
+          <div className={cx("flex min-w-[360px] flex-1 flex-col", rightVisible && ui.rightExpanded && "hidden")}>
             <div className="flex h-[46px] shrink-0 items-center gap-1 pl-3 pr-2">
               {ui.navView === "chats" ? (
                 <>
@@ -64,7 +65,7 @@ export default function DesktopShell({ overlays }) {
               </div>
             )}
           </div>
-          {ui.rightOpen && (
+          {rightVisible && (
             <>
               {!ui.rightExpanded && <RightPanelDragHandle />}
               <div

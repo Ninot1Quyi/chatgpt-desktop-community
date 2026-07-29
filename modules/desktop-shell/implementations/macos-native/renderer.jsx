@@ -14,6 +14,8 @@ import {
 } from "../../shared/lazy-panels.jsx";
 import { IconButton } from "@app/components/ui.jsx";
 import {
+  IconHeaderBack,
+  IconHeaderForward,
   IconHeaderSidebar,
   LucideIcon,
 } from "@app/components/icons.jsx";
@@ -30,6 +32,7 @@ import "./styles.css";
 
 export default function DesktopShell({ overlays }) {
   const ui = useStore((state) => state.ui);
+  const rightVisible = ui.navView === "chats" && ui.rightOpen;
   return (
     <div className="app-shell-root desktop-shell-macos relative h-full w-full overflow-hidden">
       <div className="flex h-full w-full">
@@ -37,7 +40,7 @@ export default function DesktopShell({ overlays }) {
         <div
           className={cx(
             "flex min-w-0 flex-1 flex-col bg-(--surface) pt-[46px]",
-            ui.rightOpen && ui.rightExpanded && "hidden",
+            rightVisible && ui.rightExpanded && "hidden",
           )}
         >
           {ui.navView === "chats" ? <Conversation /> : <NavViews />}
@@ -47,7 +50,7 @@ export default function DesktopShell({ overlays }) {
             </div>
           )}
         </div>
-        {ui.rightOpen && (
+        {rightVisible && (
           <>
             {!ui.rightExpanded && <RightPanelDragHandle />}
             <div
@@ -93,16 +96,18 @@ function NavigationButtons() {
   return (
     <>
       <IconButton
-        icon={<LucideIcon name="ChevronLeft" size={16} />}
+        icon={<IconHeaderBack />}
         size={16}
         title="Back"
+        className="!rounded-[12.5px] !text-(--fg-tertiary)"
         disabled={!navBack.length}
         onClick={goBack}
       />
       <IconButton
-        icon={<LucideIcon name="ChevronRight" size={16} />}
+        icon={<IconHeaderForward />}
         size={16}
         title="Forward"
+        className="!rounded-[12.5px] !text-(--fg-tertiary)"
         disabled={!navForward.length}
         onClick={goForward}
       />

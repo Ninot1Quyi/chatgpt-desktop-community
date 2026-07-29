@@ -6,7 +6,7 @@ import * as api from "@app/api.js";
 import { cx } from "@app/lib/cx.js";
 import { basename } from "@app/lib/time.js";
 import { Spinner, Menu } from "@app/components/ui.jsx";
-import { IconPlus, IconSearch, IconMore, IconChevronDown, IconSkillCube, IconSkillCheck, IconDialogX, IconDots21, IconTryChat, IconPluginFallback } from "@app/components/icons.jsx";
+import { IconPlus, IconSearch, IconMore, IconChevronDown, IconNavSites, IconSkillCube, IconSkillCheck, IconDialogX, IconDots21, IconTryChat, IconPluginFallback } from "@app/components/icons.jsx";
 import { LucideIcon } from "@app/components/lucide/index.jsx";
 import { Markdown } from "@modules/conversations";
 import { openFileInPanel } from "@modules/workspace-panels/state";
@@ -16,11 +16,76 @@ const toast = (message) => useStore.getState().toast(message);
 export default function NavViews() {
   const navView = useStore((s) => s.ui.navView);
   switch (navView) {
+    case "sites": return <SitesView />;
     case "scheduled": return <ScheduledView />;
     case "plugins": return <PluginsView />;
     case "pull-requests": return <PullRequestsView />;
     default: return null;
   }
+}
+
+function createSiteDraft() {
+  useStore.getState().newChatWithPrefill(
+    "Create a website that …",
+    [{ kind: "site", name: "Sites", displayName: "Sites" }],
+  );
+}
+
+function SitesView() {
+  const [query, setQuery] = useState("");
+
+  return (
+    <PageShell title="Sites">
+      <div className="flex min-h-full w-full flex-col">
+        <div className="mx-auto w-full max-w-[768px] px-5 pt-5">
+          <div className="flex items-start justify-between gap-4 px-2">
+            <div className="flex min-w-0 flex-col gap-2">
+              <h1 className="text-[28px] leading-[33.6px] font-normal text-(--fg)">Sites</h1>
+              <div className="text-[16px] leading-6 text-(--fg-secondary)">
+                Turn your ideas into live websites
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mx-auto flex w-full max-w-[768px] items-center gap-2 px-5 pt-5 pb-2">
+          <label className="app-no-drag flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-(--border-heavy) bg-(--input-bg) px-2.5">
+            <IconSearch size={16} className="shrink-0 text-(--fg-tertiary)" />
+            <input
+              id="appgen-site-search"
+              type="text"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search sites"
+              className="min-w-0 flex-1 bg-transparent text-[14px] leading-[18px] text-(--fg) outline-none placeholder:text-(--fg-faint)"
+            />
+          </label>
+        </div>
+
+        <div className="mx-auto flex min-h-0 w-full max-w-[768px] flex-1 flex-col px-5 pt-6 pb-5">
+          <div className="mx-auto flex min-h-[420px] w-full max-w-[728px] flex-col items-center justify-center px-3 py-6">
+            <div className="flex w-full max-w-xl flex-col items-center justify-center gap-3 text-center">
+              <div className="pointer-events-none flex items-center justify-center text-(--fg-secondary)">
+                <IconNavSites size={32} />
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="text-[16px] leading-6 font-medium text-(--fg)">No sites yet</div>
+              </div>
+              <div className="flex w-full flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  className="app-no-drag flex h-8 items-center rounded-[12.5px] border border-(--border) bg-(--surface-hover) px-4 text-[14px] leading-[18px] text-(--fg) hover:bg-(--surface-active)"
+                  onClick={createSiteDraft}
+                >
+                  Create new site
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </PageShell>
+  );
 }
 
 function PageShell({ title, children }) {
@@ -60,7 +125,11 @@ function getGhLogin() {
 async function connectorThreadId() {
   const active = useStore.getState().activeThreadId;
   if (active) return active;
-  const tl = await api.rpc("thread/list", { cursor: null, limit: 1 }).catch(() => null);
+  const tl = await api.rpc("thread/list", {
+    cursor: null,
+    limit: 1,
+    useStateDbOnly: true,
+  }).catch(() => null);
   const tid = tl?.data?.[0]?.id || tl?.threads?.[0]?.id;
   if (!tid) return null;
   await api.rpc("thread/resume", { threadId: tid }).catch(() => {});

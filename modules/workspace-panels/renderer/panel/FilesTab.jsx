@@ -11,7 +11,7 @@ import { Menu, Spinner } from "@app/components/ui.jsx";
 import { Markdown } from "@modules/conversations";
 import {
   IconFile, IconFolder, IconChevronRight, IconChevronDown, IconExternal,
-  IconList, IconSearch,
+  IconListFiles, IconSearch,
 } from "@app/components/icons.jsx";
 import { usePanelStore } from "../state.js";
 import { FileIcon } from "./FileIcon.jsx";
@@ -27,7 +27,7 @@ export default function FilesTab({ tab }) {
   const setTabFile = usePanelStore((s) => s.setFile);
   const toast = useStore((s) => s.toast);
   const [treeOpen, setTreeOpen] = useState(true);
-  const [treeWidth, setTreeWidth] = useState(250);
+  const [treeWidth, setTreeWidth] = useState(243);
   const [source, setSource] = useState(false); // markdown: source vs rendered
   const [file, setFile] = useState(null); // {path, content|null, loading, error, image?}
   const [text, setText] = useState(null); // edited draft (null = pristine)
@@ -81,10 +81,10 @@ export default function FilesTab({ tab }) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* breadcrumb bar (h-toolbar-pane = 40px) */}
-      <nav className="flex h-10 shrink-0 items-center gap-1 border-b border-(--border-light) px-2 select-none">
+      {/* breadcrumb bar (h-toolbar-pane = 39px) */}
+      <nav className="flex h-[39px] shrink-0 items-center gap-1 border-b border-(--border-light) px-2 select-none">
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1 text-xs text-(--fg-secondary)">
-          <Crumb text={basename(root.replace(/\/+$/, "")) || root} />
+          <Crumb text={path ? basename(root.replace(/\/+$/, "")) || root : "/"} />
           {segments.map((seg, i) => (
             <React.Fragment key={i}>
               <IconChevronRight size={10} className="shrink-0 text-(--fg-faint)" />
@@ -112,7 +112,7 @@ export default function FilesTab({ tab }) {
           </button>
         )}
         <IconBtn title="Toggle file tree" active={treeOpen} onClick={() => setTreeOpen(!treeOpen)}>
-          <IconList size={14} />
+          <IconListFiles size={18} />
         </IconBtn>
         {path && <OpenSplitButton path={path} />}
       </nav>
@@ -121,10 +121,10 @@ export default function FilesTab({ tab }) {
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">
           {!path ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2">
+            <div className="relative top-[3px] flex h-full flex-col items-center justify-center gap-2">
               <IconFolder size={30} className="text-(--fg-faint)" />
-              <div className="text-[17px] font-medium text-(--fg)">Open file</div>
-              <div className="text-[13px] text-(--fg-secondary)">Select a file from the workspace tree</div>
+              <div className="text-[16px] leading-6 font-medium text-(--fg)">Open file</div>
+              <div className="max-w-[130px] text-center text-[13px] leading-[18.57px] font-[445] text-(--fg-secondary)">Select a file from the workspace tree</div>
             </div>
           ) : file?.loading ? (
             <div className="flex h-full items-center justify-center text-(--fg-tertiary)"><Spinner size={16} /></div>
@@ -448,7 +448,7 @@ function FileTree({ root, selected, onSelect }) {
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
       <div className="shrink-0 px-2 pt-2 pb-px">
-        <div className="flex h-7 w-full items-center gap-1.5 rounded-lg border border-(--border-light) bg-(--surface-fog)">
+        <div className="flex h-7 w-full items-center gap-1.5 rounded-[12.5px] border border-(--border) bg-(--panel-action-bg)">
           <IconSearch size={13} className="ms-2 shrink-0 text-(--fg-faint)" />
           <input
             value={query}
@@ -511,7 +511,6 @@ function DirNode({ path, depth, selected, onSelect, gitMap }) {
   return (
     <>
       {entries
-        .filter((e) => !e.fileName.startsWith("."))
         .map((e) => (
           <TreeEntry key={e.fileName} entry={e} parent={path} depth={depth} selected={selected} onSelect={onSelect} gitMap={gitMap} />
         ))}

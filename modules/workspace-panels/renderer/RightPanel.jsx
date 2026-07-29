@@ -123,10 +123,10 @@ export function RightPanelHeader() {
   ];
 
   return (
-    <div className="app-no-drag flex h-full min-w-0 items-center">
+    <div className="app-drag flex h-full min-w-0 items-center">
       {/* tab strip: scrollable, "+" pinned at its end (like the reference) */}
       <div
-        className="hide-scrollbar flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pl-1"
+        className="app-no-drag hide-scrollbar flex h-full min-w-0 max-w-[calc(100%-44px)] shrink items-center gap-1.5 overflow-x-auto pl-1"
         onDragOver={(e) => {
           if (draggedTabId == null) return;
           // dragging over strip background (not a tab) → move to the end
@@ -149,12 +149,13 @@ export function RightPanelHeader() {
         <button
           ref={plusRef}
           title="Open side panel tab"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-(--fg-secondary) hover:bg-(--tab-active-bg) hover:text-(--fg)"
+          className="app-no-drag flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-(--fg-secondary) hover:bg-(--tab-active-bg) hover:text-(--fg)"
           onClick={() => setMenuOpen(true)}
         >
           <IconPlus size={14} />
         </button>
       </div>
+      <div className="app-drag h-full min-w-4 flex-1" />
       <IconButton
         icon={expanded ? <IconCompress /> : <IconExpand />}
         title={expanded ? "Collapse panel" : "Expand panel"}
@@ -175,7 +176,7 @@ function PanelTab({ tab, active, showSep, onActivate, onClose }) {
   const title = tab.kind === "terminal" && shellTitle ? shellTitle : tabTitle(tab);
   return (
     <div
-      className="group/tab relative flex h-7 max-w-39 shrink-0 items-center rounded-lg"
+      className="app-no-drag group/tab relative flex h-7 max-w-39 shrink-0 items-center rounded-lg"
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", String(tab.id));
@@ -247,10 +248,14 @@ export default function RightPanel() {
   const tabs = usePanelStore((s) => s.tabs);
   const activeId = usePanelStore((s) => s.activeId);
   if (!tabs.length) {
-    return <PanelEmptyState />;
+    return (
+      <div className="h-full w-full pt-[46px]">
+        <PanelEmptyState />
+      </div>
+    );
   }
   return (
-    <div className="right-panel-root flex h-full w-full flex-col">
+    <div className="right-panel-root flex h-full w-full flex-col pt-[46px]">
       <div className="min-h-0 flex-1">
         {tabs.map((t) => {
           const C = TAB_KINDS[t.kind].component;
@@ -331,9 +336,9 @@ function useSuggestedFiles() {
 function PanelEmptyState() {
   const keybindings = useStore((s) => s.ui.keybindings);
   return (
-    <div className="flex h-full w-full flex-col bg-(--surface)">
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <div className="m-auto flex w-full max-w-xl flex-col gap-1 px-4 py-6">
+    <div className="flex h-full w-full flex-col overflow-x-hidden overflow-y-auto bg-(--surface) p-2 select-none">
+      <div className="flex min-h-0 flex-1 flex-col justify-center">
+        <div className="mx-auto flex w-full max-w-xl flex-col gap-1 px-5">
           {PANEL_ACTION_ORDER.map((k) => {
             const def = TAB_KINDS[k];
             const Icon = def.icon;
@@ -341,13 +346,13 @@ function PanelEmptyState() {
             return (
               <button
                 key={k}
-                className="flex min-h-10 w-full items-center gap-2 rounded-md bg-(--surface-hover) px-2.5 py-2 text-left transition-colors hover:bg-(--surface-active)"
+                className="flex min-h-10 w-full items-center gap-2 rounded-[10px] bg-(--panel-action-bg) px-2.5 py-2 text-left hover:bg-(--panel-action-hover-bg)"
                 onClick={() => usePanelStore.getState().open(k)}
               >
                 <Icon size={16} className="shrink-0 text-(--fg-tertiary)" />
-                <span className="min-w-0 flex-1 truncate text-[13px] text-(--fg)">{def.title}</span>
+                <span className="min-w-0 flex-1 truncate text-[13px] leading-[18.5714px] text-(--fg)">{def.title}</span>
                 {hint && (
-                  <kbd className="shrink-0 rounded-md bg-(--surface-active) px-1.5 py-0.5 text-xs text-(--fg-secondary)">{hint}</kbd>
+                  <kbd className="shrink-0 rounded-[10px] bg-(--keybinding-bg) px-1.5 py-0.5 text-xs leading-3 font-[445] text-(--fg-secondary)">{hint}</kbd>
                 )}
               </button>
             );

@@ -885,7 +885,13 @@ function ArchivedSection() {
     let cursor;
     for (let page = 0; page < 30; page++) {
       const r = await api
-        .rpc("thread/list", { sortKey: "updated_at", archived: true, limit: 100, ...(cursor ? { cursor } : {}) })
+        .rpc("thread/list", {
+          sortKey: "updated_at",
+          archived: true,
+          limit: 100,
+          useStateDbOnly: true,
+          ...(cursor ? { cursor } : {}),
+        })
         .catch(() => null);
       const data = r?.data || [];
       all.push(...data);

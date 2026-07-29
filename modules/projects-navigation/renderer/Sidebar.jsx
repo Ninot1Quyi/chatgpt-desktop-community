@@ -19,7 +19,7 @@ import {
   IconPlus, IconSearch, IconMore, IconGear, IconArchive, IconPencil,
   IconTrash, IconUndo, IconChevronDown, IconChevronRight, IconFolder, IconFolderFilled, IconClock,
   IconUsage, IconInvite, IconLogout, IconBranch, IconX, IconGlobe,
-  IconHelpCircle, IconNavNewChat, IconNavPullRequests, IconNavScheduled, IconNavPlugins,
+  IconHelpCircle, IconNavNewChat, IconNavPullRequests, IconNavSites, IconNavScheduled, IconNavPlugins,
   IconCircleAlert, IconPin, IconPinFilled, IconQuickChat, IconRefresh,
 } from "@app/components/icons.jsx";
 import {
@@ -30,6 +30,7 @@ import { isSidebarEmpty } from "./sidebar-empty.mjs";
 
 const NAV_ITEMS = [
   { id: "pull-requests", label: "Pull requests", icon: <IconNavPullRequests size={16} /> },
+  { id: "sites", label: "Sites", icon: <IconNavSites size={16} /> },
   { id: "scheduled", label: "Scheduled", icon: <IconNavScheduled size={16} /> },
   { id: "plugins", label: "Plugins", icon: <IconNavPlugins size={16} /> },
 ];

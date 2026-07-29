@@ -82,11 +82,13 @@
 .md a:hover { text-decoration: underline; }
 .md code:not(pre code) {
   font-family: var(--font-mono);
-  font-size: 12px;
-  background: var(--code-bg);
-  border: 1px solid var(--border-light);
-  border-radius: 5px;
-  padding: 0.1em 0.35em;
+  font-size: 12.88px;
+  font-weight: 445;
+  line-height: 22px;
+  background: color-mix(in srgb, var(--fg) 10.7059%, transparent);
+  border: 0;
+  border-radius: 6px;
+  padding: 1px 6px;
 }
 .md pre {
   font-family: var(--font-mono);
@@ -111,3 +113,24 @@
 .md th { background: var(--surface-hover); font-weight: 600; }
 .md hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
 .md img { max-width: 100%; border-radius: 8px; }
+.home-suggestion-grid {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+@container (max-width: 42.249rem) {
+  .home-suggestion-grid > :nth-child(n + 4) {
+    display: none;
+  }
+}
+
+@container (max-width: 31.499rem) {
+  .home-suggestion-grid > :nth-child(n + 3) {
+    display: none;
+  }
+}
+
+@container (max-width: 20.749rem) {
+  .home-suggestion-grid > :nth-child(n + 2) {
+    display: none;
+  }
+}

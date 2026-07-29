@@ -82,7 +82,7 @@ export default function App() {
             break;
           }
           case "nextTab": {
-            const order = ["chats", "pull-requests", "scheduled", "plugins"];
+            const order = ["chats", "pull-requests", "sites", "scheduled", "plugins"];
             const index = order.indexOf(state.ui.navView);
             state.setUi({ navView: order[(index + 1) % order.length] });
             break;

@@ -1,10 +1,10 @@
 // Renderers for the ThreadItem union, the turn action row, the plan-steps
 // widget and the inline approval cards shown above the composer.
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { cx } from "@app/lib/cx.js";
 import * as api from "@app/api.js";
 import { localFileUrl, showItemInFolder } from "@app/api.js";
-import { countDiff, parseUnifiedDiff } from "@app/lib/diff.js";
+import { countDiff, diffFileName, parseUnifiedDiff } from "@app/lib/diff.js";
 import { basename, formatDuration } from "@app/lib/time.js";
 import { commandActivity } from "@app/lib/commandActivity.mjs";
 import { useStore } from "@app/store.js";
@@ -28,14 +28,15 @@ const IconRetry = (p) => <LucideIcon name="RotateCcw" size={p.size || 16} classN
 // ItemView: dispatches on ThreadItem.type.
 // `streaming` is true only for the item(s) of the currently-active turn.
 // ---------------------------------------------------------------------------
-export function ItemView({ item, streaming, turnId }) {
+export function ItemView({ item, streaming, turnId, showReasoning = false }) {
+  if (item.type === "reasoning" && !showReasoning) return null;
   if (item.type === "reasoning"
     && !(item.summary?.length || item.content?.length)
     && !streaming) return null;
   const body = (() => {
     switch (item.type) {
       case "userMessage": return <UserMessage item={item} />;
-      case "agentMessage": return <AgentMessage item={item} streaming={streaming} />;
+      case "agentMessage": return <AgentMessage item={item} streaming={streaming} showThinking={showReasoning} />;
       case "reasoning": return <Reasoning item={item} streaming={streaming} />;
       case "plan": return <PlanText item={item} />;
       case "commandExecution": return <CommandCard item={item} streaming={streaming} />;
@@ -204,9 +205,9 @@ function HoverAction({ icon, title, onClick }) {
 // ---------------------------------------------------------------------------
 // agentMessage — markdown; shimmer while empty.
 // ---------------------------------------------------------------------------
-function AgentMessage({ item, streaming }) {
+function AgentMessage({ item, streaming, showThinking }) {
   if (!item.text) {
-    return streaming ? <span className="shimmer-text text-[14px]">Thinking</span> : null;
+    return streaming && showThinking ? <span className="shimmer-text text-[14px]">Thinking</span> : null;
   }
   return (
     <div className="min-w-0">
@@ -462,6 +463,46 @@ function FileChangeCard({ item }) {
   );
 }
 
+export function TurnDiffCard({ diff, changes: fallbackChanges = [] }) {
+  const changes = useMemo(() => {
+    const files = parseUnifiedDiff(diff || "");
+    if (files.length > 0) {
+      return files.map((file) => ({
+        path: diffFileName(file),
+        added: file.added,
+        deleted: file.deleted,
+        diff: "",
+      }));
+    }
+
+    const byPath = new Map();
+    for (const change of fallbackChanges) {
+      if (!change?.path) continue;
+      const count = changeCounts(change);
+      const previous = byPath.get(change.path);
+      byPath.set(change.path, {
+        ...change,
+        added: (previous?.added || 0) + count.add,
+        deleted: (previous?.deleted || 0) + count.del,
+      });
+    }
+    return [...byPath.values()];
+  }, [diff, fallbackChanges]);
+
+  if (changes.length === 0) return null;
+  return <EditedGroupCard item={{ status: "completed" }} changes={changes} turnDiff />;
+}
+
+function changeCounts(change) {
+  if (Number.isFinite(change?.added) || Number.isFinite(change?.deleted)) {
+    return {
+      add: Number(change.added) || 0,
+      del: Number(change.deleted) || 0,
+    };
+  }
+  return countDiff(change?.diff);
+}
+
 // A single edited document: icon box + name + "Document · MD" + Open in split.
 function DocumentCard({ change }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -502,7 +543,7 @@ function DocumentCard({ change }) {
   );
 }
 
-function EditedGroupCard({ item, changes }) {
+function EditedGroupCard({ item, changes, turnDiff = false }) {
   const [showAll, setShowAll] = useState(false);
   const [undoOpen, setUndoOpen] = useState(false);
   const [confirmRevert, setConfirmRevert] = useState(false);
@@ -512,7 +553,7 @@ function EditedGroupCard({ item, changes }) {
   const cwd = useStore((s) => s.activeConversation()?.thread?.cwd || "");
   const totals = changes.reduce(
     (acc, c) => {
-      const { add, del } = countDiff(c.diff);
+      const { add, del } = changeCounts(c);
       acc.add += add; acc.del += del;
       return acc;
     },
@@ -521,7 +562,9 @@ function EditedGroupCard({ item, changes }) {
   const running = item.status === "inProgress";
   const title = running
     ? `Editing ${changes.length === 1 ? basename(changes[0]?.path) : `${changes.length} files`}`
-    : `Edited ${changes.length === 1 ? basename(changes[0]?.path) : `${changes.length} files`}`;
+    : turnDiff && changes.length === 1
+      ? `Edited ${basename(changes[0]?.path)}`
+      : `Edited ${changes.length === 1 ? basename(changes[0]?.path) : `${changes.length} files`}`;
   const visible = showAll ? changes : changes.slice(0, FILE_ROWS_COLLAPSED);
 
   const doRevert = async () => {
@@ -545,7 +588,7 @@ function EditedGroupCard({ item, changes }) {
     setUi({ rightOpen: true, rightTab: "review" });
   };
 
-  if (changes.length === 1) {
+  if (changes.length === 1 && !turnDiff) {
     const change = changes[0];
     return (
       <div className="group/edit flex min-w-0 items-center gap-1.5 text-[14px] leading-[21px] [color:color-mix(in_srgb,var(--fg)_60%,transparent)]">
@@ -559,44 +602,55 @@ function EditedGroupCard({ item, changes }) {
             {basename(change.path)}
           </button>
         </span>
-        {(totals.add > 0 || totals.del > 0) && (
-          <span className="flex shrink-0 gap-1 text-[13px] leading-[19.5px]">
-            {totals.add > 0 && <span className="group-hover/edit:text-(--diff-add-fg)">+{totals.add}</span>}
-            {totals.del > 0 && <span className="group-hover/edit:text-(--diff-del-fg)">-{totals.del}</span>}
-          </span>
-        )}
+        <span className="flex shrink-0 gap-1 text-[13px] leading-[19.5px]">
+          <span className="group-hover/edit:text-(--diff-add-fg)">+{totals.add}</span>
+          <span className="group-hover/edit:text-(--diff-del-fg)">-{totals.del}</span>
+        </span>
         {running && <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />}
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-[12.5px] bg-[rgb(255_255_255/0.5)] dark:bg-[rgb(38_38_38/0.5)]">
+    <div className={cx(
+      "overflow-hidden rounded-lg bg-[rgb(255_255_255/0.5)] dark:bg-[rgb(38_38_38/0.5)]",
+      turnDiff && "mb-2",
+    )}>
       {/* header */}
-      <div className="flex min-h-[64.5px] items-center gap-2.5 px-3 py-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-[12.5px] bg-[color-mix(in_srgb,var(--surface-under)_92%,transparent)] text-(--fg-secondary)">
+      <div className="group/turn-diff-header relative flex min-h-[64.5px] items-center gap-2.5 px-3 py-3 text-[14px] leading-[21px]">
+        {turnDiff && (
+          <button
+            aria-label="Review changed files"
+            className="absolute inset-0 z-0 bg-transparent hover:bg-white/[0.03] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-(--accent) focus-visible:outline-none"
+            onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
+          />
+        )}
+        <span className="relative z-10 flex size-10 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--surface-under)_92%,transparent)] text-(--fg-secondary)">
           <EditedFilesIcon size={24} />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="relative z-10 min-w-0 flex-1">
           <div className="truncate text-[14px] leading-[21px] font-medium">{title}</div>
-          {(totals.add > 0 || totals.del > 0) && (
-            <div className="flex gap-1 font-mono text-[13px] leading-[19.5px]">
-              <span className="text-(--diff-add-fg)">+{totals.add}</span>{" "}
-              <span className="text-(--diff-del-fg)">-{totals.del}</span>
+          <div className="turn-diff-default-subtitle flex gap-1 text-[13px] leading-[19.5px] group-hover/turn-diff-header:hidden">
+            <span className="text-(--diff-add-fg)">+{totals.add}</span>{" "}
+            <span className="text-(--diff-del-fg)">-{totals.del}</span>
+          </div>
+          {turnDiff && (
+            <div className="hidden items-center gap-1 text-[13px] leading-[19.5px] text-(--fg-secondary) group-hover/turn-diff-header:flex">
+              Review changes <IconChevronRight size={11} />
             </div>
           )}
         </div>
         {!running && changes.length > 0 && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="relative z-10 flex shrink-0 items-center gap-2">
             <button
               ref={undoBtnRef}
-              className="flex h-7 items-center gap-1 rounded-[12.5px] px-2 text-[14px] leading-[18px] text-(--fg-secondary) hover:bg-(--surface-hover)"
+              className="app-no-drag flex h-7 items-center gap-1 rounded-[12.5px] px-[9px] text-[14px] leading-[18px] font-[445] text-(--fg) hover:bg-(--surface-hover)"
               onClick={() => setUndoOpen(true)}
             >
               Undo <IconUndo size={14} />
             </button>
             <button
-              className="flex h-7 items-center rounded-[12.5px] border border-(--border) bg-[rgb(255_255_255/0.96)] px-2 text-[14px] leading-[18px] hover:bg-(--surface-hover)"
+              className="app-no-drag flex h-7 items-center rounded-[12.5px] border border-(--border) bg-black/[0.03] px-2 text-[14px] leading-[18px] font-[445] text-(--fg) hover:bg-black/[0.08] dark:bg-white/[0.03] dark:hover:bg-white/[0.08]"
               onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
             >
               Review
@@ -607,17 +661,17 @@ function EditedGroupCard({ item, changes }) {
       </div>
 
       {/* file rows */}
-      {changes.length > 0 && (
-        <div>
+      {changes.length > 1 && (
+        <div className="border-t border-(--border)">
           {visible.map((c, i) => {
-            const { add, del } = countDiff(c.diff);
+            const { add, del } = changeCounts(c);
             const name = basename(c.path);
             const path = cwd && c.path?.startsWith(`${cwd}/`) ? c.path.slice(cwd.length + 1) : c.path || "";
             const dir = path.slice(0, -name.length);
             return (
               <button
                 key={i}
-                className="flex h-9 w-full items-center gap-0 px-3 py-1 text-left text-[14px] leading-[21px] hover:bg-(--surface-hover)"
+                className="flex h-9 w-full items-center gap-2 bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 text-left text-[14px] leading-[21px] hover:bg-(--surface-hover)"
                 title={c.path}
                 onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
               >
@@ -625,9 +679,9 @@ function EditedGroupCard({ item, changes }) {
                   <span className="inline-flex h-[21px] items-center text-(--fg-secondary)">{dir}</span>
                   <span className="inline-flex h-[21px] items-center">{name}</span>
                 </span>
-                <span className="flex shrink-0 gap-1 font-mono">
-                  {add > 0 && <span className="text-(--diff-add-fg)">+{add} </span>}
-                  {del > 0 && <span className="text-(--diff-del-fg)">-{del}</span>}
+                <span className="flex shrink-0 gap-1">
+                  <span className="text-(--diff-add-fg)">+{add}</span>
+                  <span className="text-(--diff-del-fg)">-{del}</span>
                 </span>
               </button>
             );

@@ -50,6 +50,9 @@
   --surface-raised: #ffffff;
   --surface-hover: rgb(0 0 0 / 0.06);
   --surface-active: rgb(0 0 0 / 0.1);
+  --panel-action-bg: rgb(0 0 0 / 0.03);
+  --panel-action-hover-bg: rgb(0 0 0 / 0.08);
+  --keybinding-bg: rgb(0 0 0 / 0.065);
   --sidebar-row-active: rgb(26 28 31 / 0.055);
   --surface-fog: rgb(0 0 0 / 0.03);
   --tab-active-bg: rgb(0 0 0 / 0.07);
@@ -90,11 +93,14 @@
   --fg-tertiary: rgb(252 252 252 / 0.495);
   --fg-faint: rgb(252 252 252 / 0.3);
   --conversation-body: rgb(252 252 252 / 0.6);
-  --surface: #171717;
-  --surface-under: #131313;
+  --surface: #111111;
+  --surface-under: #0e0e0e;
   --surface-raised: rgb(43 43 43);
   --surface-hover: rgb(252 252 252 / 0.06);
   --surface-active: rgb(252 252 252 / 0.1);
+  --panel-action-bg: rgb(252 252 252 / 0.03);
+  --panel-action-hover-bg: rgb(252 252 252 / 0.08);
+  --keybinding-bg: rgb(252 252 252 / 0.065);
   --sidebar-row-active: rgb(252 252 252 / 0.084);
   --surface-fog: rgb(252 252 252 / 0.04);
   --tab-active-bg: #1d1d1d;

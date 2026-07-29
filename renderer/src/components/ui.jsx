@@ -6,7 +6,71 @@ import { useStore } from "../store.js";
 import { IconX } from "./icons.jsx";
 
 export function ActivityDisclosure({ open, children }) {
-  return open ? <div>{children}</div> : null;
+  const ref = useRef(null);
+  const firstRender = useRef(true);
+  const frame = useRef(null);
+  const timer = useRef(null);
+  const [rendered, setRendered] = useState(open);
+
+  useEffect(() => {
+    if (open) setRendered(true);
+  }, [open]);
+
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!rendered || !element) return undefined;
+
+    cancelAnimationFrame(frame.current);
+    clearTimeout(timer.current);
+
+    if (firstRender.current) {
+      firstRender.current = false;
+      element.style.height = open ? "auto" : "0px";
+      element.style.opacity = open ? "1" : "0";
+      if (!open) setRendered(false);
+      return undefined;
+    }
+
+    const duration = 300;
+    const easing = "cubic-bezier(0.19, 1, 0.22, 1)";
+    element.style.transition = `height ${duration}ms ${easing}, opacity ${duration}ms ${easing}`;
+    element.style.overflow = "hidden";
+    element.style.pointerEvents = open ? "auto" : "none";
+
+    if (open) {
+      element.style.height = "0px";
+      element.style.opacity = "0";
+      frame.current = requestAnimationFrame(() => {
+        element.style.height = `${element.scrollHeight}px`;
+        element.style.opacity = "1";
+      });
+      timer.current = setTimeout(() => {
+        if (!ref.current) return;
+        ref.current.style.height = "auto";
+        ref.current.style.overflow = "visible";
+      }, duration);
+    } else {
+      element.style.height = `${element.getBoundingClientRect().height}px`;
+      element.style.opacity = "1";
+      frame.current = requestAnimationFrame(() => {
+        element.style.height = "0px";
+        element.style.opacity = "0";
+      });
+      timer.current = setTimeout(() => setRendered(false), duration);
+    }
+
+    return () => {
+      cancelAnimationFrame(frame.current);
+      clearTimeout(timer.current);
+    };
+  }, [open, rendered]);
+
+  if (!rendered) return null;
+  return (
+    <div ref={ref} aria-hidden={!open}>
+      {children}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------

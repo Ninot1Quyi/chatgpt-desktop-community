@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import * as api from "./api.js";
 import { panelHook } from "./lib/panelHook.js";
-import { applyAppearance } from "./lib/appearance.js";
+import { applyAppearance, setDesktopAppearance } from "./lib/appearance.js";
 import {
   RUNTIME_IDS,
   externalProjectId,
@@ -74,6 +74,7 @@ export function planLabel(planType) {
 }
 
 const threadPlanKey = (threadId) => `thread.plan.${threadId}`;
+const DEFAULT_SIDEBAR_WIDTH = /Windows/i.test(globalThis.navigator?.userAgent || "") ? 240 : 321;
 
 let toastSeq = 0;
 
@@ -98,10 +99,10 @@ export const useStore = create((set, get) => ({
   // ---- ui ----
   ui: {
     sidebarOpen: stored("ui.sidebarOpen", true),
-    sidebarWidth: stored("ui.sidebarWidth", 240),
+    sidebarWidth: stored("ui.sidebarWidth", DEFAULT_SIDEBAR_WIDTH),
     rightOpen: stored("ui.rightOpen", false),
     rightTab: stored("ui.rightTab", "review"),
-    rightWidth: stored("ui.rightWidth", Math.round((globalThis.innerWidth || 1440) * 0.52)),
+    rightWidth: stored("ui.rightWidth", Math.round((globalThis.innerWidth || 1280) * 0.316)),
     rightExpanded: stored("ui.rightExpanded", false),
     terminalLocation: stored("ui.terminalLocation", "bottom"),
     suggestedPrompts: stored("ui.suggestedPrompts", true),
@@ -110,7 +111,7 @@ export const useStore = create((set, get) => ({
     settingsOpen: false,
     settingsSection: null, // deep-link target section consumed on open
     pluginsTab: "plugins", // plugins | skills (header-band tabs)
-    navView: "chats", // chats | pull-requests | scheduled | plugins
+    navView: "chats", // chats | pull-requests | sites | scheduled | plugins
     pinnedProjects: stored("ui.pinnedProjects", []), // cwd strings
     keybindings: stored("ui.keybindings", {}), // command id -> accelerator string
   },
@@ -260,6 +261,17 @@ export const useStore = create((set, get) => ({
     if (get()._booted) return;
     set({ _booted: true });
     try {
+      const configResult = await api.rpc("config/read", {}).catch(() => null);
+      const desktopConfig = configResult?.config?.desktop || {};
+      const prefersDark =
+        get().ui.theme === "dark"
+        || (get().ui.theme === "system"
+          && (window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true));
+      setDesktopAppearance(
+        prefersDark
+          ? desktopConfig.appearanceDarkChromeTheme
+          : desktopConfig.appearanceLightChromeTheme,
+      );
       const account = await get().refreshAccountAndModels(true);
       if (account || !get().requiresOpenaiAuth) {
         api.profileRead().then((p) => p && set({ profile: p })).catch(() => {});
@@ -459,6 +471,7 @@ export const useStore = create((set, get) => ({
         limit: 60,
         sortKey: "updated_at",
         sortDirection: "desc",
+        useStateDbOnly: true,
         ...(append && threadsCursor ? { cursor: threadsCursor } : {}),
         ...(searchTerm ? { searchTerm } : {}),
       });
@@ -554,14 +567,25 @@ export const useStore = create((set, get) => ({
     if (isKimiThreadId(threadId)) {
       return get()._openKimiThread(threadId);
     }
-    get().setRuntime("codex", { quiet: true, force: true });
+    get().setRuntime("codex", { quiet: true, force: true, saveThreadPrefs: false });
     set({ activeThreadId: threadId });
     // restore this thread's composer prefs (model/effort/tier/permission)
     const tp = stored(`thread.prefs.${threadId}`, null);
-    if (tp) {
+    const codexModels = get().modelsByRuntime.codex || [];
+    if (tp?.runtime === "codex") {
+      const restoredModel = codexModels.some((candidate) => candidate.model === tp.model)
+        ? tp.model
+        : get().model;
+      const restoredMeta = codexModels.find((candidate) => candidate.model === restoredModel);
+      const restoredEffort = restoredMeta?.supportedReasoningEfforts?.some(
+        (candidate) => candidate.reasoningEffort === tp.effort,
+      )
+        ? tp.effort
+        : restoredMeta?.defaultReasoningEffort || null;
       set((s) => ({
-        model: tp.model ?? s.model,
-        effort: tp.effort ?? s.effort,
+        model: restoredModel,
+        modelSelections: { ...s.modelSelections, codex: restoredModel },
+        effort: restoredEffort,
         serviceTier: tp.serviceTier ?? s.serviceTier,
         permission: tp.permission ?? s.permission,
       }));
@@ -621,7 +645,7 @@ export const useStore = create((set, get) => ({
   },
 
   async _openClaudeThread(threadId) {
-    get().setRuntime("claude", { quiet: true, force: true });
+    get().setRuntime("claude", { quiet: true, force: true, saveThreadPrefs: false });
     set({ activeThreadId: threadId });
     const existing = get().conversations[threadId];
     if (existing?.loaded) return;
@@ -691,7 +715,7 @@ export const useStore = create((set, get) => ({
   },
 
   async _openKimiThread(threadId) {
-    get().setRuntime("kimi", { quiet: true, force: true });
+    get().setRuntime("kimi", { quiet: true, force: true, saveThreadPrefs: false });
     set({ activeThreadId: threadId });
     const existing = get().conversations[threadId];
     if (existing?.loaded) return;
@@ -1116,7 +1140,7 @@ export const useStore = create((set, get) => ({
   // =======================================================================
   // composer prefs
   // =======================================================================
-  setRuntime(runtime, { quiet = false, force = false } = {}) {
+  setRuntime(runtime, { quiet = false, force = false, saveThreadPrefs = true } = {}) {
     if (!["codex", "claude", "kimi"].includes(runtime)) return false;
     const activeId = get().activeThreadId;
     const lockedRuntime = activeId && !activeId.startsWith("local-thread:")
@@ -1154,7 +1178,7 @@ export const useStore = create((set, get) => ({
     persist("composer.models", selections);
     persist("composer.model", selected);
     persist("composer.effort", effort);
-    get()._saveThreadPrefs();
+    if (saveThreadPrefs) get()._saveThreadPrefs();
     return true;
   },
   setModel(model, requestedRuntime = null) {

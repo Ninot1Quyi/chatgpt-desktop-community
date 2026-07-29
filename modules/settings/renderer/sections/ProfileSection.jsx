@@ -59,7 +59,12 @@ export default function ProfileSection() {
         if (Number.isFinite(n)) setChatCount(n.toLocaleString());
       })
       .catch(() => {
-        api.rpc("thread/list", { limit: 100, sortKey: "updated_at", sortDirection: "desc" })
+        api.rpc("thread/list", {
+          limit: 100,
+          sortKey: "updated_at",
+          sortDirection: "desc",
+          useStateDbOnly: true,
+        })
           .then((r) => live && setChatCount(r?.nextCursor ? "100+" : String((r?.data || []).length)))
           .catch(() => {});
       });

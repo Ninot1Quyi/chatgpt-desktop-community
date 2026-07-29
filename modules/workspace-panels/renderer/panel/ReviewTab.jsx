@@ -1,14 +1,23 @@
 // Review tab: git working-tree state of the thread cwd — Staged / Unstaged /
 // Untracked sections with expandable per-file unified diffs, plus a fallback
 // "Changes this chat" section built from the thread's fileChange items.
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@app/store.js";
 import * as api from "@app/api.js";
 import { cx } from "@app/lib/cx.js";
 import { parseUnifiedDiff, diffFileName, countDiff } from "@app/lib/diff.js";
-import { shortenPath } from "@app/lib/time.js";
-import { IconButton, Spinner } from "@app/components/ui.jsx";
-import { IconBranch, IconRefresh, IconFile, IconChevronRight } from "@app/components/icons.jsx";
+import { Menu, Spinner } from "@app/components/ui.jsx";
+import {
+  IconBranch,
+  IconChevronDown,
+  IconChevronRight,
+  IconCopy,
+  IconFile,
+  IconFolder,
+  IconRefresh,
+  LucideIcon,
+} from "@app/components/icons.jsx";
+import { usePanelStore } from "../state.js";
 import { EmptyState } from "./common.jsx";
 
 const out = (r) => r?.stdout ?? r?.output ?? "";
@@ -21,6 +30,15 @@ export default function ReviewTab() {
   const cwd = conv?.thread?.cwd || globalCwd;
   const gitBranch = conv?.thread?.gitInfo?.branch;
   const [state, setState] = useState({ status: "loading", branch: "", staged: [], unstaged: [], untracked: [] });
+  const [confirmRevertAll, setConfirmRevertAll] = useState(false);
+  const [collapseSignal, setCollapseSignal] = useState(0);
+  const [split, setSplit] = useState(false);
+  const [menu, setMenu] = useState(null);
+  const branchButtonRef = useRef(null);
+  const optionsButtonRef = useRef(null);
+  const commitButtonRef = useRef(null);
+  const moreButtonRef = useRef(null);
+  const scrollRef = useRef(null);
 
   const refresh = useCallback(async () => {
     if (!cwd) return;
@@ -69,13 +87,16 @@ export default function ReviewTab() {
 
   // "Last Turn" section: the diff of the most recent turn (turn/diff/updated).
   const lastTurnFiles = useMemo(() => parseUnifiedDiff(conv?.diff || ""), [conv?.diff]);
-
-  if (!cwd) return <EmptyState text="Open a chat to review its changes" />;
-
   const { status, branch, staged, unstaged, untracked } = state;
   const gitEmpty = status === "ready" && staged.length === 0 && unstaged.length === 0 && untracked.length === 0;
   const showThreadFallback = gitEmpty && threadChanges.length > 0 && lastTurnFiles.length === 0;
   const nothing = gitEmpty && threadChanges.length === 0 && lastTurnFiles.length === 0;
+  const tracked = [...staged, ...unstaged];
+  const totals = tracked.reduce(
+    (sum, file) => ({ added: sum.added + (file.added || 0), deleted: sum.deleted + (file.deleted || 0) }),
+    { added: 0, deleted: 0 },
+  );
+  const skipUntracked = untracked.length > 250;
 
   const initRepo = async () => {
     try {
@@ -91,7 +112,6 @@ export default function ReviewTab() {
     await api.rpc("command/exec", { command: ["git", ...args], cwd, timeoutMs: 20000 });
     refresh();
   }, [cwd, refresh]);
-  const [confirmRevertAll, setConfirmRevertAll] = useState(false);
 
   const stageAll = () => git(["add", "-A"]).catch(err);
   const unstageAll = () => git(["restore", "--staged", "--", "."]).catch(err);
@@ -105,6 +125,14 @@ export default function ReviewTab() {
     } catch (e) { err(e); }
   };
   const err = (e) => useStore.getState().toast(`git failed: ${e.message}`, "error");
+  const copyText = async (text, message) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      useStore.getState().toast(message);
+    } catch (e) {
+      useStore.getState().toast(`Copy failed: ${e.message}`, "error");
+    }
+  };
 
   // Revert a single hunk by reverse-applying it via `git apply -R`.
   const revertHunk = async (file, hunk) => {
@@ -128,22 +156,117 @@ export default function ReviewTab() {
     }
   };
 
+  if (!cwd) return <EmptyState text="Open a chat to review its changes" />;
+
+  const menuConfig = {
+    branch: {
+      ref: branchButtonRef,
+      width: 230,
+      items: [
+        { header: "Current branch" },
+        { id: "current", label: branch || "HEAD", icon: <IconBranch size={14} />, disabled: true },
+        { sep: true },
+        { id: "copy", label: "Copy branch name", icon: <IconCopy size={14} />, onSelect: () => copyText(branch || "HEAD", "Branch name copied") },
+      ],
+    },
+    options: {
+      ref: optionsButtonRef,
+      width: 220,
+      items: [
+        { id: "refresh", label: "Refresh changes", icon: <IconRefresh size={14} />, onSelect: refresh },
+        { id: "stage", label: "Stage all changes", onSelect: stageAll, disabled: gitEmpty },
+        { id: "unstage", label: "Unstage all changes", onSelect: unstageAll, disabled: staged.length === 0 },
+      ],
+    },
+    commit: {
+      ref: commitButtonRef,
+      width: 220,
+      items: [
+        { id: "terminal", label: "Open Terminal to commit", onSelect: () => usePanelStore.getState().open("terminal") },
+        { id: "copy-status", label: "Copy git status command", icon: <IconCopy size={14} />, onSelect: () => copyText("git status --short", "Command copied") },
+      ],
+    },
+    more: {
+      ref: moreButtonRef,
+      width: 220,
+      items: [
+        { id: "refresh", label: "Refresh", icon: <IconRefresh size={14} />, onSelect: refresh },
+        { id: "terminal", label: "Open Git terminal", onSelect: () => usePanelStore.getState().open("terminal") },
+        { sep: true },
+        { id: "revert", label: "Revert all unstaged changes", danger: true, disabled: unstaged.length === 0, onSelect: () => setConfirmRevertAll(true) },
+      ],
+    },
+  };
+  const openMenu = (name) => setMenu((current) => (current === name ? null : name));
+  const activeMenu = menu ? menuConfig[menu] : null;
+  const jumpToFirstFile = () => {
+    scrollRef.current?.querySelector("[data-review-file]")?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+
   return (
     <div className="relative flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-(--border-light) px-3 py-2">
-        {branch && status !== "nogit" && (
-          <span className="flex shrink-0 items-center gap-1 rounded-md bg-(--surface-hover) px-1.5 py-0.5 text-xs text-(--fg-secondary)">
-            <IconBranch size={11} />
-            <span className="max-w-[140px] truncate">{branch}</span>
-          </span>
-        )}
-        <span className="min-w-0 flex-1 truncate text-xs text-(--fg-tertiary)" title={cwd}>
-          {shortenPath(cwd, home)}
-        </span>
-        <IconButton icon={<IconRefresh />} title="Refresh" onClick={refresh} size={13} disabled={status === "loading"} />
+      <div className="border-b border-(--border-light)">
+        <div className="flex h-9 items-center px-2">
+          <button
+            ref={branchButtonRef}
+            className="flex h-7 w-[87px] shrink-0 items-center gap-1 rounded-lg px-1.5 text-[14px] hover:bg-(--surface-hover)"
+            onClick={() => openMenu("branch")}
+            title={branch || "Branch"}
+          >
+            <span>Branch</span>
+            <IconChevronDown size={13} className="shrink-0 text-(--fg-tertiary)" />
+          </button>
+          <span className="ml-1 shrink-0 font-mono text-[14px] text-(--diff-add-fg)">+{totals.added}</span>
+          <span className="ml-1 shrink-0 font-mono text-[14px] text-(--diff-del-fg)">−{totals.deleted}</span>
+          <div className="min-w-1 flex-1" />
+          <div className="flex items-center gap-1.5">
+            <span ref={optionsButtonRef}>
+              <ReviewToolButton icon="Ellipsis" title="Review options" onClick={() => openMenu("options")} />
+            </span>
+            <ReviewToolButton icon="ListCollapse" title="Collapse all diffs" onClick={() => setCollapseSignal((value) => value + 1)} />
+            <ReviewToolButton icon="FileSearch" title="Jump to file" onClick={jumpToFirstFile} />
+            <ReviewToolButton icon="Columns2" title="Switch to split diff" active={split} onClick={() => setSplit((value) => !value)} />
+            <ReviewToolButton icon="FolderOpen" title="Show files" onClick={() => usePanelStore.getState().open("files")} />
+            <div className="flex h-7 w-[51px] items-center overflow-hidden rounded-[10px] ring-1 ring-inset ring-(--border)">
+              <span ref={commitButtonRef}>
+                <ReviewToolButton icon="GitCommitHorizontal" title="Commit or push" onClick={() => openMenu("commit")} />
+              </span>
+              <button
+                ref={moreButtonRef}
+                className="flex h-7 w-[23px] items-center justify-center text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
+                title="More Git actions"
+                aria-label="More Git actions"
+                onClick={() => openMenu("more")}
+              >
+                <IconChevronDown size={13} />
+              </button>
+            </div>
+          </div>
+        </div>
+        <button
+          className="flex h-8 w-full items-center gap-2 px-4 text-left font-mono text-[14px] text-(--fg-tertiary) hover:bg-(--surface-hover)"
+          onClick={() => openMenu("branch")}
+          title={cwd}
+        >
+          <span className="truncate">{branch || "HEAD"}</span>
+          <span>→</span>
+          <span className="truncate">origin/{branch || "HEAD"}</span>
+          <IconChevronDown size={13} />
+        </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {activeMenu && (
+        <Menu
+          open
+          anchor={() => activeMenu.ref.current?.getBoundingClientRect()}
+          items={activeMenu.items}
+          width={activeMenu.width}
+          align={menu === "more" || menu === "commit" ? "end" : "start"}
+          onClose={() => setMenu(null)}
+        />
+      )}
+
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         {status === "loading" && staged.length + unstaged.length + untracked.length === 0 && (
           <div className="flex justify-center py-6 text-(--fg-tertiary)"><Spinner /></div>
         )}
@@ -163,10 +286,35 @@ export default function ReviewTab() {
           <EmptyState text="No file changes yet" sub="Track, review, and undo changes in this project" />
         )}
 
+        {skipUntracked && (
+          <div className="mx-2 mt-2 overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[color-mix(in_srgb,var(--warning)_5%,var(--surface))]">
+            <div className="flex gap-3 px-3 pt-3 pb-2">
+              <LucideIcon name="CircleAlert" size={15} className="mt-0.5 shrink-0 text-(--warning)" />
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold leading-[18px]">Showing tracked changes only</div>
+                <div className="mt-1 text-[13px] leading-[21px] text-(--fg-tertiary)">
+                  Review skipped {untracked.length} untracked files to stay responsive. If these files are generated, clean them up and refresh.
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-(--border-light) px-3 py-2">
+              <button
+                className="h-6 rounded-full border border-(--border) bg-(--panel-action-bg) px-2.5 text-[13px] hover:bg-(--panel-action-hover-bg)"
+                onClick={() => copyText("git clean -nd", "Cleanup preview command copied")}
+              >
+                Copy cleanup command
+              </button>
+              <button className="h-6 rounded-lg px-2.5 text-[13px] text-(--fg-tertiary) hover:bg-(--surface-hover)" onClick={refresh}>
+                Refresh
+              </button>
+            </div>
+          </div>
+        )}
+
         {lastTurnFiles.length > 0 && (
           <Section title="Last Turn">
             {lastTurnFiles.map((f, i) => (
-              <DiffFile key={`lt${i}`} file={f} defaultOpen={lastTurnFiles.length <= 3} />
+              <DiffFile key={`lt${i}`} file={f} defaultOpen={lastTurnFiles.length <= 3} collapseSignal={collapseSignal} split={split} />
             ))}
           </Section>
         )}
@@ -187,6 +335,8 @@ export default function ReviewTab() {
                 file={f}
                 defaultOpen={unstaged.length <= 3}
                 onRevertHunk={revertHunk}
+                collapseSignal={collapseSignal}
+                split={split}
                 actions={
                   <>
                     <FileAction label="Stage" onClick={(e) => { e.stopPropagation(); stageFile(diffFileName(f)); }} />
@@ -208,17 +358,19 @@ export default function ReviewTab() {
                 key={`s${i}`}
                 file={f}
                 defaultOpen={staged.length <= 3}
+                collapseSignal={collapseSignal}
+                split={split}
                 actions={<FileAction label="Unstage" onClick={(e) => { e.stopPropagation(); unstageFile(diffFileName(f)); }} />}
               />
             ))}
           </Section>
         )}
 
-        {untracked.length > 0 && (
+        {untracked.length > 0 && !skipUntracked && (
           <Section title="Untracked" actions={<SectionAction label="Stage all" onClick={stageAll} />}>
             {untracked.map((p, i) => (
-              <div key={i} className="group flex items-center gap-2 px-3 py-1 text-xs text-(--fg-secondary) hover:bg-(--surface-hover)">
-                <IconFile size={12} className="shrink-0 text-(--fg-tertiary)" />
+              <div key={i} data-review-file className="group flex min-h-9 items-center gap-2 px-4 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)">
+                <FileKindIcon name={p} />
                 <span className="min-w-0 flex-1 truncate font-mono" title={p}>{p}</span>
                 <FileAction label="Stage" onClick={() => stageFile(p)} />
               </div>
@@ -241,6 +393,8 @@ export default function ReviewTab() {
                   deleted: countDiff(c.diff).del,
                 }}
                 defaultOpen={threadChanges.length <= 3}
+                collapseSignal={collapseSignal}
+                split={split}
               />
             ))}
           </Section>
@@ -272,8 +426,8 @@ function fakeHeader(c) {
 
 function Section({ title, children, actions }) {
   return (
-    <div className="border-b border-(--border-light) pb-2">
-      <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
+    <div className="border-b border-(--border-light) py-2">
+      <div className="flex items-center justify-between px-4 py-1.5">
         <div className="text-xs font-medium text-(--fg-tertiary)">{title}</div>
         {actions && <div className="flex items-center gap-1">{actions}</div>}
       </div>
@@ -310,24 +464,73 @@ function FileAction({ label, onClick, danger }) {
   );
 }
 
-function DiffFile({ file, defaultOpen = false, actions, onRevertHunk }) {
+function ReviewToolButton({ icon, title, onClick, active }) {
+  return (
+    <button
+      className={cx(
+        "flex size-7 items-center justify-center rounded-lg text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)",
+        active && "bg-(--surface-active) text-(--fg)",
+      )}
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+    >
+      <LucideIcon name={icon} size={15} />
+    </button>
+  );
+}
+
+function FileKindIcon({ name }) {
+  const lower = name.toLowerCase();
+  if (lower.endsWith("/")) {
+    return <IconFolder size={14} className="shrink-0 text-(--fg-tertiary)" />;
+  }
+  const extension = lower.match(/\.([a-z0-9]+)$/)?.[1] || "";
+  const labels = {
+    cjs: ["JS", "#d6ae3b"],
+    css: ["#", "#b06dff"],
+    js: ["JS", "#d6ae3b"],
+    json: ["{}", "#d6ae3b"],
+    jsx: ["JS", "#d6ae3b"],
+    md: ["M", "#8b949e"],
+    mjs: ["JS", "#d6ae3b"],
+    ts: ["TS", "#3b82f6"],
+    tsx: ["TS", "#3b82f6"],
+  };
+  const badge = labels[extension];
+  if (!badge) return <IconFile size={14} className="shrink-0 text-(--fg-tertiary)" />;
+  return (
+    <span
+      className="flex size-[14px] shrink-0 items-center justify-center rounded-[4px] text-[7px] leading-none font-bold text-black/75"
+      style={{ backgroundColor: badge[1] }}
+      aria-hidden="true"
+    >
+      {badge[0]}
+    </span>
+  );
+}
+
+function DiffFile({ file, defaultOpen = false, actions, onRevertHunk, collapseSignal = 0, split = false }) {
   const [open, setOpen] = useState(defaultOpen);
   const name = diffFileName(file);
+  useEffect(() => {
+    if (collapseSignal > 0) setOpen(false);
+  }, [collapseSignal]);
   return (
-    <div className="group mx-2 mb-1 overflow-hidden rounded-lg border border-(--border-light) bg-(--surface)">
+    <div data-review-file className="group border-b border-(--border-light)">
       <button
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-(--surface-hover)"
+        className="flex min-h-11 w-full items-center gap-2 px-4 py-2 text-left hover:bg-(--surface-hover)"
         onClick={() => setOpen(!open)}
       >
         <IconChevronRight size={12} className={cx("shrink-0 text-(--fg-tertiary) transition-transform", open && "rotate-90")} />
-        <IconFile size={12} className="shrink-0 text-(--fg-tertiary)" />
-        <span className="min-w-0 flex-1 truncate font-mono text-xs" title={name}>{name}</span>
+        <FileKindIcon name={name} />
+        <span className="min-w-0 flex-1 truncate font-mono text-[13px]" title={name}>{formatFileName(name)}</span>
         {actions}
         {file.isNew && <span className="shrink-0 rounded bg-(--diff-add-bg) px-1 text-[10px] text-(--diff-add-fg)">new</span>}
         {file.isDeleted && <span className="shrink-0 rounded bg-(--diff-del-bg) px-1 text-[10px] text-(--diff-del-fg)">deleted</span>}
-        <span className="shrink-0 font-mono text-[11px]">
+        <span className="shrink-0 font-mono text-[13px]">
           {file.added > 0 && <span className="text-(--diff-add-fg)">+{file.added} </span>}
-          {file.deleted > 0 && <span className="text-(--diff-del-fg)">-{file.deleted}</span>}
+          {file.deleted > 0 && <span className="text-(--diff-del-fg)">−{file.deleted}</span>}
         </span>
       </button>
       {open && (
@@ -345,7 +548,16 @@ function DiffFile({ file, defaultOpen = false, actions, onRevertHunk }) {
                   </button>
                 )}
               </div>
-              {h.lines.map((l, li) => (
+              {split ? (
+                <div className="grid grid-cols-2">
+                  {splitRows(h.lines).map((row, index) => (
+                    <React.Fragment key={index}>
+                      <DiffCell line={row.old} />
+                      <DiffCell line={row.next} />
+                    </React.Fragment>
+                  ))}
+                </div>
+              ) : h.lines.map((l, li) => (
                 <div key={li} className={cx("diff-line", l.type === "add" && "add", l.type === "del" && "del")}>
                   <span className="content px-2">{l.text || " "}</span>
                 </div>
@@ -357,6 +569,52 @@ function DiffFile({ file, defaultOpen = false, actions, onRevertHunk }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function formatFileName(name) {
+  const slash = name.lastIndexOf("/");
+  if (slash < 0) return name;
+  return (
+    <>
+      <span className="text-(--fg-tertiary)">{name.slice(0, slash + 1)}</span>
+      <span>{name.slice(slash + 1)}</span>
+    </>
+  );
+}
+
+function splitRows(lines) {
+  const rows = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line.type === "del") {
+      const next = lines[index + 1];
+      if (next?.type === "add") {
+        rows.push({ old: line, next });
+        index += 1;
+      } else {
+        rows.push({ old: line, next: null });
+      }
+    } else if (line.type === "add") {
+      rows.push({ old: null, next: line });
+    } else {
+      rows.push({ old: line, next: line });
+    }
+  }
+  return rows;
+}
+
+function DiffCell({ line }) {
+  return (
+    <div
+      className={cx(
+        "diff-line min-w-0 border-r border-(--border-light)",
+        line?.type === "add" && "add",
+        line?.type === "del" && "del",
+      )}
+    >
+      <span className="content block truncate px-2">{line?.text || " "}</span>
     </div>
   );
 }
