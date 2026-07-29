@@ -10,7 +10,7 @@ import vscodeIcon from "@app/assets/vscode.png";
 import Composer from "./Composer.jsx";
 import { ItemView, PlanWidget, ApprovalCard, TurnActionRow, TurnDiffCard } from "./items.jsx";
 import { ActivityDisclosure, Menu, Dialog, IconButton, Spinner } from "@app/components/ui.jsx";
-import { IconBranch, IconFolder, IconMore, IconChevronRight, IconChevronDown, IconX, IconFile, IconTerminal, IconGlobe, IconSparkle, IconFolderFilled, IconDots21, IconHeaderOutputs, IconHeaderPanelBottom, IconHeaderPanelSide, IconHeaderChevronDown, IconCmdGoal, IconBookOpen, IconCodeSearching, IconEditFiles, IconGoalEdit, IconGoalPause, IconGoalResume, IconGoalTrash, IconGoalChevron, IconListFiles, IconMcpSource, IconRunCommand, IconWebSearch, IconClaude, IconKimi, LucideIcon } from "@app/components/icons.jsx";
+import { IconBranch, IconFolder, IconMore, IconChevronRight, IconChevronDown, IconX, IconFile, IconTerminal, IconGlobe, IconSparkle, IconFolderFilled, IconDots21, IconHeaderSidebar, IconHeaderOutputs, IconHeaderPanelBottom, IconHeaderChevronDown, IconCmdGoal, IconBookOpen, IconCodeSearching, IconEditFiles, IconGoalEdit, IconGoalPause, IconGoalResume, IconGoalTrash, IconGoalChevron, IconListFiles, IconMcpSource, IconRunCommand, IconWebSearch, IconClaude, IconKimi, LucideIcon } from "@app/components/icons.jsx";
 import { panelHook } from "@app/lib/panelHook.js";
 import { usePanelStore } from "@modules/workspace-panels/state";
 import { CodexMark } from "@app/components/icons.jsx";
@@ -174,7 +174,7 @@ export function HeaderPanelButtons() {
         onClick={() => setUi({ bottomOpen: !ui.bottomOpen })}
       />
       <IconButton
-        icon={<IconHeaderPanelSide />}
+        icon={<IconHeaderSidebar style={{ transform: "rotate(180deg)" }} />}
         size={16}
         title="Toggle side panel"
         active={!!ui.rightOpen}

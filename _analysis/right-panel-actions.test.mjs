@@ -103,7 +103,9 @@ test("mac right-panel header keeps blank title-bar space draggable", () => {
   assert.match(panel, /tabRef\.current\?\.scrollIntoView\(\{ block: "nearest", inline: "nearest" \}\);/);
   assert.match(panel, /ref=\{plusRef\}[\s\S]*?className="app-no-drag /);
   assert.match(panel, /className="app-no-drag group\/tab /);
-  assert.match(panel, /title=\{expanded \? "Collapse panel" : "Expand panel"\}[\s\S]*?className="mr-1"/);
+  assert.match(panel, /title=\{expanded \? "Restore panel width" : "Expand panel"\}[\s\S]*?className="mr-1"/);
+  assert.match(panel, /viewBox="0 0 20 20"[\s\S]*?M4\.33496 11C4\.33496/);
+  assert.match(panel, /viewBox="0 0 16 16"[\s\S]*?M6\.1664 8\.80845C6\.7325/);
   assert.match(sharedParts, /import "\.\/styles\.css";/);
   assert.match(sharedStyles, /\.app-drag\s*\{\s*-webkit-app-region:\s*drag;/);
   assert.match(sharedStyles, /\.app-no-drag\s*\{\s*-webkit-app-region:\s*no-drag;/);
@@ -113,6 +115,10 @@ test("mac right-panel header keeps blank title-bar space draggable", () => {
   );
   assert.match(macShell, /items-center gap-1 pr-3 pl-\[88px\]/);
   assert.match(conversation, /className="app-no-drag flex h-7 w-\[52px\]/);
+  assert.match(
+    conversation,
+    /IconHeaderSidebar style=\{\{ transform: "rotate\(180deg\)" \}\}/,
+  );
 });
 
 test("right-panel shortcuts match native modifiers on both platforms", () => {
