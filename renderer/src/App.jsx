@@ -1,11 +1,12 @@
 // App shell: sidebar / conversation / right panel layout, drag-resize,
 // global shortcuts, command menu, settings window, connection gate.
 import React, { useEffect, useRef, useState } from "react";
-import { useStore } from "./store.js";
+import { useStore, runtimeConnected } from "./store.js";
 import { cx } from "./lib/cx.js";
 import { COMMANDS, matchAccel, bindingFor, bindingsFor } from "./lib/keys.js";
 import * as api from "./api.js";
 import { panelHook } from "./lib/panelHook.js";
+import { EXTERNAL_RUNTIMES, RUNTIMES, RUNTIME_IDS, runtimeMeta } from "./lib/runtimes.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Conversation, { ConversationHeaderContent, HeaderPanelButtons, HeaderContextButtons } from "./components/Conversation.jsx";import NavViews from "./components/NavViews.jsx";
 import RightPanel, { RightPanelHeader } from "./components/RightPanel.jsx";
@@ -14,14 +15,14 @@ import WinWindowControls from "./components/WinWindowControls.jsx";
 import TerminalTab from "./components/panel/TerminalTab.jsx";
 import Settings from "./components/Settings.jsx";
 import { Toasts, Spinner, IconButton, Menu } from "./components/ui.jsx";
-import { IconSearch, IconChat, IconHeaderSidebar, IconHeaderArrow, IconX, IconGear, IconPlus, IconChevronDown, LucideIcon } from "./components/icons.jsx";
+import { IconSearch, IconChat, IconHeaderSidebar, IconX, IconGear, IconPlus, IconChevronDown, LucideIcon } from "./components/icons.jsx";
 
 export default function App() {
   const init = useStore((s) => s.init);
   const status = useStore((s) => s.status);
-  const account = useStore((s) => s.account);
   const accountChecked = useStore((s) => s.accountChecked);
-  const requiresOpenaiAuth = useStore((s) => s.requiresOpenaiAuth);
+  const externalAuthChecked = useStore((s) => s.externalAuthChecked);
+  const anyConnected = useStore((s) => RUNTIME_IDS.some((id) => runtimeConnected(s, id)));
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
 
@@ -46,7 +47,10 @@ export default function App() {
           case "newChat": s.setUi({ navView: "chats" }); s.newChat(); break;
           case "newStandaloneChat": { s.setCwd(null); s.setUi({ navView: "chats" }); s.newChat(); break; }
           case "quickChat": api.toggleQuickChat(); break;
-          case "archiveChat": { if (s.activeThreadId) s.archiveThread(s.activeThreadId); break; }
+          case "archiveChat": {
+            if (s.activeThreadId && !s.activeConversation?.()?.readOnly) s.archiveThread(s.activeThreadId);
+            break;
+          }
           case "openInNewWindow": { if (s.activeThreadId) api.openThreadWindow(s.activeThreadId); break; }
           case "nextRecentChat": {
             const ordered = [...(s.navBack || [])].reverse();
@@ -55,13 +59,19 @@ export default function App() {
           }
           case "nextTab": {
             const tabs = useStore.getState().ui;
-            const order = ["chats", "pull-requests", "sites", "scheduled", "plugins"];
+            const order = ["chats", "pull-requests", "scheduled", "plugins"];
             const i = order.indexOf(tabs.navView);
             s.setUi({ navView: order[(i + 1) % order.length] });
             break;
           }
-          case "renameChat": { if (s.activeThreadId) set({ renameRequest: Date.now() }); break; }
+          case "renameChat": {
+            if (s.activeThreadId && !s.activeConversation?.()?.readOnly) {
+              useStore.setState({ renameRequest: Date.now() });
+            }
+            break;
+          }
           case "togglePin": {
+            if (s.activeConversation?.()?.readOnly) break;
             const cwd = s.activeConversation?.()?.thread?.cwd || s.cwd;
             if (cwd) s.togglePinnedProject(cwd);
             break;
@@ -79,8 +89,6 @@ export default function App() {
           case "openBrowserTab": panelHook.open?.("browser"); break;
           case "openSideChatTab": panelHook.open?.("sidechat"); break;
           case "openReviewTab": panelHook.open?.("review"); break;
-          case "back": s.goBack(); break;
-          case "forward": s.goForward(); break;
           case "closeWindow": window.close(); break;
           case "settings": setUi({ settingsOpen: true }); break;
         }
@@ -96,10 +104,12 @@ export default function App() {
   if (status !== "ready") {
     return <BootScreen status={status} />;
   }
-  if (!accountChecked) {
+  if (!accountChecked || !externalAuthChecked) {
     return <BootScreen status="checking-account" />;
   }
-  if (requiresOpenaiAuth && !account) {
+  // Any connected vendor (Codex account or claude/kimi CLI credentials) is
+  // enough to enter the app.
+  if (!anyConnected) {
     return <AuthScreen />;
   }
 
@@ -233,9 +243,6 @@ export default function App() {
 function GlobalHeader() {
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
-  const navBack = useStore((s) => s.navBack);
-  const navFwd = useStore((s) => s.navFwd);
-  const { goBack, goForward } = useStore();
   return (
     <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pl-3">
       <IconButton
@@ -243,20 +250,6 @@ function GlobalHeader() {
         size={16}
         title="Toggle sidebar (Ctrl+B)"
         onClick={() => setUi({ sidebarOpen: !ui.sidebarOpen })}
-      />
-      <IconButton
-        icon={<IconHeaderArrow />}
-        size={16}
-        title="Back"
-        disabled={!navBack.length}
-        onClick={goBack}
-      />
-      <IconButton
-        icon={<IconHeaderArrow className="-scale-x-100" />}
-        size={16}
-        title="Forward"
-        disabled={!navFwd.length}
-        onClick={goForward}
       />
       <WinMenuBar />
       {/* collapsed sidebar exposes a quick new-chat button (reference header) */}
@@ -277,13 +270,10 @@ function GlobalHeader() {
   );
 }
 
-// The peek sidebar's own copy of the window-control buttons (toggle/back/
-// forward), floating over its top edge like the reference peek shows.
+// The peek sidebar's own copy of the sidebar toggle, floating over its top
+// edge like the reference peek shows.
 function PeekHeader() {
   const setUi = useStore((s) => s.setUi);
-  const navBack = useStore((s) => s.navBack);
-  const navFwd = useStore((s) => s.navFwd);
-  const { goBack, goForward } = useStore();
   return (
     <div className="app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-3">
       <IconButton
@@ -291,20 +281,6 @@ function PeekHeader() {
         size={16}
         title="Show sidebar (Ctrl+B)"
         onClick={() => setUi({ sidebarOpen: true, sidebarPeek: false })}
-      />
-      <IconButton
-        icon={<IconHeaderArrow />}
-        size={16}
-        title="Back"
-        disabled={!navBack.length}
-        onClick={goBack}
-      />
-      <IconButton
-        icon={<IconHeaderArrow className="-scale-x-100" />}
-        size={16}
-        title="Forward"
-        disabled={!navFwd.length}
-        onClick={goForward}
       />
     </div>
   );
@@ -335,7 +311,7 @@ function PluginsHeaderTabs() {
 }
 
 // Per-page actions at the right edge of the header band (reference: Plugins
-// has refresh + manage gear + Create; Scheduled/Sites just Create; PR none).
+// has refresh + manage gear + Create; Scheduled just Create; PR none).
 function NavHeaderActions({ view }) {
   const setUi = useStore((s) => s.setUi);
   const [createOpen, setCreateOpen] = useState(false);
@@ -403,27 +379,9 @@ function NavHeaderActions({ view }) {
           align="end"
           width={220}
           items={[
-            { id: "task", label: "Create scheduled task", onSelect: () => toast("Create scheduled tasks from a chat by asking Codex") },
+            { id: "task", label: "Create scheduled task", onSelect: () => toast("Create scheduled tasks from a chat by asking Noma") },
           ]}
         />
-      </div>
-    );
-  }
-  if (view === "sites") {
-    return (
-      <div className="app-no-drag flex items-center gap-1.5">
-        <IconButton
-          icon={<LucideIcon name="RefreshCw" size={14} />}
-          title="Refresh"
-          onClick={() => window.dispatchEvent(new CustomEvent("sites:reload"))}
-        />
-        <button
-          className="flex h-7 items-center gap-1.5 rounded-full border border-(--border) px-3 text-sm hover:bg-(--surface-hover)"
-          onClick={() => toast("Ask Codex in a chat to set this up")}
-        >
-          <IconPlus size={12} />
-          Create
-        </button>
       </div>
     );
   }
@@ -496,11 +454,11 @@ function BootScreen({ status }) {
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-(--surface)">
       {status === "crashed" ? (
         <>
-          <div className="text-[15px] font-medium text-(--danger)">Codex backend failed to start</div>
+          <div className="text-[15px] font-medium text-(--danger)">Noma backend failed to start</div>
           <div className="max-w-[420px] text-center text-[13px] text-(--fg-tertiary)">
             Tried to launch: <span className="font-mono">{binary || "codex"}</span>
             <br />
-            {backendError || "The bundled Codex runtime could not be started."}
+            {backendError || "The bundled Noma runtime could not be started."}
           </div>
           {binaryCandidates.length > 0 && (
             <details className="max-w-[560px] text-[12px] text-(--fg-tertiary)">
@@ -522,7 +480,7 @@ function BootScreen({ status }) {
           <Spinner size={22} className="text-(--fg-tertiary)" />
           <div className="text-[13px] text-(--fg-tertiary)">
             {status === "starting"
-              ? "Starting Codex…"
+              ? "Starting Noma…"
               : status === "checking-account"
                 ? "Checking account…"
                 : "Connecting…"}
@@ -534,45 +492,83 @@ function BootScreen({ status }) {
 }
 
 function AuthScreen() {
-  const loginStatus = useStore((s) => s.loginStatus);
   const loginError = useStore((s) => s.loginError);
-  const startLogin = useStore((s) => s.startChatgptLogin);
-  const cancelLogin = useStore((s) => s.cancelChatgptLogin);
-  const waiting = loginStatus === "starting" || loginStatus === "waiting" || loginStatus === "completing";
+
+  // External sign-ins complete in a separate console window; poll for them.
+  useEffect(() => {
+    useStore.getState().refreshExternalAuth();
+    const t = setInterval(() => useStore.getState().refreshExternalAuth(), 4000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
     <div className="app-drag flex h-full w-full items-center justify-center bg-(--surface)">
-      <div className="app-no-drag flex w-[380px] flex-col items-center text-center">
+      <div className="app-no-drag flex w-[400px] flex-col items-center text-center">
         <div className="mb-5 flex size-12 items-center justify-center rounded-2xl border border-(--border) bg-(--surface-raised)">
           <IconChat size={24} />
         </div>
-        <h1 className="text-[22px] font-semibold">ChatGPT Desktop Community</h1>
+        <h1 className="text-[22px] font-semibold">Noma</h1>
         <p className="mt-2 max-w-[340px] text-[13px] leading-5 text-(--fg-tertiary)">
-          Sign in with ChatGPT to use your account and models in the local desktop app.
+          Sign in with any provider below to use its account and models in Noma.
         </p>
-        <button
-          className="mt-6 flex h-10 w-full items-center justify-center rounded-xl bg-(--fg) text-[13px] font-medium text-(--surface) disabled:opacity-60"
-          disabled={waiting}
-          onClick={startLogin}
-        >
-          {loginStatus === "starting"
-            ? "Starting sign-in…"
-            : loginStatus === "waiting"
-              ? "Finish signing in in your browser"
-              : loginStatus === "completing"
-                ? "Finishing sign-in…"
-                : "Continue with ChatGPT"}
-        </button>
-        {loginStatus === "waiting" && (
-          <button className="mt-3 text-xs text-(--fg-tertiary) hover:text-(--fg)" onClick={cancelLogin}>
-            Cancel
-          </button>
-        )}
+        <div className="mt-6 flex w-full flex-col gap-2">
+          {RUNTIMES.map((meta) => <AuthVendorRow key={meta.id} meta={meta} />)}
+        </div>
         {loginError && <div className="mt-4 text-[12px] leading-5 text-(--danger)">{loginError}</div>}
         <p className="mt-6 text-[11px] leading-4 text-(--fg-faint)">
-          Authentication is handled and stored locally by the bundled Codex runtime.
+          Credentials are handled and stored locally by each provider's own runtime.
         </p>
       </div>
+    </div>
+  );
+}
+
+// One provider row on the sign-in screen: icon, name, status, connect button.
+function AuthVendorRow({ meta }) {
+  const connected = useStore((s) => runtimeConnected(s, meta.id));
+  const loginStatus = useStore((s) => s.loginStatus);
+  const startLogin = useStore((s) => s.startChatgptLogin);
+  const cancelLogin = useStore((s) => s.cancelChatgptLogin);
+  const startExternalLogin = useStore((s) => s.startExternalLogin);
+  const codex = meta.id === "codex";
+  const waiting = codex && (loginStatus === "starting" || loginStatus === "waiting" || loginStatus === "completing");
+  const codexLabel = loginStatus === "starting"
+    ? "Starting…"
+    : loginStatus === "waiting"
+      ? "In browser…"
+      : loginStatus === "completing"
+        ? "Finishing…"
+        : "Connect";
+
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-(--border-light) bg-(--surface-under) px-4 py-3 text-left">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center">{meta.icon(20)}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-medium">{meta.label}</div>
+        <div className="text-[11px] text-(--fg-tertiary)">
+          {connected
+            ? "Connected"
+            : codex
+              ? "Sign in with your ChatGPT account"
+              : `Sign in via the ${meta.label} CLI (opens a window)`}
+        </div>
+      </div>
+      {connected ? (
+        <LucideIcon name="Check" size={16} className="shrink-0 text-(--success)" />
+      ) : (
+        <button
+          className="flex h-7 shrink-0 items-center rounded-lg bg-(--fg) px-3 text-[12px] font-medium text-(--surface) disabled:opacity-60"
+          disabled={waiting}
+          onClick={() => (codex ? startLogin() : startExternalLogin(meta.id))}
+        >
+          {codex ? codexLabel : "Connect"}
+        </button>
+      )}
+      {!connected && codex && loginStatus === "waiting" && (
+        <button className="shrink-0 text-xs text-(--fg-tertiary) hover:text-(--fg)" onClick={cancelLogin}>
+          Cancel
+        </button>
+      )}
     </div>
   );
 }
@@ -582,6 +578,8 @@ function CommandMenu() {
   const open = useStore((s) => s.ui.commandMenuOpen);
   const setUi = useStore((s) => s.setUi);
   const threads = useStore((s) => s.threads);
+  // External history sources, registry-driven (fixed registry = stable hooks).
+  const externalThreads = EXTERNAL_RUNTIMES.map((r) => useStore((s) => s[r.stateKeys.threads]));
   const { openThread, newChat } = useStore();
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
@@ -589,7 +587,7 @@ function CommandMenu() {
   useEffect(() => { if (open) { setQ(""); setIdx(0); } }, [open]);
   if (!open) return null;
 
-  const filtered = threads
+  const filtered = [...threads, ...externalThreads.flat()]
     .filter((t) => {
       const hay = `${t.name || ""} ${t.preview || ""} ${t.cwd || ""}`.toLowerCase();
       return hay.includes(q.toLowerCase());
@@ -632,7 +630,9 @@ function CommandMenu() {
             <span className="flex h-6 w-6 items-center justify-center rounded-md bg-(--accent-soft) text-(--accent)">＋</span>
             New chat
           </button>
-          {filtered.map((t, i) => (
+          {filtered.map((t, i) => {
+            const meta = runtimeMeta(t.source);
+            return (
             <button
               key={t.id}
               className={cx(
@@ -642,10 +642,18 @@ function CommandMenu() {
               onMouseEnter={() => setIdx(i)}
               onClick={() => pick(t)}
             >
-              <IconChat size={14} className="shrink-0 text-(--fg-tertiary)" />
+              {meta
+                ? meta.icon(14, "shrink-0")
+                : <IconChat size={14} className="shrink-0 text-(--fg-tertiary)" />}
               <span className="truncate">{t.name || (t.preview || "").split("\n")[0] || "New chat"}</span>
+              {meta && (
+                <span className="ml-auto shrink-0 text-[10px] text-(--fg-faint)">
+                  {meta.label}
+                </span>
+              )}
             </button>
-          ))}
+            );
+          })}
           {filtered.length === 0 && (
             <div className="px-4 py-6 text-center text-[13px] text-(--fg-tertiary)">No matches</div>
           )}

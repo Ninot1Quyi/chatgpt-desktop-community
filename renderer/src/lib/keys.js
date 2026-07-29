@@ -11,8 +11,6 @@ export const COMMANDS = [
   ["togglePin", "Toggle pin", "Ctrl+Alt+P", "Pin or unpin the current chat"],
   ["openSideChatTab", "Open side chat", "Ctrl+Alt+S", "Open the current chat in a side chat"],
   ["focusBrowserAddress", "Focus browser address bar", "Ctrl+L", "Focus the in-app browser address bar"],
-  ["back", "Back", "Ctrl+[", "Go back in navigation history", ["Mouse Back"]],
-  ["forward", "Forward", "Ctrl+]", "Go forward in navigation history", ["Mouse Forward"]],
   ["nextRecentChat", "Next recently viewed chat", "Ctrl+Tab", "Cycle to the next recently viewed chat"],
   ["nextTab", "Next tab", "Ctrl+Tab", "Switch to the next tab", ["Ctrl+Shift+]", "Ctrl+Alt+Right"]],
   ["commandMenu", "Command menu", "Ctrl+K", "Open the command menu"],

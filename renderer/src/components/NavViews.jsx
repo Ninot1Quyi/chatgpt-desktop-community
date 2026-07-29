@@ -1,4 +1,4 @@
-// Secondary nav views: Pull requests / Sites / Scheduled / Plugins.
+// Secondary nav views: Pull requests / Scheduled / Plugins.
 // These mirror the reference app's pages with honest, data-backed content.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store.js";
@@ -19,7 +19,6 @@ export default function NavViews() {
     case "scheduled": return <ScheduledView />;
     case "plugins": return <PluginsView />;
     case "pull-requests": return <PullRequestsView />;
-    case "sites": return <SitesView />;
     default: return null;
   }
 }
@@ -37,135 +36,6 @@ function SimpleView({ title, desc }) {
     <PageShell title={title}>
       <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
         <div className="text-[14px] text-(--fg-tertiary)">{desc}</div>
-      </div>
-    </PageShell>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Sites: generated .html artifacts under %USERPROFILE%\.codex\visualizations.
-// ---------------------------------------------------------------------------
-function SitesView() {
-  const codexHome = useStore((s) => s.codexHome);
-  const [sites, setSites] = useState(null);
-  const [query, setQuery] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
-  const [reload, setReload] = useState(0);
-
-  useEffect(() => {
-    const onReload = () => setReload((n) => n + 1);
-    window.addEventListener("sites:reload", onReload);
-    return () => window.removeEventListener("sites:reload", onReload);
-  }, []);
-
-  useEffect(() => {
-    let live = true;
-    if (!codexHome) return;
-    setRefreshing(true);
-    (async () => {
-      const found = [];
-      const years = await api.rpc("fs/readDirectory", { path: `${codexHome}/visualizations` }).catch(() => null);
-      for (const y of (years?.entries || []).filter((e) => e.isDirectory)) {
-        const months = await api.rpc("fs/readDirectory", { path: `${codexHome}/visualizations/${y.fileName}` }).catch(() => null);
-        for (const m of (months?.entries || []).filter((e) => e.isDirectory)) {
-          const days = await api.rpc("fs/readDirectory", { path: `${codexHome}/visualizations/${y.fileName}/${m.fileName}` }).catch(() => null);
-          for (const d of (days?.entries || []).filter((e) => e.isDirectory)) {
-            const threads = await api.rpc("fs/readDirectory", { path: `${codexHome}/visualizations/${y.fileName}/${m.fileName}/${d.fileName}` }).catch(() => null);
-            for (const t of (threads?.entries || []).filter((e) => e.isDirectory)) {
-              const dir = `${codexHome}/visualizations/${y.fileName}/${m.fileName}/${d.fileName}/${t.fileName}`;
-              const files = await api.rpc("fs/readDirectory", { path: dir }).catch(() => null);
-              for (const f of (files?.entries || []).filter((e) => e.isFile && e.fileName.endsWith(".html"))) {
-                found.push({
-                  path: `${dir}/${f.fileName}`,
-                  name: f.fileName.replace(/\.html$/i, ""),
-                  date: `${y.fileName}-${m.fileName}-${d.fileName}`,
-                  threadId: t.fileName,
-                });
-              }
-            }
-          }
-        }
-      }
-      found.sort((a, b) => b.date.localeCompare(a.date));
-      if (live) {
-        setSites(found);
-        setRefreshing(false);
-      }
-    })();
-    return () => { live = false; };
-  }, [codexHome, reload]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return (sites || []).filter((s) => !q || s.name.toLowerCase().includes(q));
-  }, [sites, query]);
-
-  const openSite = (site) => {
-    useStore.getState().setUi({ rightOpen: true, rightTab: "browser" });
-    // Give the browser tab a tick to mount, then navigate.
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("codex:open-url", { detail: { url: `codex-file://local/${encodeURIComponent(site.path)}` } }));
-    }, 150);
-  };
-
-  return (
-    <PageShell title="Sites">
-      <div className="flex min-h-full flex-col">
-        {/* Header */}
-        <div className="px-6 pt-5">
-          <div className="min-w-0">
-            <div className="text-[28px] font-normal">Sites</div>
-            <div className="mt-1 text-[16px] leading-6 text-(--fg-secondary)">Turn your ideas into live websites</div>
-          </div>
-          <div className="relative mt-3">
-            <LucideIcon name="Search" size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-(--fg-faint)" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search sites"
-              spellCheck={false}
-              className="h-8 w-full rounded-full border border-(--border-light) bg-(--input-bg) pl-8 pr-3 text-sm outline-none placeholder:text-(--fg-faint)"
-            />
-          </div>
-        </div>
-
-        {/* Body */}
-        {sites === null ? (
-          <div className="flex justify-center py-10 text-(--fg-tertiary)"><Spinner /></div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 pb-20 text-center">
-            <LucideIcon name="LayoutGrid" size={30} className="text-(--fg-faint)" />
-            <div className="mt-1 text-[14px] text-(--fg-tertiary)">
-              {query ? "No sites match your search" : "No sites yet"}
-            </div>
-            {!query && (
-              <button
-                className="mt-2 flex h-7 items-center gap-1.5 rounded-full border border-(--border) px-3 text-xs hover:bg-(--surface-hover)"
-                onClick={() => toast("Ask Codex in a chat to set this up")}
-              >
-                <LucideIcon name="Plus" size={12} />
-                Create new site
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="mx-auto grid w-full max-w-[56rem] grid-cols-2 gap-2.5 px-4 py-3 xl:grid-cols-3">
-            {filtered.map((s) => (
-              <button
-                key={s.path}
-                className="group flex flex-col items-start gap-1.5 rounded-xl border border-(--border-light) bg-(--surface-under) p-3 text-left hover:border-(--border) hover:bg-(--surface-hover)"
-                onClick={() => openSite(s)}
-                title={s.path}
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--accent-soft) text-(--accent)">
-                  <LucideIcon name="Globe" size={15} />
-                </span>
-                <span className="w-full truncate text-[13px] font-medium">{s.name}</span>
-                <span className="text-xs text-(--fg-tertiary)">{s.date}</span>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </PageShell>
   );
@@ -728,7 +598,7 @@ function ScheduledView() {
           <button
             key={s.name}
             className="flex items-start gap-3 rounded-xl border border-(--border-light) bg-(--surface-under) p-3 text-left hover:bg-(--surface-hover)"
-            onClick={() => toast("Ask Codex in a chat to set this up")}
+            onClick={() => toast("Ask Noma in a chat to set this up")}
           >
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--accent-soft) text-(--accent)">
               <LucideIcon name={s.icon} size={14} />

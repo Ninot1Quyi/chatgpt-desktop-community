@@ -43,7 +43,7 @@ export default function AppearanceSection() {
         <div className="px-4 py-3.5">
           <div className="rounded-xl border border-(--border-light) bg-(--surface) p-4">
             <div className="text-[18px] font-medium">Aa</div>
-            <div className="mt-1 text-[12px] text-(--fg-tertiary)">Codex</div>
+            <div className="mt-1 text-[12px] text-(--fg-tertiary)">Noma</div>
             <div className="mt-3 flex gap-2">
               <button
                 className="rounded-lg border border-(--border) px-2.5 py-1 text-[12px] hover:bg-(--surface-hover)"

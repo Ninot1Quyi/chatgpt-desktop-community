@@ -11,20 +11,12 @@ import Composer from "./Composer.jsx";
 import OutputsPanel from "./OutputsPanel.jsx";
 import { ItemView, PlanWidget, ApprovalCard, TurnActionRow } from "./items.jsx";
 import { ActivityDisclosure, Menu, Dialog, IconButton, Spinner } from "./ui.jsx";
-import { IconBranch, IconFolder, IconMore, IconChevronRight, IconChevronDown, IconX, IconFile, IconTerminal, IconGlobe, IconSparkle, IconFolderFilled, IconDots21, IconHeaderOutputs, IconHeaderPanelBottom, IconHeaderPanelSide, IconHeaderChevronDown, IconCmdGoal, IconBookOpen, IconCodeSearching, IconEditFiles, IconGoalEdit, IconGoalPause, IconGoalResume, IconGoalTrash, IconGoalChevron, IconListFiles, IconMcpSource, IconRunCommand, IconWebSearch, LucideIcon } from "./icons.jsx";
+import { IconBranch, IconFolder, IconMore, IconChevronRight, IconChevronDown, IconX, IconFile, IconTerminal, IconGlobe, IconSparkle, IconFolderFilled, IconDots21, IconHeaderOutputs, IconHeaderPanelBottom, IconHeaderPanelSide, IconHeaderChevronDown, IconCmdGoal, IconBookOpen, IconCodeSearching, IconEditFiles, IconGoalEdit, IconGoalPause, IconGoalResume, IconGoalTrash, IconGoalChevron, IconListFiles, IconMcpSource, IconRunCommand, IconWebSearch, IconClaude, IconKimi, LucideIcon } from "./icons.jsx";
 import { panelHook } from "../lib/panelHook.js";
 import { usePanelStore } from "./RightPanel.jsx";
+import { CodexMark } from "./icons.jsx";
 
 const IconArrowDown = (p) => <LucideIcon name="ArrowDown" size={p.size || 16} className={p.className} style={p.style} />;
-
-// Codex mark (home logo) — extracted verbatim from the reference app bundle.
-export function CodexMark({ size = 56, className, style }) {
-  return (
-    <svg width={size} height={size} viewBox="149 149 418 418" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} style={style} aria-hidden="true">
-      <mask id="codex-mark-mask" fill="white"><path fillRule="evenodd" clipRule="evenodd" d="M247.429 247.43C257.73 208.911 292.871 180.543 334.638 180.543C359.555 180.543 382.115 190.64 398.449 206.964C405.906 204.97 413.743 203.905 421.829 203.905C471.681 203.906 512.096 244.32 512.096 294.173C512.096 302.259 511.031 310.096 509.037 317.553C525.361 333.887 535.458 356.446 535.458 381.364C535.458 423.131 507.09 458.271 468.571 468.572C458.271 507.091 423.131 535.459 381.364 535.459C356.446 535.459 333.886 525.362 317.552 509.037C310.095 511.031 302.258 512.097 294.172 512.097C244.319 512.097 203.906 471.682 203.906 421.829C203.906 413.743 204.969 405.905 206.963 398.448C190.639 382.115 180.543 359.555 180.543 334.638C180.543 292.871 208.91 257.73 247.429 247.43Z"></path></mask><path d="M247.429 247.43L252.746 267.312L264.238 264.239L267.311 252.747L247.429 247.43ZM334.638 180.543L334.638 159.962L334.638 159.962L334.638 180.543ZM398.449 206.964L383.9 221.521L392.297 229.913L403.765 226.846L398.449 206.964ZM421.829 203.905L421.829 183.325L421.829 183.325L421.829 203.905ZM512.096 294.173L532.677 294.173L532.677 294.173L512.096 294.173ZM509.037 317.553L489.155 312.236L486.087 323.705L494.48 332.102L509.037 317.553ZM535.458 381.364L556.039 381.364L556.039 381.364L535.458 381.364ZM468.571 468.572L463.255 448.69L451.762 451.763L448.689 463.255L468.571 468.572ZM381.364 535.459L381.364 556.04L381.364 556.04L381.364 535.459ZM317.552 509.037L332.101 494.481L323.704 486.088L312.235 489.155L317.552 509.037ZM294.172 512.097L294.172 532.678L294.173 532.678L294.172 512.097ZM203.906 421.829L183.325 421.829L183.325 421.829L203.906 421.829ZM206.963 398.448L226.845 403.765L229.912 392.297L221.52 383.9L206.963 398.448ZM180.543 334.638L159.962 334.638L159.962 334.639L180.543 334.638ZM247.429 247.43L267.311 252.747C275.266 223.003 302.423 201.124 334.638 201.124L334.638 180.543L334.638 159.962C283.319 159.962 240.195 194.819 227.547 242.113L247.429 247.43ZM334.638 180.543L334.638 201.124C353.88 201.124 371.268 208.896 383.9 221.521L398.449 206.964L412.997 192.407C392.962 172.383 365.231 159.962 334.638 159.962L334.638 180.543ZM398.449 206.964L403.765 226.846C409.506 225.311 415.557 224.486 421.829 224.486L421.829 203.905L421.829 183.325C411.929 183.325 402.305 184.629 393.132 187.082L398.449 206.964ZM421.829 203.905L421.828 224.486C460.315 224.486 491.516 255.687 491.516 294.173L512.096 294.173L532.677 294.173C532.677 232.953 483.048 183.325 421.829 183.325L421.829 203.905ZM512.096 294.173L491.516 294.173C491.516 300.444 490.69 306.494 489.155 312.236L509.037 317.553L528.919 322.87C531.372 313.698 532.677 304.074 532.677 294.173L512.096 294.173ZM509.037 317.553L494.48 332.102C507.105 344.735 514.877 362.122 514.877 381.364L535.458 381.364L556.039 381.364C556.039 350.771 543.618 323.04 523.594 303.005L509.037 317.553ZM535.458 381.364L514.877 381.364C514.877 413.578 492.999 440.735 463.255 448.69L468.571 468.572L473.888 488.454C521.182 475.806 556.039 432.683 556.039 381.364L535.458 381.364ZM468.571 468.572L448.689 463.255C440.735 492.999 413.578 514.878 381.364 514.878L381.364 535.459L381.364 556.04C432.683 556.04 475.806 521.183 488.454 473.889L468.571 468.572ZM381.364 535.459L381.364 514.878C362.122 514.878 344.733 507.106 332.101 494.481L317.552 509.037L303.003 523.594C323.038 543.619 350.77 556.04 381.364 556.04L381.364 535.459ZM317.552 509.037L312.235 489.155C306.493 490.691 300.443 491.516 294.172 491.516L294.172 512.097L294.173 532.678C304.073 532.678 313.698 531.372 322.869 528.919L317.552 509.037ZM294.172 512.097L294.172 491.516C255.686 491.516 224.486 460.316 224.486 421.829L203.906 421.829L183.325 421.829C183.325 483.048 232.953 532.678 294.172 532.678L294.172 512.097ZM203.906 421.829L224.486 421.829C224.486 415.555 225.311 409.504 226.845 403.765L206.963 398.448L187.081 393.131C184.627 402.307 183.325 411.932 183.325 421.829L203.906 421.829ZM206.963 398.448L221.52 383.9C208.895 371.268 201.124 353.88 201.124 334.638L180.543 334.638L159.962 334.639C159.962 365.231 172.382 392.962 192.406 412.997L206.963 398.448ZM180.543 334.638L201.124 334.638C201.124 302.423 223.002 275.266 252.746 267.312L247.429 247.43L242.112 227.547C194.818 240.195 159.962 283.319 159.962 334.638L180.543 334.638Z" fill="currentColor" mask="url(#codex-mark-mask)"></path><path d="M436.706 408.738H370.021" stroke="currentColor" strokeWidth="24" strokeLinecap="round"></path><path d="M276.533 309.154L303.468 357.831C304.433 359.575 304.412 361.698 303.414 363.423L276.533 409.854" stroke="currentColor" strokeWidth="24" strokeLinecap="round"></path>
-    </svg>
-  );
-}
 
 // ---------------------------------------------------------------------------
 export default function Conversation() {
@@ -32,6 +24,7 @@ export default function Conversation() {
   const conv = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId] : null));
   const gs = useStore((s) => s.gs);
   const hasTurns = (conv?.turns || []).length > 0;
+  const readOnly = !!conv?.readOnly;
 
   if (!activeThreadId) {
     return (
@@ -48,19 +41,30 @@ export default function Conversation() {
       ) : conv?.error ? (
         <div className="flex flex-1 items-center justify-center px-8 text-center text-[13px] text-(--danger)">{conv.error}</div>
       ) : !hasTurns ? (
-        // Empty thread: home-like centered prompt with the composer below.
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="my-auto flex flex-col items-center px-4 py-6">
-            <CodexMark size={56} className="text-(--fg) opacity-[0.24]" />
-            <div className="mt-5 text-center text-[28px] leading-9 font-medium">
-              What should we build in {matchProjectName(gs, threadCwdOf(conv)) || basename(threadCwdOf(conv)) || "this folder"}?
-            </div>
+            {readOnly ? (
+              <>
+                <IconClaude size={48} className="text-[#d97757] opacity-70" />
+                <div className="mt-5 text-center text-[20px] leading-8 font-medium">No displayable messages</div>
+                <div className="mt-1 text-center text-[13px] text-(--fg-tertiary)">
+                  This Claude Code transcript is available as read-only history.
+                </div>
+              </>
+            ) : (
+              <>
+                <CodexMark size={56} className="text-(--fg) opacity-[0.24]" />
+                <div className="mt-5 text-center text-[28px] leading-9 font-medium">
+                  What should we build in {matchProjectName(gs, threadCwdOf(conv)) || basename(threadCwdOf(conv)) || "this folder"}?
+                </div>
+              </>
+            )}
           </div>
         </div>
       ) : (
         <MessageList key={activeThreadId} conv={conv} />
       )}
-      {!hasTurns && <BottomArea conv={conv} />}
+      {!hasTurns && !readOnly && <BottomArea conv={conv} />}
     </div>
   );
 }
@@ -93,11 +97,27 @@ function ThreadHeaderContent() {
             className="app-no-drag flex h-7 w-7 shrink-0 items-center justify-center"
             aria-label={`Project: ${basename(thread?.cwd || conv?.thread?.cwd || "")}`}
           >
-            <IconFolderFilled size={16} className="text-(--fg-secondary)" />
+            {thread?.source === "claude"
+              ? <IconClaude size={16} className="text-[#d97757]" />
+              : thread?.source === "kimi"
+                ? <IconKimi size={16} className="text-[#7777e8]" />
+                : <IconFolderFilled size={16} className="text-(--fg-secondary)" />}
           </button>
           <div className="max-w-[320px] truncate text-[14px] font-medium">{thread?.name || "New chat"}</div>
+          {(thread?.source === "claude" || thread?.source === "kimi") && (
+            <span className={cx(
+              "shrink-0 rounded-full px-1.5 py-0.5 text-[10px]",
+              thread.source === "claude"
+                ? "bg-[#d97757]/10 text-[#b85f43] dark:text-[#e39a80]"
+                : "bg-[#7777e8]/10 text-[#6262ce] dark:text-[#aaaaf4]",
+            )}>
+              {thread.source === "claude" ? "Claude Code" : "Kimi Code"}
+            </span>
+          )}
         </div>
-        <ThreadMenu thread={thread} />
+        {(thread?.source === "claude" || thread?.source === "kimi")
+          ? <RuntimeThreadMenu thread={thread} />
+          : <ThreadMenu thread={thread} />}
       </div>
     </div>
   );
@@ -108,21 +128,26 @@ function ThreadHeaderContent() {
 // the side panel's tab strip.
 export function HeaderContextButtons() {
   const activeThreadId = useStore((s) => s.activeThreadId);
+  const conv = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId] : null));
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
   // New chat has no conversation context: only the panel toggles show then
   // (reference new-chat page).
   if (!activeThreadId) return null;
+  const readOnly = !!conv?.readOnly;
+  const hasCwd = !!conv?.thread?.cwd;
   return (
     <div className="flex shrink-0 translate-x-0.5 items-center gap-1.5">
-      <OpenInEditorButton />
-      <IconButton
-        icon={<IconHeaderOutputs />}
-        size={16}
-        title="Toggle pinned summary"
-        active={!!ui.outputsOpen}
-        onClick={() => setUi({ outputsOpen: !ui.outputsOpen })}
-      />
+      {(!readOnly || hasCwd) && <OpenInEditorButton />}
+      {!readOnly && (
+        <IconButton
+          icon={<IconHeaderOutputs />}
+          size={16}
+          title="Toggle pinned summary"
+          active={!!ui.outputsOpen}
+          onClick={() => setUi({ outputsOpen: !ui.outputsOpen })}
+        />
+      )}
     </div>
   );
 }
@@ -156,6 +181,7 @@ export function HeaderPanelButtons() {
 function OpenInEditorButton() {
   const cwd = useStore((s) => {
     const conv = s.activeThreadId ? s.conversations[s.activeThreadId] : null;
+    if (conv?.readOnly) return conv?.thread?.cwd || "";
     return conv?.thread?.cwd || s.cwd || "";
   });
   const [menuOpen, setMenuOpen] = useState(false);
@@ -199,9 +225,95 @@ function OpenInEditorButton() {
 // ---------------------------------------------------------------------------
 // "…" menu: rename / archive / copy working directory / copy session id.
 // ---------------------------------------------------------------------------
+function RuntimeThreadMenu({ thread }) {
+  const toast = useStore((s) => s.toast);
+  const pinned = useStore((s) => s.pinnedThreadIds.includes(thread?.id));
+  const agentName = thread?.source === "kimi" ? "Kimi" : "Claude";
+  const btnRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const copy = (text, label) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast(`${label} copied to clipboard`);
+  };
+  const copyMarkdown = () => {
+    const conv = useStore.getState().activeConversation?.();
+    const lines = [];
+    for (const turn of conv?.turns || []) {
+      for (const item of turn.items || []) {
+        if (item.type === "userMessage") {
+          const text = (item.content || [])
+            .filter((content) => content.type === "text")
+            .map((content) => content.text)
+            .join("\n");
+          if (text) lines.push("## User\n", text);
+        } else if (item.type === "agentMessage" && item.text) {
+          lines.push(`## ${agentName}\n`, item.text);
+        }
+      }
+    }
+    if (lines.length) copy(lines.join("\n"), "Markdown");
+    else toast("Nothing to copy", "info");
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        aria-label={`${agentName} session actions`}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        className="app-no-drag flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
+        onClick={() => setMenuOpen((open) => !open)}
+      >
+        <IconDots21 size={18} />
+      </button>
+      <Menu
+        open={menuOpen}
+        anchor={() => btnRef.current?.getBoundingClientRect()}
+        align="end"
+        onClose={() => setMenuOpen(false)}
+        items={[
+          {
+            id: "pin",
+            label: pinned ? "Unpin chat" : "Pin chat",
+            onSelect: () => useStore.getState().togglePinnedThread(thread?.id),
+          },
+          { sep: true },
+          {
+            id: "show-transcript",
+            label: "Show transcript in File Explorer",
+            disabled: !thread?.path,
+            onSelect: () => thread?.path && api.showItemInFolder(thread.path),
+          },
+          { sep: true },
+          {
+            id: "copy-cwd",
+            label: "Copy working directory",
+            disabled: !thread?.cwd,
+            onSelect: () => copy(thread.cwd, "Working directory"),
+          },
+          {
+            id: "copy-id",
+            label: "Copy session ID",
+            disabled: !thread?.sessionId,
+            onSelect: () => copy(thread.sessionId, "Session ID"),
+          },
+          {
+            id: "copy-md",
+            label: "Copy as Markdown",
+            onSelect: copyMarkdown,
+          },
+        ]}
+      />
+    </>
+  );
+}
+
 function ThreadMenu({ thread }) {
   const activeThreadId = useStore((s) => s.activeThreadId);
-  const pinned = useStore((s) => (s.gs?.["pinned-thread-ids"] || []).includes(s.activeThreadId));
+  const pinned = useStore((s) => s.pinnedThreadIds.includes(s.activeThreadId));
   const renameThread = useStore((s) => s.renameThread);
   const archiveThread = useStore((s) => s.archiveThread);
   const toast = useStore((s) => s.toast);
@@ -234,7 +346,7 @@ function ThreadMenu({ thread }) {
         if (it.type === "userMessage") {
           lines.push("## User\n", (it.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n"));
         } else if (it.type === "agentMessage") {
-          lines.push("## Codex\n", it.text || "");
+          lines.push("## Noma\n", it.text || "");
         }
       }
     }
@@ -561,6 +673,7 @@ function itemText(item) {
 function MessageList({ conv }) {
   const ref = useRef(null);
   const contentRef = useRef(null);
+  const outputsOpen = useStore((s) => s.ui.outputsOpen);
   const [stickBottom, setStickBottom] = useState(true);
   const [externalActivity, setExternalActivity] = useState(null);
   const turns = conv?.turns || [];
@@ -581,7 +694,7 @@ function MessageList({ conv }) {
 
   useEffect(() => {
     const file = conv?.thread?.path;
-    if (!file) {
+    if (conv?.readOnly || !file) {
       setExternalActivity(null);
       return;
     }
@@ -595,7 +708,7 @@ function MessageList({ conv }) {
       live = false;
       clearInterval(timer);
     };
-  }, [conv?.thread?.path]);
+  }, [conv?.readOnly, conv?.thread?.path]);
 
   useEffect(() => {
     if (stickBottom && ref.current) {
@@ -635,13 +748,13 @@ function MessageList({ conv }) {
             {activeTurnId && !hasActiveWork && <WorkingRow conv={conv} />}
             {showExternalActivity && <WorklogActionRow item={externalActivity} live />}
           </div>
-          <BottomArea conv={conv} />
+          {!conv?.readOnly && <BottomArea conv={conv} />}
         </div>
       </div>
       {useStore((s) => s.ui.findOpen) && <FindBar conv={conv} />}
       <MessageRail turns={turns} scrollRef={ref} />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-(--surface) to-transparent" />
-      {useStore((s) => s.ui.outputsOpen) && <OutputsPanel />}
+      {!conv?.readOnly && outputsOpen && <OutputsPanel />}
       {!stickBottom && (
         <button
           title="Scroll to bottom"
@@ -1243,7 +1356,7 @@ function GoalDialog({ open, goal }) {
   };
   return (
     <Dialog open={open} title="Set a goal" onClose={close}>
-      <div className="mb-2 text-xs text-(--fg-tertiary)">Codex keeps pursuing the goal across turns until it's done or you clear it.</div>
+      <div className="mb-2 text-xs text-(--fg-tertiary)">Noma keeps pursuing the goal across turns until it's done or you clear it.</div>
       <textarea
         autoFocus
         rows={3}

@@ -30,7 +30,7 @@ export default function ConfigurationSection() {
   const permission = useStore((s) => normalizePermission(s.permission));
   const setPermission = useStore((s) => s.setPermission);
   const cwd = useStore((s) => s.cwd);
-  const models = useStore((s) => s.models);
+  const models = useStore((s) => s.modelsByRuntime.codex);
   const toast = useStore((s) => s.toast);
 
   const [ultra, setUltra] = useState(() => lsGet("settings.ultraSlider", false));
@@ -188,8 +188,8 @@ export default function ConfigurationSection() {
       </Card>
 
       <Card title="Workspace Dependencies">
-        <Row title="Codex dependencies" desc="Allow ChatGPT to install and expose bundled Node.js and Python tools" />
-        <Row title="Diagnose issues in Codex Workspace" desc="Checks the current bundle and records diagnostic logs">
+        <Row title="Noma dependencies" desc="Allow ChatGPT to install and expose bundled Node.js and Python tools" />
+        <Row title="Diagnose issues in Noma Workspace" desc="Checks the current bundle and records diagnostic logs">
           <Btn disabled={busy === "diagnose"} onClick={() => runVersionCheck("diagnose")}>
             {busy === "diagnose" ? "Diagnosing…" : "Diagnose"}
           </Btn>

@@ -2,7 +2,7 @@
 // Overlay replaces the whole app while open (not a modal); Esc or
 // "Back to app" closes it.
 import React, { useEffect, useMemo, useState } from "react";
-import { useStore, normalizePermission } from "../store.js";
+import { useStore, normalizePermission, runtimeConnected, planLabel } from "../store.js";
 import * as api from "../api.js";
 import { cx } from "../lib/cx.js";
 import { basename, isPathInside } from "../lib/time.js";
@@ -23,7 +23,9 @@ import {
   IconTrash,
   LucideIcon,
 } from "./icons.jsx";
-import { Card, Row, Toggle, Dropdown, Segmented, lsGet, lsSet } from "./settings/shared.jsx";
+import { RUNTIMES, runtimeMeta } from "../lib/runtimes.jsx";
+import { SortableList } from "./SortableList.jsx";
+import { Card, Row, Toggle, Dropdown, Segmented, Btn, lsGet, lsSet } from "./settings/shared.jsx";
 import ProfileSection from "./settings/ProfileSection.jsx";
 import AppearanceSection from "./settings/AppearanceSection.jsx";
 import VoiceSection from "./settings/VoiceSection.jsx";
@@ -355,10 +357,28 @@ function GeneralSection() {
           />
         </Row>
       </Card>
+      <RuntimeOrderCard />
       <Card title="Updates">
         <UpdateRow />
       </Card>
     </>
+  );
+}
+
+// Drag-to-reorder card for sidebar vendor sections; the row data and visuals
+// come from the runtime registry, the drag behavior from SortableList.
+function RuntimeOrderCard() {
+  const runtimeOrder = useStore((s) => s.runtimeOrder);
+  const setRuntimeOrder = useStore((s) => s.setRuntimeOrder);
+  const items = runtimeOrder.map((id) => {
+    const meta = runtimeMeta(id);
+    return { id, label: meta?.label || id, icon: meta?.icon(14) };
+  });
+  return (
+    <Card title="Sidebar">
+      <Row title="Vendor order" desc="Drag to reorder the vendor sections in the sidebar" />
+      <SortableList items={items} onChange={setRuntimeOrder} />
+    </Card>
   );
 }
 
@@ -574,7 +594,7 @@ function UsageSection() {
         <Row
           title={
             <span>
-              Buy credits or turn on auto-reload to continue using Codex if you hit a limit.{" "}
+              Buy credits or turn on auto-reload to continue using Noma if you hit a limit.{" "}
               <button className="underline" onClick={() => api.openExternal("https://help.openai.com/en/articles/20000106")}>Learn more</button>
             </span>
           }
@@ -658,21 +678,33 @@ function AccountSection() {
   const codexHome = useStore((s) => s.codexHome);
   const binary = useStore((s) => s.binary);
   const appInfo = useStore((s) => s.appInfo);
+
+  // Keep vendor sign-in status fresh while this page is open — external
+  // logins complete in a separate console window.
+  useEffect(() => {
+    useStore.getState().refreshExternalAuth();
+    const t = setInterval(() => useStore.getState().refreshExternalAuth(), 5000);
+    return () => clearInterval(t);
+  }, []);
+
   return (
     <>
+      <Card title="Connected accounts">
+        {RUNTIMES.map((meta) => <VendorAccountRow key={meta.id} meta={meta} />)}
+      </Card>
       <Card title="Account">
         <Row title="Email">
           <span className="text-[13px] text-(--fg-secondary)">{account?.email || "Not signed in"}</span>
         </Row>
         <Row title="Plan">
-          <span className="text-[13px] capitalize text-(--fg-secondary)">{account?.planType || "—"}</span>
+          <span className="text-[13px] text-(--fg-secondary)">{planLabel(account?.planType) || "—"}</span>
         </Row>
       </Card>
       <Card title="Backend">
         <InfoRow label="CLI path" value={binary} />
         <InfoRow label="Codex home" value={codexHome} />
-        <InfoRow label="Client" value={`codex-desktop-rebuilt v${appInfo?.version ?? "?"}`} />
-        <Row title="Restart backend" desc="Restart the Codex backend process.">
+        <InfoRow label="Client" value={`Noma v${appInfo?.version ?? "?"}`} />
+        <Row title="Restart backend" desc="Restart the Noma backend process.">
           <button
             className="rounded-lg border border-(--border) px-3 py-1.5 text-[13px] hover:bg-(--surface-hover)"
             onClick={() => api.restartAppServer()}
@@ -682,6 +714,31 @@ function AccountSection() {
         </Row>
       </Card>
     </>
+  );
+}
+
+// One provider row: icon, name, connection status, Connect/Switch button.
+function VendorAccountRow({ meta }) {
+  const account = useStore((s) => s.account);
+  const connected = useStore((s) => runtimeConnected(s, meta.id));
+  const startChatgptLogin = useStore((s) => s.startChatgptLogin);
+  const startExternalLogin = useStore((s) => s.startExternalLogin);
+  const codex = meta.id === "codex";
+  const status = codex
+    ? account?.email || (connected ? "Connected" : "Not connected")
+    : connected ? "Connected" : "Not connected";
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center">{meta.icon(18)}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px]">{meta.label}</div>
+        <div className="mt-0.5 truncate text-[12px] text-(--fg-tertiary)">{status}</div>
+      </div>
+      {connected && <LucideIcon name="Check" size={14} className="shrink-0 text-(--success)" />}
+      <Btn onClick={() => (codex ? startChatgptLogin() : startExternalLogin(meta.id))}>
+        {connected ? "Switch" : "Connect"}
+      </Btn>
+    </div>
   );
 }
 

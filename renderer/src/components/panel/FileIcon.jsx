@@ -1,12 +1,12 @@
 // File-type icons for the workspace tree, mirroring the reference app's
 // system: filename/extension -> icon token -> bundled SVG, tinted with the
 // reference palette (currentColor). Drop-in replaceable: overwrite any SVG
-// in ./file-icons/ and the loader picks it up automatically.
+// in ../../assets/file-icons/ and the loader picks it up automatically.
 import React from "react";
 import { EXACT, EXT, TOKEN_COLOR, PALETTE_DARK, PALETTE_LIGHT } from "./fileIconMap.js";
 
-// Bundled icon set (Vite raw-imports every svg in ./file-icons).
-const RAW = import.meta.glob("./file-icons/*.svg", { query: "?raw", import: "default", eager: true });
+// Bundled icon set (Vite raw-imports every svg in the shared assets dir).
+const RAW = import.meta.glob("../../assets/file-icons/*.svg", { query: "?raw", import: "default", eager: true });
 const ICONS = {};
 for (const [path, svg] of Object.entries(RAW)) {
   const name = path.slice(path.lastIndexOf("/") + 1, -4);

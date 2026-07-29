@@ -1,22 +1,23 @@
-// Left sidebar: Codex header + search toggle, nav rows, Pinned / Projects
-// thread tree, account footer (archived / help / settings).
+// Left sidebar: Noma header + search toggle, nav rows, Noma-owned pins,
+// runtime / project / thread tree, account footer (archived / help / settings).
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useStore } from "../store.js";
+import { useStore, runtimeConnected, planLabel } from "../store.js";
 import { cx } from "../lib/cx.js";
 import { isPathInside } from "../lib/time.js";
-import { openExternal, toggleQuickChat, showItemInFolder, rpc, logout } from "../api.js";
+import { externalProjectId, normalizeProjectPath } from "../lib/runtimeProject.js";
+import { openExternal, toggleQuickChat, showItemInFolder, rpc, logout, agentRuntimeUsage } from "../api.js";
 import { Menu, Dialog, Spinner, IconButton } from "./ui.jsx";
+import { EXTERNAL_RUNTIMES, RUNTIMES, runtimeMeta } from "../lib/runtimes.jsx";
 import {
   IconPlus, IconSearch, IconMore, IconGear, IconArchive, IconPencil,
   IconTrash, IconUndo, IconChevronDown, IconChevronRight, IconFolder, IconFolderFilled, IconClock,
-  IconUsage, IconPet, IconInvite, IconLogout, IconBranch, IconX,
-  IconHelpCircle, IconNavNewChat, IconNavPullRequests, IconNavSites, IconNavScheduled, IconNavPlugins,
-  IconCircleAlert, IconPin, IconPinFilled, IconFolderBadge, IconFolderRemote, IconQuickChat, IconHeaderChevronDown,
+  IconUsage, IconInvite, IconLogout, IconBranch, IconX, IconGlobe,
+  IconHelpCircle, IconNavNewChat, IconNavPullRequests, IconNavScheduled, IconNavPlugins,
+  IconCircleAlert, IconPin, IconPinFilled, IconQuickChat, IconRefresh,
 } from "./icons.jsx";
 
 const NAV_ITEMS = [
   { id: "pull-requests", label: "Pull requests", icon: <IconNavPullRequests size={16} /> },
-  { id: "sites", label: "Sites", icon: <IconNavSites size={16} /> },
   { id: "scheduled", label: "Scheduled", icon: <IconNavScheduled size={16} /> },
   { id: "plugins", label: "Plugins", icon: <IconNavPlugins size={16} /> },
 ];
@@ -27,24 +28,77 @@ const HELP_URL = "https://developers.openai.com/codex/";
 export default function Sidebar() {
   const threads = useStore((s) => s.threads);
   const threadsLoading = useStore((s) => s.threadsLoading);
+  // External history sources (registry-driven; hook order stable because the
+  // registry is a fixed module-level array).
+  const external = EXTERNAL_RUNTIMES.map((r) => ({
+    meta: r,
+    threads: useStore((s) => s[r.stateKeys.threads]),
+    loading: useStore((s) => s[r.stateKeys.loading]),
+    error: useStore((s) => s[r.stateKeys.error]),
+    configDir: useStore((s) => s[r.stateKeys.configDir]),
+  }));
   const archivedView = useStore((s) => s.archivedView);
   const searchTerm = useStore((s) => s.searchTerm);
   const navView = useStore((s) => s.ui.navView);
   const gs = useStore((s) => s.gs);
+  const pinnedThreadIds = useStore((s) => s.pinnedThreadIds);
+  const pinnedProjectIds = useStore((s) => s.pinnedProjectIds);
+  const runtimeOrder = useStore((s) => s.runtimeOrder);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [renaming, setRenaming] = useState(null); // {id, name}
   const [expand, setExpand] = useState({}); // section key -> bool override
 
-  const model = useMemo(() => buildSidebarModel(threads, gs, !archivedView), [threads, gs, archivedView]);
+  const model = useMemo(
+    () => buildSidebarModel(threads, gs, pinnedProjectIds, pinnedThreadIds, !archivedView),
+    [threads, gs, pinnedProjectIds, pinnedThreadIds, archivedView],
+  );
+  // Per-source filtered threads + project grouping (registry-driven).
+  const externalSections = useMemo(
+    () => external.map((r) => ({
+      ...r,
+      projects: buildExternalProjects(
+        filterThreadsByQuery(r.threads, searchTerm).filter((thread) => !pinnedThreadIds.includes(thread.id)),
+        gs,
+        r.meta.id,
+      ).filter((project) => !pinnedProjectIds.includes(project.id)),
+    })),
+    // deps: one thread-list slot per external source + the other inputs
+    [...external.map((r) => r.threads), searchTerm, gs, pinnedThreadIds, pinnedProjectIds],
+  );
+  const pinnedExternalProjects = useMemo(
+    () => external.flatMap((r) =>
+      buildExternalProjects(
+        r.threads.filter((thread) => !pinnedThreadIds.includes(thread.id)),
+        gs,
+        r.meta.id,
+      )
+    ).filter((project) => pinnedProjectIds.includes(project.id)),
+    [...external.map((r) => r.threads), gs, pinnedThreadIds, pinnedProjectIds],
+  );
+  const codexProjects = useMemo(() => {
+    const projects = [...model.projects];
+    if (model.chats.length) {
+      projects.push({
+        id: "codex:other-chats",
+        kind: "virtual",
+        runtime: "codex",
+        name: "Other chats",
+        path: "",
+        rootPaths: [],
+        threads: model.chats,
+      });
+    }
+    return projects;
+  }, [model.projects, model.chats]);
   const pinnedThreads = useMemo(() => {
     if (archivedView) return [];
-    const ids = gs?.["pinned-thread-ids"] || [];
-    if (!ids.length) return [];
-    const byId = new Map(threads.map((t) => [t.id, t]));
-    return ids.map((id) => byId.get(id)).filter(Boolean);
-  }, [threads, gs, archivedView]);
-  const showPinned = !archivedView && (model.pinned.length > 0 || pinnedThreads.length > 0);
+    const allThreads = [...threads, ...external.flatMap((r) => r.threads)];
+    const byId = new Map(allThreads.map((thread) => [thread.id, thread]));
+    return pinnedThreadIds.map((id) => byId.get(id)).filter(Boolean);
+  }, [threads, ...external.map((r) => r.threads), pinnedThreadIds, archivedView]);
+  const showPinned = !archivedView
+    && (model.pinned.length > 0 || pinnedExternalProjects.length > 0 || pinnedThreads.length > 0);
 
   const isOpen = (key, dflt = true) => expand[key] ?? dflt;
   const toggleOpen = (key, cur) => setExpand((e) => ({ ...e, [key]: !cur }));
@@ -63,7 +117,11 @@ export default function Sidebar() {
   };
 
   const onRename = (t) => setRenaming({ id: t.id, name: t.name || t.preview || "" });
-  const empty = model.projects.length === 0 && model.chats.length === 0 && model.pinned.length === 0 && pinnedThreads.length === 0;
+  const empty = model.projects.length === 0
+    && model.chats.length === 0
+    && model.pinned.length === 0
+    && pinnedThreads.length === 0
+    && (archivedView || (filteredClaudeThreads.length === 0 && filteredKimiThreads.length === 0));
 
   return (
     <div className="app-sidebar flex h-full w-full flex-col">
@@ -89,7 +147,7 @@ export default function Sidebar() {
             <input
               autoFocus
               className="w-full bg-transparent text-[13px] outline-none placeholder:text-(--fg-faint)"
-              placeholder="Search chats"
+              placeholder="Search chats and history"
               value={searchTerm}
               onChange={(e) => useStore.getState().setSearchTerm(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Escape") closeSearch(); }}
@@ -136,7 +194,7 @@ export default function Sidebar() {
         {showPinned && (
           <>
             <SectionLabel>Pinned</SectionLabel>
-            {pinnedThreads.map((t) => (
+            {pinnedThreads.map((t) => runtimeOfThread(t) === "codex" ? (
               <ThreadRow
                 key={`pt:${t.id}`}
                 thread={t}
@@ -144,38 +202,88 @@ export default function Sidebar() {
                 archived={false}
                 onRename={() => onRename(t)}
               />
+            ) : (
+              <ExternalThreadRow key={`pt:${t.id}`} thread={t} runtime={runtimeOfThread(t)} />
             ))}
             {model.pinned.map((p) => (
               <ProjectSection
                 key={`pin:${p.id}`}
                 project={p}
+                runtime="codex"
                 open={isOpen(`pin:${p.id}`)}
                 onToggle={() => toggleOpen(`pin:${p.id}`, isOpen(`pin:${p.id}`))}
                 archived={false}
                 onRename={onRename}
               />
             ))}
+            {pinnedExternalProjects.map((project) => (
+              <ProjectSection
+                key={`pin:${project.id}`}
+                project={project}
+                runtime={project.runtime}
+                open={isOpen(`pin:${project.id}`)}
+                onToggle={() => toggleOpen(`pin:${project.id}`, isOpen(`pin:${project.id}`))}
+                archived={false}
+                onRename={() => {}}
+              />
+            ))}
           </>
         )}
 
-        {model.projects.length > 0 && <SectionLabel>Projects</SectionLabel>}
-        {model.projects.map((p) => (
-          <ProjectSection
-            key={`proj:${p.id}`}
-            project={p}
-            open={isOpen(`proj:${p.id}`)}
-            onToggle={() => toggleOpen(`proj:${p.id}`, isOpen(`proj:${p.id}`))}
-            archived={archivedView}
-            onRename={onRename}
-          />
-        ))}
-
-        {!archivedView && model.chats.length > 0 && (
-          <>
-            <SectionLabel>Chats</SectionLabel>
-            <ChatList threads={model.chats} archived={false} onRename={onRename} />
-          </>
-        )}
+        {runtimeOrder.map((runtime) => {
+          if (runtime === "codex") {
+            return (
+              <React.Fragment key="codex">
+                <RuntimeHeader
+                  runtime="codex"
+                  label="Codex"
+                  loading={threadsLoading}
+                  open={isOpen("runtime:codex")}
+                  onToggle={() => toggleOpen("runtime:codex", isOpen("runtime:codex"))}
+                  onRefresh={() => useStore.getState().loadThreads()}
+                />
+                {isOpen("runtime:codex") && (
+                  <>
+                    {codexProjects.map((p) => (
+                      <ProjectSection
+                        key={`proj:${p.id}`}
+                        project={p}
+                        runtime="codex"
+                        nested
+                        open={isOpen(`proj:${p.id}`)}
+                        onToggle={() => toggleOpen(`proj:${p.id}`, isOpen(`proj:${p.id}`))}
+                        archived={archivedView}
+                        onRename={onRename}
+                      />
+                    ))}
+                    {!archivedView && codexProjects.length === 0 && !threadsLoading && (
+                      <RuntimeEmpty searching={!!searchTerm.trim()} label="Codex" />
+                    )}
+                  </>
+                )}
+              </React.Fragment>
+            );
+          }
+          if (archivedView) return null;
+          const section = externalSections.find((s) => s.meta.id === runtime);
+          if (!section) return null;
+          return (
+            <RuntimeProjectSection
+              key={runtime}
+              runtime={runtime}
+              label={section.meta.label}
+              projects={section.projects}
+              loading={section.loading}
+              error={section.error}
+              configDir={section.configDir}
+              searching={!!searchTerm.trim()}
+              open={isOpen(`runtime:${runtime}`)}
+              onToggle={() => toggleOpen(`runtime:${runtime}`, isOpen(`runtime:${runtime}`))}
+              isOpen={isOpen}
+              toggleOpen={toggleOpen}
+            />
+          );
+        })}
 
         {empty && !threadsLoading && (
           <div className="px-3 pt-8 text-center text-[13px] text-(--fg-tertiary)">
@@ -223,12 +331,12 @@ function SectionLabel({ children }) {
 // ---------------------------------------------------------------------------
 const THREAD_CAP = 5;
 
-function ProjectSection({ project, open, onToggle, archived, onRename }) {
+function ProjectSection({ project, runtime = "codex", nested = false, open, onToggle, archived, onRename }) {
   const activeThreadId = useStore((s) => s.activeThreadId);
   const draftAt = useStore((s) => s.draftAt);
   const navView = useStore((s) => s.ui.navView);
   const storeCwd = useStore((s) => s.cwd);
-  const pinned = useStore((s) => (s.gs?.["pinned-project-ids"] || []).includes(project.id));
+  const pinned = useStore((s) => s.pinnedProjectIds.includes(project.id));
   const gs = useStore((s) => s.gs);
   const allLocalProjects = useMemo(
     () => Object.entries(gs?.["local-projects"] || {}).map(([id, p]) => ({ id, rootPaths: p.rootPaths || [] })),
@@ -271,29 +379,29 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
   const hidden = rows.length - visible.length;
 
   const newChatHere = (e) => {
-    e.stopPropagation();
+    e?.stopPropagation();
     const s = useStore.getState();
-    if (project.kind === "local") s.setCwd(project.path);
-    s.setUi({ navView: "chats" });
     s.newChat();
+    if (project.path) s.setCwd(project.path);
+    s.setRuntime(runtime);
+    s.setUi({ navView: "chats" });
   };
 
   return (
     <div>
       <div
         ref={rowRef}
-        className="group/proj relative mx-2 flex h-[30px] cursor-pointer select-none items-center gap-2 rounded-[12.5px] px-2 hover:bg-(--surface-hover)"
+        className={cx(
+          "group/proj relative mx-2 flex h-[30px] cursor-pointer select-none items-center gap-2 rounded-[12.5px] pr-2 hover:bg-(--surface-hover)",
+          nested ? "pl-6" : "pl-2",
+        )}
         onClick={onToggle}
         onMouseEnter={() => { clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHoverCard(true), 550); }}
         onMouseLeave={() => { clearTimeout(hoverTimer.current); setHoverCard(false); }}
       >
         <span className="flex h-4 w-4 shrink-0 items-center justify-center text-(--fg-secondary)">
           <span className="group-hover/proj:hidden">
-            {project.kind === "remote"
-              ? <IconFolderRemote size={16} />
-              : project.branch
-                ? <IconFolderBadge size={16} />
-                : <IconFolderFilled size={16} />}
+            <IconFolderFilled size={16} />
           </span>
           <span className="hidden group-hover/proj:block">
             <IconChevronRight
@@ -311,7 +419,7 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
         {attention && (
           <IconCircleAlert size={14} className="shrink-0 text-(--danger)" />
         )}
-        {project.kind === "local" && (
+        {project.kind !== "remote" && project.kind !== "virtual" && !!project.path && (
           <button
             className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover/proj:flex"
             title={`Start new chat in ${project.name}`}
@@ -334,8 +442,8 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
           onClose={() => setMenuOpen(false)}
           align="end"
           items={[
-            ...(project.kind === "local"
-              ? [{ id: "new", label: `New chat in ${project.name}`, icon: <IconPlus size={14} />, onSelect: () => { const s = useStore.getState(); s.setCwd(project.path); s.setUi({ navView: "chats" }); s.newChat(); } }]
+            ...(project.kind !== "remote" && project.kind !== "virtual" && project.path
+              ? [{ id: "new", label: `New chat in ${project.name}`, icon: <IconPlus size={14} />, onSelect: () => newChatHere() }]
               : []),
             {
               id: "pin",
@@ -343,7 +451,7 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
               icon: <IconPin size={14} />,
               onSelect: () => useStore.getState().togglePinnedProjectId(project.id),
             },
-            ...(project.kind === "local"
+            ...(project.path && project.kind !== "remote"
               ? [{ id: "explorer", label: "Show in File Explorer", icon: <IconFolder size={14} />, onSelect: () => showItemInFolder(project.path) }]
               : []),
           ]}
@@ -377,13 +485,17 @@ function ProjectSection({ project, open, onToggle, archived, onRename }) {
                 row.type === "draft" ? (
                   <DraftRow key="draft" />
                 ) : (
-                  <ThreadRow
-                    key={row.t.id}
-                    thread={row.t}
-                    active={row.t.id === activeThreadId}
-                    archived={archived}
-                    onRename={() => onRename(row.t)}
-                  />
+                  runtime === "codex" ? (
+                    <ThreadRow
+                      key={row.t.id}
+                      thread={row.t}
+                      active={row.t.id === activeThreadId}
+                      archived={archived}
+                      onRename={() => onRename(row.t)}
+                    />
+                  ) : (
+                    <ExternalThreadRow key={row.t.id} thread={row.t} runtime={runtime} />
+                  )
                 )
               )}
               {hidden > 0 && (
@@ -440,62 +552,210 @@ function ChatList({ threads, archived, onRename }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Product switcher (ChatGPT / Codex), like the reference wordmark menu.
-function WordmarkMenu() {
-  const mode = useStore((s) => s.mode);
-  const setMode = useStore((s) => s.setMode);
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const label = mode === "chatgpt" ? "ChatGPT" : "Codex";
+function RuntimeHeader({ runtime, label, loading, configDir, open, onToggle, onRefresh }) {
+  return (
+    <div className={cx("px-2", open ? "pt-4 pb-1" : "pt-1 pb-1")}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        className="group/runtime flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] px-2 text-[14px] font-medium text-(--fg-tertiary) hover:bg-(--surface-hover)"
+        onClick={onToggle}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onToggle?.();
+          }
+        }}
+      >
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+          {runtimeMeta(runtime)?.icon(14, "shrink-0")}
+        </span>
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {onRefresh && (
+          <button
+            className={cx(
+              "flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-(--fg-tertiary) transition-opacity hover:bg-(--surface-active) hover:text-(--fg)",
+              loading ? "cursor-default" : "opacity-0 group-hover/runtime:opacity-100 focus-visible:opacity-100",
+            )}
+            title={configDir ? `Refresh history from ${configDir}` : `Refresh ${label}`}
+            disabled={loading}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRefresh();
+            }}
+          >
+            {loading ? <Spinner size={11} /> : <IconRefresh size={12} />}
+          </button>
+        )}
+        <IconChevronRight
+          size={14}
+          className={cx("shrink-0 transition-transform duration-100", open && "rotate-90")}
+        />
+      </div>
+    </div>
+  );
+}
+
+function RuntimeEmpty({ searching, label }) {
+  return (
+    <div className="px-4 py-2 text-[12px] text-(--fg-faint)">
+      {searching ? `No matching ${label} sessions` : `No local ${label} sessions`}
+    </div>
+  );
+}
+
+function RuntimeProjectSection({
+  runtime,
+  label,
+  projects,
+  loading,
+  error,
+  configDir,
+  searching,
+  open,
+  onToggle,
+  isOpen,
+  toggleOpen,
+}) {
+  const refresh = () => {
+    const loader = runtimeMeta(runtime)?.loaderName;
+    if (loader) useStore.getState()[loader]();
+  };
   return (
     <>
-      <button
-        ref={btnRef}
-        className="-ml-2 flex h-8 items-center gap-1 rounded-xl border border-transparent px-2 py-0.5 text-[17px] leading-6 hover:bg-(--surface-hover)"
-        title="Switch product"
-        onClick={() => setOpen(true)}
-      >
-        <span className="truncate font-openai-sans font-semibold">{label}</span>
-        <IconHeaderChevronDown size={14} className="shrink-0 text-(--fg-tertiary)" />
-      </button>
-      <Menu
+      <RuntimeHeader
+        runtime={runtime}
+        label={label}
+        loading={loading}
+        configDir={configDir}
         open={open}
-        anchor={() => btnRef.current?.getBoundingClientRect()}
-        onClose={() => setOpen(false)}
-        width={230}
-        items={[
-          {
-            id: "chatgpt",
-            label: (
-              <span>
-                <span className="block text-[13px] font-medium">ChatGPT</span>
-                <span className="block text-xs text-(--fg-tertiary)">Create, learn, and explore</span>
-              </span>
-            ),
-            checked: mode === "chatgpt",
-            keepOpen: false,
-            onSelect: () => setMode("chatgpt"),
-          },
-          {
-            id: "codex",
-            label: (
-              <span>
-                <span className="block text-[13px] font-medium">Codex</span>
-                <span className="block text-xs text-(--fg-tertiary)">Build, debug, and ship</span>
-              </span>
-            ),
-            checked: mode !== "chatgpt",
-            onSelect: () => setMode("codex"),
-          },
-        ]}
+        onToggle={onToggle}
+        onRefresh={refresh}
       />
+      {open && projects.map((project) => {
+        const key = `${runtime}:${project.id}`;
+        const projectOpen = isOpen(key);
+        return (
+          <ProjectSection
+            key={key}
+            project={project}
+            runtime={runtime}
+            nested
+            open={projectOpen}
+            onToggle={() => toggleOpen(key, projectOpen)}
+            archived={false}
+            onRename={() => {}}
+          />
+        );
+      })}
+      {open && !loading && !error && projects.length === 0 && (
+        <RuntimeEmpty searching={searching} label={label} />
+      )}
+      {open && error && (
+        <button
+          className="mx-2 rounded-lg px-2 py-1.5 text-left text-[12px] text-(--danger) hover:bg-(--surface-hover)"
+          title={error}
+          onClick={refresh}
+        >
+          Could not read {label} history · Retry
+        </button>
+      )}
     </>
   );
 }
 
+function ExternalThreadRow({ thread, runtime }) {
+  const active = useStore((s) => s.activeThreadId === thread.id);
+  const pinned = useStore((s) => s.pinnedThreadIds.includes(thread.id));
+  const [menuOpen, setMenuOpen] = useState(false);
+  const rowRef = useRef(null);
+  const claude = runtime === "claude";
+  const label = claude ? "Claude" : "Kimi";
+  const title = thread.name || firstLine(thread.preview) || `${label} Code session`;
+  const age = shortAge(thread.updatedAt || thread.createdAt);
+  const copy = (value, label) => {
+    if (!value) return;
+    navigator.clipboard.writeText(value);
+    useStore.getState().toast(`${label} copied to clipboard`);
+  };
+  return (
+    <div
+      ref={rowRef}
+      className={cx(
+        "group/external relative mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] pl-8 pr-2",
+        active ? "bg-(--sidebar-row-active) text-(--fg)" : "hover:bg-(--surface-hover)"
+      )}
+      title={`${title}${thread.cwd ? `\n${thread.cwd}` : ""}`}
+      onClick={() => useStore.getState().openThread(thread.id)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setMenuOpen(true);
+      }}
+    >
+      <span className="min-w-0 flex-1 truncate text-[14px] leading-5">{title}</span>
+      {pinned && <IconPinFilled size={12} className="shrink-0 text-(--fg-tertiary) group-hover/external:hidden" />}
+      {age && <span className="shrink-0 text-[10px] text-(--fg-faint) group-hover/external:hidden">{age}</span>}
+      <button
+        className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover/external:flex"
+        title={`${label} session actions`}
+        onClick={(event) => {
+          event.stopPropagation();
+          setMenuOpen(true);
+        }}
+      >
+        <IconMore size={13} />
+      </button>
+      <Menu
+        open={menuOpen}
+        anchor={() => rowRef.current?.getBoundingClientRect()}
+        align="end"
+        onClose={() => setMenuOpen(false)}
+        items={[
+          {
+            id: "pin",
+            label: pinned ? "Unpin chat" : "Pin chat",
+            icon: <IconPin size={14} />,
+            onSelect: () => useStore.getState().togglePinnedThread(thread.id),
+          },
+          { sep: true },
+          {
+            id: "show-transcript",
+            label: "Show transcript in File Explorer",
+            disabled: !thread.path,
+            onSelect: () => thread.path && showItemInFolder(thread.path),
+          },
+          {
+            id: "copy-id",
+            label: "Copy session ID",
+            onSelect: () => copy(thread.sessionId, "Session ID"),
+          },
+          {
+            id: "copy-cwd",
+            label: "Copy working directory",
+            disabled: !thread.cwd,
+            onSelect: () => copy(thread.cwd, "Working directory"),
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Product wordmark (product switching dropdown was removed).
+function WordmarkMenu() {
+  const mode = useStore((s) => s.mode);
+  const label = mode === "chatgpt" ? "ChatGPT" : "Noma";
+  return (
+    <div className="-ml-2 flex h-8 items-center rounded-xl px-2 py-0.5 text-[17px] leading-6">
+      <span className="truncate font-openai-sans font-semibold">{label}</span>
+    </div>
+  );
+}
+
 function ThreadRow({ thread, active, archived, onRename }) {  const needsInput = useStore((s) => s.approvals.some((a) => a.threadId === thread.id));
-  const pinned = useStore((s) => (s.gs?.["pinned-thread-ids"] || []).includes(thread.id));
+  const pinned = useStore((s) => s.pinnedThreadIds.includes(thread.id));
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoverCard, setHoverCard] = useState(false);
   const hoverTimer = useRef(null);
@@ -707,6 +967,7 @@ function Footer() {
   const email = account?.email || "";
   const displayName = profile?.name || (email ? email.split("@")[0] : "Not signed in");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [providerOpen, setProviderOpen] = useState(false);
   const profileRef = useRef(null);
 
   return (
@@ -742,12 +1003,220 @@ function Footer() {
         width={220}
         items={[
           { id: "usage", label: "Usage remaining", icon: <IconUsage size={14} />, onSelect: () => useStore.getState().setUi({ settingsOpen: true, settingsSection: "usage" }) },
-          { id: "pet", label: "Show pet", icon: <IconPet size={14} />, disabled: true },
+          { id: "provider", label: "Provider", icon: <IconGlobe size={14} />, onSelect: () => setProviderOpen(true) },
           { sep: true },
           { id: "settings", label: "Settings", hint: "Ctrl+,", icon: <IconGear size={14} />, onSelect: () => useStore.getState().setUi({ settingsOpen: true }) },
           { id: "logout", label: "Log out", icon: <IconLogout size={14} />, onSelect: () => logout() },
         ]}
       />
+      <ProviderDialog open={providerOpen} onClose={() => setProviderOpen(false)} />
+    </div>
+  );
+}
+
+// Provider popup: one tab per vendor. Connected tabs show the account card
+// (avatar / id / account / usage); disconnected tabs show a centered login
+// button only.
+function ProviderDialog({ open, onClose }) {
+  const account = useStore((s) => s.account);
+  const externalAuth = useStore((s) => s.externalAuth);
+  const requiresOpenaiAuth = useStore((s) => s.requiresOpenaiAuth);
+  const [tab, setTab] = useState("codex");
+
+  // External logins finish in a separate console window; poll while open.
+  useEffect(() => {
+    if (!open) return;
+    useStore.getState().refreshExternalAuth();
+    const t = setInterval(() => useStore.getState().refreshExternalAuth(), 4000);
+    return () => clearInterval(t);
+  }, [open]);
+
+  const authState = { account, externalAuth, requiresOpenaiAuth };
+  const meta = runtimeMeta(tab);
+  const connected = runtimeConnected(authState, tab);
+
+  return (
+    <Dialog open={open} title="Providers" onClose={onClose} width={420}>
+      {/* vendor tabs, with a connection dot on each */}
+      <div className="mb-4 flex gap-1 rounded-xl border border-(--border-light) bg-(--surface-under) p-1">
+        {RUNTIMES.map((m) => (
+          <button
+            key={m.id}
+            className={cx(
+              "flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[12px] transition-colors",
+              tab === m.id ? "bg-(--surface) font-medium shadow-sm" : "text-(--fg-tertiary) hover:text-(--fg)",
+            )}
+            onClick={() => setTab(m.id)}
+          >
+            {m.icon(14)}
+            <span className="truncate">{m.label}</span>
+            <span className={cx(
+              "h-1.5 w-1.5 shrink-0 rounded-full",
+              runtimeConnected(authState, m.id) ? "bg-(--success)" : "bg-(--fg-faint)",
+            )} />
+          </button>
+        ))}
+      </div>
+      {connected
+        ? <ProviderAccount key={tab} runtime={tab} meta={meta} />
+        : <ProviderLogin runtime={tab} meta={meta} />}
+    </Dialog>
+  );
+}
+
+// Centered login prompt for a vendor that is not connected.
+function ProviderLogin({ runtime, meta }) {
+  const loginStatus = useStore((s) => s.loginStatus);
+  const codex = runtime === "codex";
+  const waiting = codex && (loginStatus === "starting" || loginStatus === "waiting" || loginStatus === "completing");
+  return (
+    <div className="flex flex-col items-center gap-3 py-8">
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-(--border-light) bg-(--surface-under)">
+        {meta?.icon(24)}
+      </span>
+      <div className="text-[12px] text-(--fg-tertiary)">Not signed in to {meta?.label}</div>
+      <button
+        className="rounded-full bg-(--fg) px-4 py-1.5 text-[13px] font-medium text-(--surface) disabled:opacity-60"
+        disabled={waiting}
+        onClick={() => {
+          if (codex) useStore.getState().startChatgptLogin();
+          else useStore.getState().startExternalLogin(runtime);
+        }}
+      >
+        {waiting ? "Signing in…" : "Log in"}
+      </button>
+    </div>
+  );
+}
+
+// Account card for a connected vendor: avatar, name/account, plan (right of
+// the name, same type as the name), and usage below.
+function ProviderAccount({ runtime, meta }) {
+  const account = useStore((s) => s.account);
+  const profile = useStore((s) => s.profile);
+  const externalAuth = useStore((s) => s.externalAuth);
+  const codex = runtime === "codex";
+  const kimi = runtime === "kimi";
+
+  // Kimi plan + quota come from one /usages payload; fetch it here so the
+  // membership level can sit on the name row.
+  const [kimiData, setKimiData] = useState(null);
+  const [kimiLoaded, setKimiLoaded] = useState(false);
+  useEffect(() => {
+    if (!kimi) return;
+    let live = true;
+    agentRuntimeUsage("kimi")
+      .then((r) => { if (live) { setKimiData(r); setKimiLoaded(true); } })
+      .catch(() => { if (live) setKimiLoaded(true); });
+    return () => { live = false; };
+  }, [kimi]);
+  const kimiLevel = (kimiData?.user?.membership?.level || "").replace(/^LEVEL_/, "");
+
+  const name = codex
+    ? profile?.name || account?.email || "Codex account"
+    : `${meta?.label} account`;
+  const accountLine = codex
+    ? account?.email || "Signed in"
+    : runtime === "claude"
+      ? externalAuth?.claude?.detail === "oauth_token" ? "OAuth token" : externalAuth?.claude?.detail || "Signed in"
+      : kimiData?.user?.userId || "Signed in";
+  const plan = codex
+    ? planLabel(account?.planType)
+    : kimi && kimiLevel
+      ? kimiLevel[0] + kimiLevel.slice(1).toLowerCase()
+      : null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        {codex && profile?.photo ? (
+          <img src={profile.photo} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
+        ) : (
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--border-light) bg-(--surface-under)">
+            {meta?.icon(22)}
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[14px] font-medium">{name}</div>
+          <div className="truncate text-[12px] text-(--fg-tertiary)">{accountLine}</div>
+        </div>
+        {plan && <span className="ml-auto shrink-0 text-[14px] font-medium">{plan}</span>}
+      </div>
+      {codex
+        ? <CodexUsage />
+        : kimi
+          ? <KimiUsage data={kimiData} loaded={kimiLoaded} />
+          : <UsageUnavailable label="Claude Code" />}
+    </div>
+  );
+}
+
+// Small "x% left" bar, same visual language as Settings → Usage.
+function UsageBar({ label, pctLeft, reset }) {
+  const pct = Math.max(0, Math.min(100, Math.round(pctLeft)));
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-[12px]">
+        <span>{label}</span>
+        <span className="text-(--fg-tertiary)">{reset && <>Resets {reset} · </>}{pct}% left</span>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-(--surface-active)">
+        <div
+          className={cx("h-full rounded-full", pct <= 15 ? "bg-(--danger)" : pct <= 40 ? "bg-(--warning)" : "bg-(--success)")}
+          style={{ width: `${Math.max(2, pct)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function UsageUnavailable({ label }) {
+  return (
+    <div className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-[12px] text-(--fg-tertiary)">
+      Usage data is not available for {label}.
+    </div>
+  );
+}
+
+// Codex rate limits via the app-server (same RPC as Settings → Usage).
+function CodexUsage() {
+  const [data, setData] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    rpc("account/rateLimits/read", {})
+      .then((r) => setData(r))
+      .catch(() => setFailed(true));
+  }, []);
+  const main = data?.rateLimits;
+  if (failed) return <UsageUnavailable label="Codex" />;
+  if (!data) return <div className="flex justify-center py-3 text-(--fg-tertiary)"><Spinner size={14} /></div>;
+  if (!main?.primary && !main?.secondary) return <UsageUnavailable label="Codex" />;
+  const fmtReset = (snap) => {
+    if (!snap?.resetsAt) return null;
+    const d = new Date(snap.resetsAt * 1000);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5">
+      {main.primary && <UsageBar label="Primary window" pctLeft={100 - (main.primary.usedPercent ?? 0)} reset={fmtReset(main.primary)} />}
+      {main.secondary && <UsageBar label="Weekly limit" pctLeft={100 - (main.secondary.usedPercent ?? 0)} reset={fmtReset(main.secondary)} />}
+    </div>
+  );
+}
+
+// Kimi quota bar (data fetched by ProviderAccount so the plan label can sit
+// on the name row).
+function KimiUsage({ data, loaded }) {
+  if (!loaded) return <div className="flex justify-center py-3 text-(--fg-tertiary)"><Spinner size={14} /></div>;
+  if (!data?.usage) return <UsageUnavailable label="Kimi Code" />;
+  const { usage } = data;
+  const limit = Number(usage.limit) || 0;
+  const remaining = Number(usage.remaining) || 0;
+  const pctLeft = limit > 0 ? (remaining / limit) * 100 : 0;
+  const reset = usage.resetTime ? (() => { const d = new Date(usage.resetTime); return `${d.getMonth() + 1}/${d.getDate()}`; })() : null;
+  return (
+    <div className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5">
+      <UsageBar label="Quota" pctLeft={pctLeft} reset={reset} />
     </div>
   );
 }
@@ -786,15 +1255,21 @@ function RenameDialog({ renaming, onClose }) {
 // (%USERPROFILE%\.codex\.codex-global-state.json) — the same source the official desktop
 // app uses, so both apps render the same projects/pins/order.
 // ---------------------------------------------------------------------------
-function buildSidebarModel(threads, gs, excludePinned = false) {
+function buildSidebarModel(
+  threads,
+  gs,
+  pinnedProjectIds = [],
+  pinnedThreadIds = [],
+  excludePinned = false,
+) {
   const local = gs?.["local-projects"] || {};
   const remote = gs?.["remote-projects"] || [];
   const order = gs?.["project-order"] || [];
-  const pinnedIds = gs?.["pinned-project-ids"] || [];
+  const pinnedIds = pinnedProjectIds;
   // Pinned threads live in the Pinned section only, never duplicated under
   // their project / the chats list. In the archived view the Pinned section
   // is hidden, so pinned archived threads stay listed in place.
-  const pinnedThreadSet = new Set(excludePinned ? gs?.["pinned-thread-ids"] || [] : []);
+  const pinnedThreadSet = new Set(excludePinned ? pinnedThreadIds : []);
   const assignments = gs?.["thread-project-assignments"] || {};
   const hostNames = {};
   for (const c of gs?.["codex-managed-remote-connections"] || []) {
@@ -871,6 +1346,73 @@ function buildSidebarModel(threads, gs, excludePinned = false) {
   const pinned = pinnedIds.map((id) => projects.get(id)).filter(Boolean);
   const rest = orderedIds.map((id) => projects.get(id)).filter((p) => p && !pinnedSet.has(p.id));
   return { pinned, projects: rest, chats };
+}
+
+function filterThreadsByQuery(list, searchTerm) {
+  const query = searchTerm.trim().toLowerCase();
+  if (!query) return list;
+  return list.filter((thread) =>
+    `${thread.name || ""} ${thread.preview || ""} ${thread.cwd || ""}`.toLowerCase().includes(query)
+  );
+}
+
+function buildExternalProjects(threads, gs, runtime) {
+  const localProjects = Object.entries(gs?.["local-projects"] || {}).map(([id, project]) => ({
+    id,
+    name: project.name || "Project",
+    rootPaths: project.rootPaths || [],
+  }));
+  const projects = new Map();
+
+  for (const thread of threads) {
+    const cwd = thread.cwd || "";
+    let matched = null;
+    for (const project of localProjects) {
+      for (const rootPath of project.rootPaths) {
+        if (rootPath && isPathInside(cwd, rootPath) && (!matched || rootPath.length > matched.rootPath.length)) {
+          matched = { project, rootPath };
+        }
+      }
+    }
+
+    const normalizedCwd = normalizeProjectPath(cwd);
+    const fallbackName = normalizedCwd.split(/[\\/]/).filter(Boolean).at(-1) || "Other sessions";
+    const key = matched
+      ? `project:${matched.project.id}`
+      : normalizedCwd ? `cwd:${normalizedCwd.toLowerCase()}` : "other";
+    if (!projects.has(key)) {
+      projects.set(key, {
+        id: matched
+          ? externalProjectId(runtime, normalizedCwd, matched.project.id)
+          : normalizedCwd ? externalProjectId(runtime, normalizedCwd) : `${runtime}:other`,
+        kind: normalizedCwd ? "external" : "virtual",
+        runtime,
+        name: matched?.project.name || fallbackName,
+        path: matched?.rootPath || normalizedCwd,
+        rootPaths: matched?.project.rootPaths || (normalizedCwd ? [normalizedCwd] : []),
+        branch: null,
+        hostName: null,
+        threads: [],
+      });
+    }
+    projects.get(key).threads.push(thread);
+  }
+
+  const byRecency = (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0);
+  for (const project of projects.values()) project.threads.sort(byRecency);
+  return [...projects.values()].sort((a, b) =>
+    (b.threads[0]?.updatedAt || 0) - (a.threads[0]?.updatedAt || 0)
+  );
+}
+
+function runtimeOfThread(thread) {
+  if (thread?.runtime === "claude" || thread?.source === "claude" || thread?.id?.startsWith("claude:")) {
+    return "claude";
+  }
+  if (thread?.runtime === "kimi" || thread?.source === "kimi" || thread?.id?.startsWith("kimi:")) {
+    return "kimi";
+  }
+  return "codex";
 }
 
 function firstLine(s) {

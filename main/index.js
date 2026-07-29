@@ -9,11 +9,34 @@ const crypto = require("node:crypto");
 const os = require("node:os");
 const { pathToFileURL } = require("node:url");
 const { resolveCodexBinary } = require("./codex-runtime");
+const { getClaudeConfigDir, listClaudeSessions, readClaudeSession } = require("./claude-history");
+const { getKimiConfigDir, listKimiSessions, readKimiSession } = require("./kimi-history");
+const { getExternalAuthStatus, getExternalUsage, getRuntimeCatalog, runExternalAgent, startExternalLogin } = require("./agent-runtimes");
 const { readRolloutActivity } = require("./rollout-activity");
 const { initUpdater } = require("./updater");
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 const communityIconPath = path.join(__dirname, "..", "assets", "community-icon.png");
+
+// Noma used to share "codex-desktop-rebuilt" with the predecessor app. When
+// both applications were running, Chromium raced over the same Cache/GPUCache
+// directories and Windows rejected the second process with ERROR_ACCESS_DENIED.
+// Keep app preferences in Roaming AppData and Chromium session/cache data in
+// Local AppData, with a separate profile for source development.
+const appDataPath = app.getPath("appData");
+const legacyUserDataPath = path.join(appDataPath, "codex-desktop-rebuilt");
+const storageProfile = isDev ? "Noma Dev" : "Noma";
+const nomaUserDataPath = path.join(appDataPath, storageProfile);
+const localAppDataPath = process.env.LOCALAPPDATA || appDataPath;
+const nomaSessionDataPath = path.join(localAppDataPath, storageProfile, "Session Data");
+fs.mkdirSync(nomaUserDataPath, { recursive: true });
+fs.mkdirSync(nomaSessionDataPath, { recursive: true });
+app.setName("Noma");
+app.setPath("userData", nomaUserDataPath);
+app.setPath("sessionData", nomaSessionDataPath);
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) app.quit();
 
 // When the app is launched detached (or its parent terminal closes), stdout/stderr
 // point at a broken pipe and console.* throws EPIPE synchronously on Windows,
@@ -33,10 +56,6 @@ for (const stream of [process.stdout, process.stderr]) {
     if (!err || err.code !== "EPIPE") throw err;
   });
 }
-
-// Keep our Electron storage separate from the official app under AppData.
-app.setName("codex-desktop-rebuilt");
-app.setPath("userData", path.join(app.getPath("appData"), "codex-desktop-rebuilt"));
 
 // ---------------------------------------------------------------------------
 // Local file protocol (codex-file://local/<encodeURIComponent(abspath)>)
@@ -437,6 +456,16 @@ let mainWindow = null;
 // quits only when every main-style window is gone.
 const threadWindows = new Set();
 
+if (hasSingleInstanceLock) {
+  app.on("second-instance", () => {
+    const win = mainWindow || [...threadWindows][0];
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  });
+}
+
 function createMainWindow(query) {
   const dark = nativeTheme.shouldUseDarkColors;
   const win = new BrowserWindow({
@@ -513,6 +542,18 @@ ipcMain.handle("window:open-thread", (_e, { threadId }) => {
 // hydrate the renderer from it at startup.
 // ---------------------------------------------------------------------------
 const PREFS_PATH = path.join(app.getPath("userData"), "renderer-prefs.json");
+const LEGACY_PREFS_PATH = path.join(legacyUserDataPath, "renderer-prefs.json");
+
+// Preserve existing Noma preferences, but never copy the legacy Chromium
+// cache/session directories that caused the cross-application lock conflict.
+if (!fs.existsSync(PREFS_PATH) && fs.existsSync(LEGACY_PREFS_PATH)) {
+  try {
+    const legacyPrefs = JSON.parse(fs.readFileSync(LEGACY_PREFS_PATH, "utf8"));
+    fs.writeFileSync(PREFS_PATH, JSON.stringify(legacyPrefs));
+  } catch (err) {
+    console.warn("[prefs] legacy migration skipped:", err.message);
+  }
+}
 
 function readPrefs() {
   try {
@@ -594,9 +635,32 @@ try {
 // Errors are returned as values ({ ok:false }) instead of rejecting: a rejected
 // ipcMain.handle makes Electron log "Error occurred in handler" on every failed
 // RPC (e.g. rate-limit polls when chatgpt.com is unreachable), spamming the console.
+let codexModelIds = new Set();
+function rememberCodexModels(result) {
+  if (Array.isArray(result?.data)) {
+    codexModelIds = new Set(result.data.map((model) => model?.model).filter(Boolean));
+  }
+}
+
 ipcMain.handle("rpc:request", async (_e, { method, params }) => {
   try {
-    return { ok: true, result: await bridge.request(method, params) };
+    if (method === "thread/start" || method === "turn/start") {
+      if (!codexModelIds.size) {
+        rememberCodexModels(await bridge.request("model/list", { limit: 100 }));
+      }
+      const requestedModels = [
+        params?.model,
+        params?.collaborationMode?.settings?.model,
+      ].filter(Boolean);
+      for (const model of requestedModels) {
+        if (!codexModelIds.has(model)) {
+          throw new Error(`Model "${model}" does not belong to the Codex runtime`);
+        }
+      }
+    }
+    const result = await bridge.request(method, params);
+    if (method === "model/list") rememberCodexModels(result);
+    return { ok: true, result };
   } catch (err) {
     return { ok: false, error: String((err && err.message) || err) };
   }
@@ -640,6 +704,112 @@ ipcMain.handle("app:info", () => ({
   hostname: os.hostname().split(".")[0],
   theme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
 }));
+ipcMain.handle("claude-history:list", async () => {
+  try {
+    const configDir = getClaudeConfigDir(app.getPath("home"));
+    return { ok: true, result: await listClaudeSessions({ configDir }) };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+ipcMain.handle("claude-history:read", async (_e, { sessionId } = {}) => {
+  try {
+    const configDir = getClaudeConfigDir(app.getPath("home"));
+    return { ok: true, result: await readClaudeSession({ configDir, sessionId }) };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+ipcMain.handle("kimi-history:list", async () => {
+  try {
+    const configDir = getKimiConfigDir(app.getPath("home"));
+    return { ok: true, result: await listKimiSessions({ configDir }) };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+ipcMain.handle("kimi-history:read", async (_e, { sessionId } = {}) => {
+  try {
+    const configDir = getKimiConfigDir(app.getPath("home"));
+    return { ok: true, result: await readKimiSession({ configDir, sessionId }) };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+
+const externalRuns = new Map();
+ipcMain.handle("agent-runtime:catalog", async () => {
+  try {
+    return {
+      ok: true,
+      result: await getRuntimeCatalog({ homePath: app.getPath("home") }),
+    };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+ipcMain.handle("agent-runtime:auth-status", async () => {
+  try {
+    return {
+      ok: true,
+      result: await getExternalAuthStatus({ homePath: app.getPath("home") }),
+    };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+ipcMain.handle("agent-runtime:usage", async (_e, { runtime } = {}) => {
+  try {
+    return {
+      ok: true,
+      result: await getExternalUsage(String(runtime || ""), { homePath: app.getPath("home") }),
+    };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+ipcMain.handle("agent-runtime:login", async (_e, { runtime } = {}) => {
+  try {
+    return {
+      ok: true,
+      result: startExternalLogin(String(runtime || ""), { homePath: app.getPath("home") }),
+    };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+ipcMain.handle("agent-runtime:send", async (_e, request = {}) => {
+  const runId = String(request.runId || "");
+  try {
+    if (!/^[0-9a-f-]{36}$/i.test(runId)) throw new Error("Invalid runtime request ID");
+    if (typeof request.prompt !== "string" || request.prompt.length > 1024 * 1024) {
+      throw new Error("Invalid runtime prompt");
+    }
+    const homePath = app.getPath("home");
+    const claudeConfigDir = getClaudeConfigDir(homePath);
+    const kimiConfigDir = getKimiConfigDir(homePath);
+    const result = await runExternalAgent(request, {
+      homePath,
+      kimiConfigDir,
+      onSpawn: (child) => externalRuns.set(runId, child),
+    });
+    const history = result.runtime === "claude"
+      ? await readClaudeSession({ configDir: claudeConfigDir, sessionId: result.sessionId })
+      : await readKimiSession({ configDir: kimiConfigDir, sessionId: result.sessionId });
+    return { ok: true, result: history };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  } finally {
+    externalRuns.delete(runId);
+  }
+});
+ipcMain.handle("agent-runtime:cancel", (_e, { runId } = {}) => {
+  const child = externalRuns.get(String(runId || ""));
+  if (!child) return false;
+  child.kill();
+  externalRuns.delete(String(runId));
+  return true;
+});
 ipcMain.handle("rollout:activity", (_e, { file }) => {
   try {
     return readRolloutActivity(file, path.join(app.getPath("home"), ".codex", "sessions"));
@@ -757,6 +927,7 @@ ipcMain.handle("save-temp-file", (_e, { dataUrl, prefix = "codex-annotate", ext 
 // App lifecycle
 // ---------------------------------------------------------------------------
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return;
   protocol.handle("codex-file", (request) => {
     try {
       const url = new URL(request.url);

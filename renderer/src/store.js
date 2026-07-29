@@ -2,6 +2,8 @@ import { create } from "zustand";
 import * as api from "./api.js";
 import { panelHook } from "./lib/panelHook.js";
 import { applyAppearance } from "./lib/appearance.js";
+import { externalProjectId, isProjectPathInside, normalizeProjectPath } from "./lib/runtimeProject.js";
+import { RUNTIME_IDS } from "./lib/runtimes.jsx";
 
 // ---------------------------------------------------------------------------
 // Permission presets → (approvalPolicy, approvalsReviewer, sandbox, sandboxPolicy)
@@ -38,6 +40,24 @@ export function normalizePermission(p) {
   return PERMISSIONS[p] ? p : "ask";
 }
 
+// Whether a vendor is signed in and usable. Codex sign-in is the app-server
+// account; claude/kimi come from `externalAuth` (CLI credential checks).
+export function runtimeConnected(s, runtime) {
+  if (runtime === "codex") return !s.requiresOpenaiAuth || !!s.account;
+  return !!s.externalAuth?.[runtime]?.loggedIn;
+}
+
+// Human-readable plan names for the raw account.planType ids.
+const PLAN_LABELS = {
+  free: "Free", go: "Go", plus: "Plus", pro: "Pro", prolite: "Pro Lite",
+  team: "Team", business: "Business", enterprise: "Enterprise", edu: "Edu",
+};
+export function planLabel(planType) {
+  if (!planType) return null;
+  const key = String(planType).toLowerCase();
+  return PLAN_LABELS[key] || key[0].toUpperCase() + key.slice(1);
+}
+
 const stored = (k, fallback) => {
   try {
     const v = localStorage.getItem(k);
@@ -45,6 +65,9 @@ const stored = (k, fallback) => {
   } catch {
     return fallback;
   }
+};
+const hasStored = (k) => {
+  try { return localStorage.getItem(k) != null; } catch { return false; }
 };
 const persist = (k, v) => {
   try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
@@ -69,6 +92,8 @@ export const useStore = create((set, get) => ({
   loginStatus: "idle",
   loginError: null,
   loginId: null,
+  runtimeCatalog: {},
+  modelsByRuntime: { codex: [], claude: [], kimi: [] },
   models: [],
 
   // ---- thread list ----
@@ -77,6 +102,18 @@ export const useStore = create((set, get) => ({
   threadsLoading: false,
   archivedView: false,
   searchTerm: "",
+  claudeThreads: [],
+  claudeThreadsLoading: false,
+  claudeThreadsError: null,
+  claudeConfigDir: null,
+  kimiThreads: [],
+  kimiThreadsLoading: false,
+  kimiThreadsError: null,
+  kimiConfigDir: null,
+  // external vendor sign-in state: { claude: {loggedIn, detail}, kimi: {...} }
+  // (codex sign-in is the `account` object; see runtimeConnected)
+  externalAuth: {},
+  externalAuthChecked: false,
 
   // ---- conversations ----
   activeThreadId: null,
@@ -85,6 +122,8 @@ export const useStore = create((set, get) => ({
 
   // ---- composer prefs ----
   cwd: stored("composer.cwd", null),
+  runtime: stored("composer.runtime", "codex"),
+  modelSelections: stored("composer.models", { codex: stored("composer.model", null) }),
   model: stored("composer.model", null),
   effort: stored("composer.effort", null),
   serviceTier: stored("composer.serviceTier", null), // null = Standard; "priority" = Fast
@@ -111,14 +150,20 @@ export const useStore = create((set, get) => ({
     settingsOpen: false,
     settingsSection: null, // deep-link target section consumed on open
     pluginsTab: "plugins", // plugins | skills (header-band tabs)
-    navView: "chats", // chats | pull-requests | sites | scheduled | plugins
+    navView: "chats", // chats | pull-requests | scheduled | plugins
     pinnedProjects: stored("ui.pinnedProjects", []), // cwd strings
     keybindings: stored("ui.keybindings", {}), // command id -> accelerator string
   },
   toasts: [],
-  navBack: [], // threadId stack for back navigation
-  navFwd: [],
-  gs: {}, // shared codex global state (projects/pins/assignments)
+  navBack: [], // recently-viewed threadId stack (Ctrl+Tab cycling)
+  gs: {}, // shared Codex project/assignment metadata (Noma pins are separate)
+  runtimeOrder: stored("noma.runtimeOrder", RUNTIME_IDS), // sidebar vendor section order
+  pinnedThreadIds: stored("noma.pinnedThreadIds", []),
+  pinnedProjectIds: stored("noma.pinnedProjectIds", []),
+  pinnedProjectPaths: stored("noma.pinnedProjectPaths", []),
+  _nomaPinsInitialized: hasStored("noma.pinnedThreadIds")
+    || hasStored("noma.pinnedProjectIds")
+    || hasStored("noma.pinnedProjectPaths"),
   profile: null, // { name, username, photo(dataUrl) } from /wham/profiles/me
     renameRequest: 0, // bump to open the thread rename dialog (Ctrl+R)
   draftAt: 0, // when the current new-chat draft was opened (seconds)
@@ -131,59 +176,51 @@ export const useStore = create((set, get) => ({
     persist("ui.keybindings", next);
   },
 
-  goBack() {
-    const { navBack, activeThreadId } = get();
-    if (!navBack.length) return;
-    const prev = navBack[navBack.length - 1];
-    set({
-      navBack: navBack.slice(0, -1),
-      navFwd: activeThreadId ? [...get().navFwd, activeThreadId] : get().navFwd,
-      _navigating: true,
-    });
-    get().setUi({ navView: "chats" });
-    get().openThread(prev);
-    set({ _navigating: false });
-  },
-
-  goForward() {
-    const { navFwd, activeThreadId } = get();
-    if (!navFwd.length) return;
-    const next = navFwd[navFwd.length - 1];
-    set({
-      navFwd: navFwd.slice(0, -1),
-      navBack: activeThreadId ? [...get().navBack, activeThreadId] : get().navBack,
-      _navigating: true,
-    });
-    get().setUi({ navView: "chats" });
-    get().openThread(next);
-    set({ _navigating: false });
-  },
-
-  togglePinnedProject(cwd) {
-    // Pin/unpin the project owning this cwd, via the shared global-state file
-    // (same store the official desktop app reads).
+  togglePinnedProject(cwd, requestedRuntime = null) {
+    if (!cwd) return;
     const gs = get().gs || {};
     const local = gs["local-projects"] || {};
-    const hit = Object.values(local).find((p) => (p.rootPaths || []).includes(cwd));
-    if (hit) return get().togglePinnedProjectId(hit.id);
-    const cur = get().ui.pinnedProjects;
-    const next = cur.includes(cwd) ? cur.filter((c) => c !== cwd) : [...cur, cwd];
-    get().setUi({ pinnedProjects: next });
-    persist("ui.pinnedProjects", next);
+    let hit = null;
+    let hitRootLength = -1;
+    for (const entry of Object.entries(local)) {
+      for (const rootPath of entry[1].rootPaths || []) {
+        if (isProjectPathInside(cwd, rootPath) && normalizeProjectPath(rootPath).length > hitRootLength) {
+          hit = entry;
+          hitRootLength = normalizeProjectPath(rootPath).length;
+        }
+      }
+    }
+    const activeThreadId = get().activeThreadId;
+    const runtime = requestedRuntime
+      || (activeThreadId
+        ? runtimeForThread(get().activeConversation?.()?.thread, activeThreadId)
+        : get().runtime);
+    if (runtime === "claude" || runtime === "kimi") {
+      return get().togglePinnedProjectId(externalProjectId(runtime, cwd, hit?.[0] || null));
+    }
+    if (hit) return get().togglePinnedProjectId(hit[0]);
+    const cur = get().pinnedProjectPaths;
+    const next = cur.some((candidate) => samePath(candidate, cwd))
+      ? cur.filter((candidate) => !samePath(candidate, cwd))
+      : [...cur, cwd];
+    set({ pinnedProjectPaths: next });
+    persist("noma.pinnedProjectPaths", next);
   },
 
   togglePinnedProjectId(projectId) {
-    const cur = get().gs?.["pinned-project-ids"] || [];
+    if (!projectId) return;
+    const cur = get().pinnedProjectIds;
     const next = cur.includes(projectId) ? cur.filter((id) => id !== projectId) : [...cur, projectId];
-    set((s) => ({ gs: { ...s.gs, "pinned-project-ids": next } }));
-    api.gsPatch({ "pinned-project-ids": next });
+    set({ pinnedProjectIds: next });
+    persist("noma.pinnedProjectIds", next);
   },
 
   togglePinnedThread(threadId) {
-    const cur = get().gs?.["pinned-thread-ids"] || [];
+    if (!threadId) return;
+    const cur = get().pinnedThreadIds;
     const next = cur.includes(threadId) ? cur.filter((id) => id !== threadId) : [...cur, threadId];
-    set((s) => ({ gs: { ...s.gs, "pinned-thread-ids": next } }));
-    api.gsPatch({ "pinned-thread-ids": next });
+    set({ pinnedThreadIds: next });
+    persist("noma.pinnedThreadIds", next);
   },
 
   // =======================================================================
@@ -203,10 +240,20 @@ export const useStore = create((set, get) => ({
           if (`ui.${k}` in prefs) uiPatch[k] = prefs[`ui.${k}`];
         }
         set((s) => ({
+          runtime: "composer.runtime" in prefs ? prefs["composer.runtime"] : s.runtime,
+          modelSelections: "composer.models" in prefs ? prefs["composer.models"] : s.modelSelections,
           model: "composer.model" in prefs ? prefs["composer.model"] : s.model,
           effort: "composer.effort" in prefs ? prefs["composer.effort"] : s.effort,
           serviceTier: "composer.serviceTier" in prefs ? prefs["composer.serviceTier"] : s.serviceTier,
           permission: "composer.permission" in prefs ? prefs["composer.permission"] : s.permission,
+          pinnedThreadIds: "noma.pinnedThreadIds" in prefs ? prefs["noma.pinnedThreadIds"] : s.pinnedThreadIds,
+          pinnedProjectIds: "noma.pinnedProjectIds" in prefs ? prefs["noma.pinnedProjectIds"] : s.pinnedProjectIds,
+          pinnedProjectPaths: "noma.pinnedProjectPaths" in prefs ? prefs["noma.pinnedProjectPaths"] : s.pinnedProjectPaths,
+          runtimeOrder: "noma.runtimeOrder" in prefs ? prefs["noma.runtimeOrder"] : s.runtimeOrder,
+          _nomaPinsInitialized: s._nomaPinsInitialized
+            || "noma.pinnedThreadIds" in prefs
+            || "noma.pinnedProjectIds" in prefs
+            || "noma.pinnedProjectPaths" in prefs,
           ui: { ...s.ui, ...uiPatch },
         }));
       }
@@ -230,11 +277,36 @@ export const useStore = create((set, get) => ({
         get().toast(`Version ${s.version || ""} downloaded — restart to update (Settings → Updates)`);
       }
     });
-    // Shared sidebar state (projects/pins) — same file the official app uses.
-    api.gsRead().then((gs) => set({ gs: gs || {} })).catch(() => {});
-    api.onGsChanged(() => api.gsRead().then((gs) => set({ gs: gs || {} })).catch(() => {}));
+    // Shared Codex state is read only for project metadata and assignments.
+    // Pins are migrated once, then owned exclusively by Noma's prefs file.
+    const applyGlobalState = (value) => {
+      const gs = value || {};
+      if (!get()._nomaPinsInitialized) {
+        const pinnedThreadIds = [...new Set(gs["pinned-thread-ids"] || [])];
+        const pinnedProjectIds = [...new Set(gs["pinned-project-ids"] || [])];
+        const pinnedProjectPaths = [...new Set(get().ui.pinnedProjects || [])];
+        set({
+          gs,
+          pinnedThreadIds,
+          pinnedProjectIds,
+          pinnedProjectPaths,
+          _nomaPinsInitialized: true,
+        });
+        persist("noma.pinnedThreadIds", pinnedThreadIds);
+        persist("noma.pinnedProjectIds", pinnedProjectIds);
+        persist("noma.pinnedProjectPaths", pinnedProjectPaths);
+        return;
+      }
+      set({ gs });
+    };
+    api.gsRead().then(applyGlobalState).catch(() => {});
+    api.onGsChanged(() => api.gsRead().then(applyGlobalState).catch(() => {}));
     const appInfo = await api.getAppInfo();
     set({ appInfo, cwd: get().cwd || appInfo.home });
+    get().loadClaudeThreads();
+    get().loadKimiThreads();
+    get().refreshExternalAuth();
+    get().refreshRuntimeCatalog();
     get().applyTheme();
     applyAppearance();
     // Status may have become ready before we subscribed — pull it explicitly.
@@ -264,7 +336,7 @@ export const useStore = create((set, get) => ({
     if (get()._booted) return;
     set({ _booted: true });
     try {
-      const account = await get().refreshAccountAndModels();
+      const account = await get().refreshAccountAndModels(true);
       if (account || !get().requiresOpenaiAuth) {
         api.profileRead().then((p) => p && set({ profile: p })).catch(() => {});
         await get().loadThreads();
@@ -286,15 +358,69 @@ export const useStore = create((set, get) => ({
       requiresOpenaiAuth: acct?.requiresOpenaiAuth ?? false,
     });
     if (models?.data) {
-      const visible = models.data.filter((m) => !m.hidden);
-      set({ models: visible });
-      const cur = get().model;
-      if (!cur || !visible.some((m) => m.model === cur)) {
+      const visible = models.data
+        .filter((m) => !m.hidden)
+        .map((m) => ({ ...m, runtime: "codex", provider: "codex" }));
+      set((s) => ({
+        modelsByRuntime: { ...s.modelsByRuntime, codex: visible },
+        runtimeCatalog: {
+          ...s.runtimeCatalog,
+          codex: { id: "codex", label: "Codex", available: true, models: visible },
+        },
+        ...(s.runtime === "codex" ? { models: visible } : {}),
+      }));
+      const selected = get().modelSelections.codex || (get().runtime === "codex" ? get().model : null);
+      if (!selected || !visible.some((m) => m.model === selected)) {
         const def = visible.find((m) => m.isDefault) || visible[0];
-        if (def) get().setModel(def.model);
+        if (def) get().setModel(def.model, "codex");
+      } else if (get().runtime === "codex") {
+        set({ model: selected });
       }
     }
     return account;
+  },
+
+  async refreshRuntimeCatalog() {
+    try {
+      const catalog = await api.agentRuntimeCatalog();
+      const external = {
+        claude: catalog?.claude?.models || [],
+        kimi: catalog?.kimi?.models || [],
+      };
+      set((s) => ({
+        runtimeCatalog: { ...s.runtimeCatalog, ...(catalog || {}) },
+        modelsByRuntime: {
+          ...s.modelsByRuntime,
+          claude: external.claude,
+          kimi: external.kimi,
+        },
+        ...(s.runtime !== "codex" ? { models: external[s.runtime] || [] } : {}),
+      }));
+      const runtime = get().runtime;
+      if (runtime !== "codex") get().setRuntime(runtime, { quiet: true });
+    } catch (error) {
+      get().toast(`Could not load local model providers: ${error.message}`, "error");
+    }
+  },
+
+  async startExternalLogin(runtime) {
+    try {
+      await api.agentRuntimeLogin(runtime);
+      get().toast(`Complete the ${runtimeLabel(runtime)} sign-in in the window that just opened`, "info");
+    } catch (error) {
+      get().toast(error.message, "error");
+    }
+  },
+
+  async refreshExternalAuth() {
+    const status = await api.agentRuntimeAuthStatus().catch(() => null);
+    set({
+      externalAuth: {
+        claude: status?.claude || null,
+        kimi: status?.kimi || null,
+      },
+      externalAuthChecked: true,
+    });
   },
 
   async startChatgptLogin() {
@@ -303,7 +429,7 @@ export const useStore = create((set, get) => ({
     try {
       const result = await api.rpc("account/login/start", { type: "chatgpt" });
       if (result?.type !== "chatgpt" || !result.authUrl || !result.loginId) {
-        throw new Error("The Codex backend returned an invalid login response.");
+        throw new Error("The Noma backend returned an invalid login response.");
       }
       set({ loginId: result.loginId, loginStatus: "waiting" });
       await api.openExternal(result.authUrl);
@@ -347,6 +473,37 @@ export const useStore = create((set, get) => ({
     }
   },
 
+  async loadClaudeThreads() {
+    set({ claudeThreadsLoading: true, claudeThreadsError: null });
+    try {
+      const result = await api.claudeHistoryList();
+      set({
+        claudeThreads: result?.sessions || [],
+        claudeConfigDir: result?.configDir || null,
+        claudeThreadsLoading: false,
+      });
+    } catch (error) {
+      set({
+        claudeThreadsLoading: false,
+        claudeThreadsError: error.message,
+      });
+    }
+  },
+
+  async loadKimiThreads() {
+    set({ kimiThreadsLoading: true, kimiThreadsError: null });
+    try {
+      const result = await api.kimiHistoryList();
+      set({
+        kimiThreads: result?.sessions || [],
+        kimiConfigDir: result?.configDir || null,
+        kimiThreadsLoading: false,
+      });
+    } catch (error) {
+      set({ kimiThreadsLoading: false, kimiThreadsError: error.message });
+    }
+  },
+
   setArchivedView(v) {
     set({ archivedView: v, activeThreadId: null });
     get().loadThreads();
@@ -376,11 +533,18 @@ export const useStore = create((set, get) => ({
   // =======================================================================
   async openThread(threadId) {
     const cur = get().activeThreadId;
-    if (cur && cur !== threadId && !get()._navigating) {
-      set((s) => ({ navBack: [...s.navBack, cur], navFwd: [] }));
+    if (cur && cur !== threadId) {
+      set((s) => ({ navBack: [...s.navBack, cur] }));
     }
     // opening a thread always lands on the chat view (reference behavior)
     get().setUi({ navView: "chats" });
+    if (isClaudeThreadId(threadId)) {
+      return get()._openClaudeThread(threadId);
+    }
+    if (isKimiThreadId(threadId)) {
+      return get()._openKimiThread(threadId);
+    }
+    get().setRuntime("codex", { quiet: true, force: true });
     set({ activeThreadId: threadId });
     // restore this thread's composer prefs (model/effort/tier/permission)
     const tp = stored(`thread.prefs.${threadId}`, null);
@@ -446,6 +610,149 @@ export const useStore = create((set, get) => ({
     }
   },
 
+  async _openClaudeThread(threadId) {
+    get().setRuntime("claude", { quiet: true, force: true });
+    set({ activeThreadId: threadId });
+    const existing = get().conversations[threadId];
+    if (existing?.loaded) return;
+    const summary = get().claudeThreads.find((thread) => thread.id === threadId) || {
+      id: threadId,
+      sessionId: threadId.slice("claude:".length),
+      source: "claude",
+      runtime: "claude",
+      readOnly: false,
+      name: "Claude Code session",
+    };
+    set((s) => ({
+      conversations: {
+        ...s.conversations,
+        [threadId]: {
+          thread: summary,
+          turns: [],
+          activeTurnId: null,
+          plan: null,
+          tokenUsage: null,
+          diff: null,
+          source: "claude",
+          runtime: "claude",
+          readOnly: false,
+          loaded: false,
+          loading: true,
+          error: null,
+        },
+      },
+    }));
+    try {
+      const result = await api.claudeHistoryRead(threadId);
+      const thread = { ...summary, ...(result?.thread || {}), source: "claude", runtime: "claude", readOnly: false };
+      set((s) => ({
+        claudeThreads: [
+          thread,
+          ...s.claudeThreads.filter((candidate) => candidate.id !== threadId),
+        ].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
+        conversations: {
+          ...s.conversations,
+          [threadId]: {
+            ...(s.conversations[threadId] || {}),
+            thread,
+            turns: normalizeTurns(result?.turns),
+            activeTurnId: null,
+            source: "claude",
+            runtime: "claude",
+            readOnly: false,
+            loaded: true,
+            loading: false,
+            error: null,
+          },
+        },
+      }));
+    } catch (error) {
+      set((s) => ({
+        conversations: {
+          ...s.conversations,
+          [threadId]: {
+            ...(s.conversations[threadId] || {}),
+            loading: false,
+            error: error.message,
+          },
+        },
+      }));
+    }
+  },
+
+  async _openKimiThread(threadId) {
+    get().setRuntime("kimi", { quiet: true, force: true });
+    set({ activeThreadId: threadId });
+    const existing = get().conversations[threadId];
+    if (existing?.loaded) return;
+    const summary = get().kimiThreads.find((thread) => thread.id === threadId) || {
+      id: threadId,
+      sessionId: threadId.slice("kimi:".length),
+      source: "kimi",
+      runtime: "kimi",
+      readOnly: false,
+      name: "Kimi Code session",
+    };
+    set((s) => ({
+      conversations: {
+        ...s.conversations,
+        [threadId]: {
+          thread: summary,
+          turns: [],
+          activeTurnId: null,
+          plan: null,
+          tokenUsage: null,
+          diff: null,
+          source: "kimi",
+          runtime: "kimi",
+          readOnly: false,
+          loaded: false,
+          loading: true,
+          error: null,
+        },
+      },
+    }));
+    try {
+      const result = await api.kimiHistoryRead(threadId);
+      const thread = { ...summary, ...(result?.thread || {}), source: "kimi", runtime: "kimi", readOnly: false };
+      if (thread.model && get().modelsByRuntime.kimi.some((m) => m.model === thread.model)) {
+        get().setModel(thread.model, "kimi");
+      }
+      set((s) => ({
+        kimiThreads: [
+          thread,
+          ...s.kimiThreads.filter((candidate) => candidate.id !== threadId),
+        ].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
+        conversations: {
+          ...s.conversations,
+          [threadId]: {
+            ...(s.conversations[threadId] || {}),
+            thread,
+            turns: normalizeTurns(result?.turns),
+            activeTurnId: null,
+            source: "kimi",
+            runtime: "kimi",
+            readOnly: false,
+            loaded: true,
+            loading: false,
+            error: null,
+          },
+        },
+      }));
+    } catch (error) {
+      set((s) => ({
+        conversations: {
+          ...s.conversations,
+          [threadId]: {
+            ...(s.conversations[threadId] || {}),
+            loading: false,
+            error: error.message,
+          },
+        },
+      }));
+    }
+  },
+
   newChat() {
     set({ activeThreadId: null, pendingNewThread: false, draftAt: Date.now() / 1000 });
   },
@@ -489,6 +796,10 @@ export const useStore = create((set, get) => ({
     text = text.trim();
     if (!text && images.length === 0 && mentions.length === 0) return;
     const { activeThreadId } = get();
+    if (activeThreadId && get().conversations[activeThreadId]?.readOnly) {
+      get().toast("This conversation is read-only", "info");
+      return;
+    }
 
     // Queue while a turn is running on this thread (unless steering).
     if (activeThreadId && get().isTurnActive(activeThreadId) && !steer) {
@@ -502,8 +813,16 @@ export const useStore = create((set, get) => ({
     for (const img of images) input.push({ type: "localImage", path: img });
 
     const perm = PERMISSIONS[normalizePermission(get().permission)] || PERMISSIONS.ask;
+    const runtime = activeThreadId
+      ? runtimeForThread(get().conversations[activeThreadId]?.thread, activeThreadId)
+      : get().runtime;
     const model = get().model;
     const effort = get().effort;
+    const allowedModels = get().modelsByRuntime[runtime] || [];
+    if (!allowedModels.some((candidate) => candidate.model === model)) {
+      get().toast(`The selected model does not belong to ${runtimeLabel(runtime)}`, "error");
+      return;
+    }
 
     // Optimistic echo: render the user's message and the running state
     // instantly instead of waiting for the app-server's turn/started
@@ -519,7 +838,7 @@ export const useStore = create((set, get) => ({
     const shownId = threadId || tempThreadId;
     set((s) => {
       const conv = s.conversations[shownId] || {
-        thread: threadId ? null : { cwd: s.cwd },
+        thread: threadId ? null : { cwd: s.cwd, source: runtime, runtime },
         turns: [],
         activeTurnId: null,
         plan: null,
@@ -539,6 +858,74 @@ export const useStore = create((set, get) => ({
     });
 
     try {
+      if (runtime !== "codex") {
+        const runId = crypto.randomUUID();
+        const sessionId = threadId ? threadId.slice(`${runtime}:`.length) : null;
+        const promptParts = [text];
+        if (mentions.length) {
+          promptParts.push(`Referenced paths:\n${mentions.map((mention) => mention.path || mention.name).filter(Boolean).join("\n")}`);
+        }
+        if (images.length) promptParts.push(`Attached local images:\n${images.join("\n")}`);
+        set({ pendingNewThread: !threadId, externalRunId: runId });
+        const result = await api.agentRuntimeSend({
+          runId,
+          runtime,
+          sessionId,
+          prompt: promptParts.filter(Boolean).join("\n\n"),
+          cwd: get().conversations[threadId]?.thread?.cwd || get().cwd || undefined,
+          model,
+          effort: effort || undefined,
+          permission: normalizePermission(get().permission),
+          planMode: !!get().planMode,
+        });
+        const thread = {
+          ...(result?.thread || {}),
+          source: runtime,
+          runtime,
+          readOnly: false,
+        };
+        const realThreadId = thread.id;
+        if (!realThreadId || !realThreadId.startsWith(`${runtime}:`)) {
+          throw new Error(`${runtimeLabel(runtime)} returned an invalid session`);
+        }
+        set((s) => {
+          const conv = s.conversations[shownId] || {};
+          const conversations = { ...s.conversations };
+          if (shownId !== realThreadId) delete conversations[shownId];
+          conversations[realThreadId] = {
+            ...conv,
+            thread,
+            turns: normalizeTurns(result?.turns),
+            activeTurnId: null,
+            source: runtime,
+            runtime,
+            readOnly: false,
+            loaded: true,
+            loading: false,
+            error: null,
+          };
+          return {
+            activeThreadId: realThreadId,
+            conversations,
+            pendingNewThread: false,
+            externalRunId: null,
+            queue: s.queue.map((queued) => queued.threadId === shownId ? { ...queued, threadId: realThreadId } : queued),
+            ...(runtime === "claude"
+              ? {
+                  claudeThreads: [thread, ...s.claudeThreads.filter((candidate) => candidate.id !== realThreadId)]
+                    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
+                }
+              : {
+                  kimiThreads: [thread, ...s.kimiThreads.filter((candidate) => candidate.id !== realThreadId)]
+                    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
+                }),
+          };
+        });
+        get()._saveThreadPrefs();
+        get().flushQueue(realThreadId);
+        return;
+      }
+
       if (!threadId) {
         set({ pendingNewThread: true });
         const startParams = {
@@ -594,7 +981,7 @@ export const useStore = create((set, get) => ({
         await api.rpc("turn/start", turnParams);
       }
     } catch (e) {
-      set({ pendingNewThread: false });
+      set({ pendingNewThread: false, externalRunId: null });
       // roll back the optimistic turn (and the temp draft conversation)
       set((s) => {
         const conversations = { ...s.conversations };
@@ -616,9 +1003,15 @@ export const useStore = create((set, get) => ({
   async interrupt() {
     const conv = get().activeConversation();
     const threadId = get().activeThreadId;
+    if (conv?.readOnly) return;
     if (!conv?.activeTurnId || !threadId) return;
     try {
-      await api.rpc("turn/interrupt", { threadId, turnId: conv.activeTurnId });
+      const runtime = runtimeForThread(conv.thread, threadId);
+      if (runtime === "codex") {
+        await api.rpc("turn/interrupt", { threadId, turnId: conv.activeTurnId });
+      } else if (get().externalRunId) {
+        await api.agentRuntimeCancel(get().externalRunId);
+      }
     } catch (e) {
       get().toast(`Stop failed: ${e.message}`, "error");
     }
@@ -641,6 +1034,10 @@ export const useStore = create((set, get) => ({
   // thread actions
   // =======================================================================
   async renameThread(threadId, name) {
+    if (isExternalThreadId(threadId)) {
+      get().toast("This runtime manages its own session metadata", "info");
+      return;
+    }
     try {
       await api.rpc("thread/name/set", { threadId, name });
       set((s) => ({
@@ -658,6 +1055,10 @@ export const useStore = create((set, get) => ({
   },
 
   async archiveThread(threadId) {
+    if (isExternalThreadId(threadId)) {
+      get().toast("This runtime manages its own session metadata", "info");
+      return;
+    }
     try {
       await api.rpc("thread/archive", { threadId });
       set((s) => ({
@@ -674,6 +1075,10 @@ export const useStore = create((set, get) => ({
   },
 
   async unarchiveThread(threadId) {
+    if (isExternalThreadId(threadId)) {
+      get().toast("This runtime manages its own session metadata", "info");
+      return;
+    }
     try {
       await api.rpc("thread/unarchive", { threadId });
       get().loadThreads();
@@ -683,6 +1088,10 @@ export const useStore = create((set, get) => ({
   },
 
   async deleteThread(threadId) {
+    if (isExternalThreadId(threadId)) {
+      get().toast("This runtime manages its own session metadata", "info");
+      return;
+    }
     try {
       await api.rpc("thread/delete", { threadId });
       set((s) => ({
@@ -697,14 +1106,68 @@ export const useStore = create((set, get) => ({
   // =======================================================================
   // composer prefs
   // =======================================================================
-  setModel(model) {
-    set({ model });
+  setRuntime(runtime, { quiet = false, force = false } = {}) {
+    if (!["codex", "claude", "kimi"].includes(runtime)) return false;
+    const activeId = get().activeThreadId;
+    const lockedRuntime = activeId && !activeId.startsWith("local-thread:")
+      ? runtimeForThread(get().conversations[activeId]?.thread, activeId)
+      : null;
+    if (!force && lockedRuntime && lockedRuntime !== runtime) {
+      if (!quiet) get().toast(`This conversation is locked to ${runtimeLabel(lockedRuntime)}`, "info");
+      return false;
+    }
+    const catalog = get().runtimeCatalog[runtime];
+    if (catalog && catalog.available === false) {
+      if (!quiet) get().toast(catalog.error || `${runtimeLabel(runtime)} is unavailable`, "error");
+      return false;
+    }
+    if (!runtimeConnected(get(), runtime)) {
+      if (!quiet) get().toast(`Sign in to ${runtimeLabel(runtime)} first (Settings → Account)`, "info");
+      return false;
+    }
+    const models = get().modelsByRuntime[runtime] || [];
+    if (!models.length) {
+      if (!quiet) get().toast(`${runtimeLabel(runtime)} has no available models`, "error");
+      return false;
+    }
+    const selections = { ...get().modelSelections };
+    const selected = models.some((m) => m.model === selections[runtime])
+      ? selections[runtime]
+      : (models.find((m) => m.isDefault) || models[0]).model;
+    selections[runtime] = selected;
+    const selectedModel = models.find((m) => m.model === selected);
+    const currentEffort = get().effort;
+    const supportsEffort = selectedModel?.supportedReasoningEfforts?.some((entry) => entry.reasoningEffort === currentEffort);
+    const effort = supportsEffort ? currentEffort : selectedModel?.defaultReasoningEffort || null;
+    set({ runtime, models, model: selected, modelSelections: selections, effort });
+    persist("composer.runtime", runtime);
+    persist("composer.models", selections);
+    persist("composer.model", selected);
+    persist("composer.effort", effort);
+    get()._saveThreadPrefs();
+    return true;
+  },
+  setModel(model, requestedRuntime = null) {
+    const runtime = requestedRuntime
+      || Object.keys(get().modelsByRuntime).find((key) => get().modelsByRuntime[key].some((entry) => entry.model === model))
+      || get().runtime;
+    if (runtime !== get().runtime && !get().setRuntime(runtime)) return false;
+    const models = get().modelsByRuntime[runtime] || [];
+    const m = models.find((x) => x.model === model);
+    if (!m) {
+      get().toast(`Model "${model}" does not belong to ${runtimeLabel(runtime)}`, "error");
+      return false;
+    }
+    const selections = { ...get().modelSelections, [runtime]: model };
+    set({ model, modelSelections: selections, models });
+    persist("composer.runtime", runtime);
+    persist("composer.models", selections);
     persist("composer.model", model);
-    const m = get().models.find((x) => x.model === model);
     if (m && !m.supportedReasoningEfforts?.some((e) => e.reasoningEffort === get().effort)) {
       get().setEffort(m.defaultReasoningEffort || null);
     }
     get()._saveThreadPrefs();
+    return true;
   },
   setEffort(effort) {
     set({ effort });
@@ -726,8 +1189,9 @@ export const useStore = create((set, get) => ({
   // thread is active, restored on openThread.
   _saveThreadPrefs() {
     const id = get().activeThreadId;
-    if (!id) return;
+    if (!id || get().conversations[id]?.readOnly) return;
     persist(`thread.prefs.${id}`, {
+      runtime: get().runtime,
       model: get().model,
       effort: get().effort,
       serviceTier: get().serviceTier,
@@ -737,6 +1201,13 @@ export const useStore = create((set, get) => ({
   setMode(mode) {
     set({ mode });
     persist("composer.mode", mode);
+  },
+  setRuntimeOrder(order) {
+    const known = RUNTIME_IDS;
+    // keep only known runtimes, then append any missing ones at the end
+    const next = [...new Set([...(order || []).filter((r) => known.includes(r)), ...known])];
+    set({ runtimeOrder: next });
+    persist("noma.runtimeOrder", next);
   },
   setPlanMode(v) {
     set({ planMode: !!v });
@@ -1123,6 +1594,33 @@ export const useStore = create((set, get) => ({
 }));
 
 // ---------------------------------------------------------------------------
+function isClaudeThreadId(threadId) {
+  return typeof threadId === "string" && threadId.startsWith("claude:");
+}
+
+function isKimiThreadId(threadId) {
+  return typeof threadId === "string" && threadId.startsWith("kimi:");
+}
+
+function isExternalThreadId(threadId) {
+  return isClaudeThreadId(threadId) || isKimiThreadId(threadId);
+}
+
+function runtimeForThread(thread, threadId) {
+  if (thread?.runtime) return thread.runtime;
+  if (thread?.source === "claude" || isClaudeThreadId(threadId)) return "claude";
+  if (thread?.source === "kimi" || isKimiThreadId(threadId)) return "kimi";
+  return "codex";
+}
+
+function runtimeLabel(runtime) {
+  return runtime === "claude" ? "Claude Code" : runtime === "kimi" ? "Kimi Code" : "Codex";
+}
+
+function samePath(left, right) {
+  return normalizeProjectPath(left).toLowerCase() === normalizeProjectPath(right).toLowerCase();
+}
+
 function normalizeTurns(turns) {
   if (!Array.isArray(turns)) return [];
   return turns.map((t) => ({ ...t, items: normalizeItems(t.items) }));

@@ -9,8 +9,8 @@ import { LucideIcon } from "../icons.jsx";
 
 const PETS = [
   ["claude-icon", "Claude Icon", "A Claude Code style orange pixel pet upgraded into a tiny chef, wearing a white chef hat and holding a frying pan."],
-  ["clawd", "Clawd", "A compact Codex pet based on official Claude Code pixel Clawd frames, extracted without stretching."],
-  ["codex", "Codex", "The original Codex companion."],
+  ["clawd", "Clawd", "A compact Noma pet based on official Claude Code pixel Clawd frames, extracted without stretching."],
+  ["codex", "Noma", "The original Noma companion."],
   ["dewey", "Dewey", "A calm companion for focused workspace days"],
   ["fireball", "Fireball", "Hot path energy for fast iteration."],
   ["hoots", "Hoots", "A sharp-eyed owl for polished work in a blink."],

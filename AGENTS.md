@@ -4,7 +4,7 @@
 
 ## Project Structure & Module Organization
 
-`main/index.js` owns the Electron lifecycle, file protocol, and JSON-RPC bridge to `codex app-server`; `main/preload.js` exposes IPC. The Vite root is `renderer/`: state and RPC helpers live in `renderer/src/store.js` and `renderer/src/api.js`, UI in `renderer/src/components/`, panel features in `renderer/src/components/panel/`, and helpers in `renderer/src/lib/`. Windows chrome (in-window menu bar, caption buttons) lives in `renderer/src/components/WinMenuBar.jsx` and `renderer/src/components/WinWindowControls.jsx`. Theme tokens are in `renderer/src/theme.css`. `_analysis/` contains smoke tools, CDP probes, generated schemas, and reference screenshots. Do not commit `dist-renderer/`, `node_modules/`, or `_analysis/asar-out/`.
+`main/index.js` owns the Electron lifecycle, file protocol, and JSON-RPC bridge to `codex app-server`; `main/preload.js` exposes IPC. The Vite root is `renderer/`: state and RPC helpers live in `renderer/src/store.js` and `renderer/src/api.js`, UI in `renderer/src/components/`, panel features in `renderer/src/components/panel/`, and helpers in `renderer/src/lib/`. Windows chrome (in-window menu bar, caption buttons) lives in `renderer/src/components/WinMenuBar.jsx` and `renderer/src/components/WinWindowControls.jsx`. Theme tokens are in `renderer/src/theme.css`. Static resources (fonts, images, brand icons, file-type SVGs) live in `renderer/src/assets/`; vendor metadata is centralized in `renderer/src/lib/runtimes.jsx`. `_analysis/` contains smoke tools, CDP probes, generated schemas, and reference screenshots. Do not commit `dist-renderer/`, `node_modules/`, or `_analysis/asar-out/`.
 
 ## Build, Test, and Development Commands
 

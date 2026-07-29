@@ -14,6 +14,7 @@
   "scripts": {
     "dev": "concurrently -k \"vite dev --port 5175\" \"wait-on http://localhost:5175 && cross-env ELECTRON_RENDERER_URL=http://localhost:5175 electron .\"",
     "build": "vite build",
+    "test": "node --test main/*.test.js",
     "test:runtime": "node --test main/codex-runtime.test.js",
     "package:win": "npm run build && node scripts/prepare-codex-runtime.mjs win32-x64 && electron-packager . \"ChatGPT Desktop Community\" --platform=win32 --arch=x64 --out=release --overwrite --prune=true --asar --icon=assets/community-icon --extra-resource=release/codex-runtime-stage/codex-runtime --ignore=\"^/(release|\\\\.git|\\\\.omx|_analysis)($|/)\"",
     "dist:win": "npm run build && node scripts/prepare-codex-runtime.mjs win32-x64 && electron-builder --win --x64",
