@@ -20,6 +20,10 @@ export const showItemInFolder = (p) => b.showItemInFolder(p);
 export const openPath = (p) => b.openPath(p);
 export const openExternal = (url) => b.openExternal(url);
 export const getAppInfo = () => b.getAppInfo();
+export const reportDiagnostic = (event, context = {}, level = "info") =>
+  b.diagnosticsReport({ event, context, level });
+export const getDiagnosticsInfo = () => b.diagnosticsInfo();
+export const openDiagnosticsLogs = () => b.diagnosticsOpenLogs();
 export const claudeHistoryList = () => b.claudeHistoryList();
 export const claudeHistoryRead = (sessionId) => b.claudeHistoryRead(sessionId);
 export const kimiHistoryList = () => b.kimiHistoryList();

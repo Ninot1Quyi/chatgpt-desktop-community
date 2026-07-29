@@ -3,10 +3,26 @@
 // pushed to all renderer windows as "update:status" broadcasts; the last
 // status is cached so late-opening windows can query it.
 const { app, ipcMain } = require("electron");
+const fs = require("node:fs");
+const path = require("node:path");
+
+function resolveUpdaterMode({
+  isPackaged,
+  resourcesPath,
+  existsSync = fs.existsSync,
+}) {
+  if (!isPackaged) return "dev";
+  const updateConfig = path.join(resourcesPath, "app-update.yml");
+  return existsSync(updateConfig) ? "enabled" : "disabled";
+}
 
 function initUpdater({ broadcast }) {
-  const enabled = app.isPackaged;
-  let last = { status: enabled ? "idle" : "dev" };
+  const mode = resolveUpdaterMode({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+  });
+  const enabled = mode === "enabled";
+  let last = { status: enabled ? "idle" : mode };
   const send = (payload) => {
     last = { ...last, ...payload };
     broadcast("update:status", last);
@@ -48,4 +64,4 @@ function initUpdater({ broadcast }) {
   setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
 }
 
-module.exports = { initUpdater };
+module.exports = { initUpdater, resolveUpdaterMode };

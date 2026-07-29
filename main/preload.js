@@ -29,6 +29,9 @@ contextBridge.exposeInMainWorld("codexBridge", {
   openPath: (p) => ipcRenderer.invoke("shell:open-path", p),
   openExternal: (url) => ipcRenderer.invoke("shell:open-external", url),
   getAppInfo: () => ipcRenderer.invoke("app:info"),
+  diagnosticsReport: (payload) => ipcRenderer.send("diagnostics:renderer-log", payload),
+  diagnosticsInfo: () => ipcRenderer.invoke("diagnostics:info"),
+  diagnosticsOpenLogs: () => ipcRenderer.invoke("diagnostics:open-logs"),
   claudeHistoryList: async () => {
     const r = await ipcRenderer.invoke("claude-history:list");
     if (r && r.ok === false) throw new Error(r.error);

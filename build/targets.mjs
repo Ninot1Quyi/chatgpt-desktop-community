@@ -19,12 +19,14 @@ const SHARED_RENDERER_MODULES = Object.freeze({
   "@modules/workspace-panels": "modules/workspace-panels/renderer/index.js",
   "@modules/agent-runtimes/state": "modules/agent-runtimes/renderer/state.js",
   "@modules/agent-runtimes": "modules/agent-runtimes/renderer/index.js",
+  "@modules/diagnostics": "modules/diagnostics/renderer/index.jsx",
   "@modules/preferences/state": "modules/preferences/renderer/state.js",
 });
 
 const SHARED_MAIN_MODULES = Object.freeze({
   "@modules/agent-runtimes":
     "modules/agent-runtimes/main/register-ipc.cjs",
+  "@modules/diagnostics": "modules/diagnostics/main/index.cjs",
   "@modules/preferences": "modules/preferences/main/index.cjs",
   "@modules/projects-navigation":
     "modules/projects-navigation/main/global-state.cjs",

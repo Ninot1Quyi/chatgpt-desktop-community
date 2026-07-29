@@ -16,6 +16,9 @@ import {
 } from "../build/targets.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const packageMetadata = JSON.parse(
+  await fs.readFile(path.join(repoRoot, "package.json"), "utf8"),
+);
 const action = process.argv[2];
 const target = resolveTarget(readTargetArg(process.argv.slice(3)));
 process.env.CHATGPT_DESKTOP_TARGET = target.id;
@@ -25,6 +28,7 @@ const distributionImport = await import(
 const distribution = distributionImport.createDistribution({
   product: PRODUCT,
   target,
+  version: packageMetadata.version,
 });
 
 function aliasPlugin(aliases) {
@@ -178,6 +182,10 @@ async function packageApplication() {
       arch,
     ),
     config: builderConfig(),
+    publish: "never",
+  });
+  await distribution.finalizeArtifacts({
+    outputDir: path.join(repoRoot, "release", target.id),
   });
 }
 
