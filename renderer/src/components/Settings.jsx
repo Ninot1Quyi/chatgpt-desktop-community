@@ -5,6 +5,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useStore, normalizePermission, runtimeConnected, planLabel } from "../store.js";
 import * as api from "../api.js";
 import { cx } from "../lib/cx.js";
+import {
+  codexRateLimitSections,
+  codexRateLimitWindows,
+  codexRemainingPercent,
+  codexResetDate,
+} from "../lib/codexUsage.js";
 import { basename, isPathInside } from "../lib/time.js";
 import { COMMANDS, bindingFor, eventToAccel, isWindowsAccelerator } from "../lib/keys.js";
 import { Spinner } from "./ui.jsx";
@@ -541,10 +547,12 @@ function ShortcutsSection() {
 // layout, data from account/rateLimits/read).
 // ---------------------------------------------------------------------------
 function UsageSection() {
+  const account = useStore((s) => s.account);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [resetMsg, setResetMsg] = useState(null);
   const load = () => {
+    setError(null);
     api
       .rpc("account/rateLimits/read", {})
       .then((r) => setData(r))
@@ -553,24 +561,26 @@ function UsageSection() {
   useEffect(() => { load(); }, []);
 
   const main = data?.rateLimits;
-  const spark = data?.rateLimitsByLimitId?.codex_bengalfox;
-  const resets = data?.rateLimitResetCredits?.credits || [];
-
-  const pctLeft = (snap) => Math.max(0, 100 - (snap?.usedPercent ?? 0));
-  const resetDate = (snap) => {
-    if (!snap?.resetsAt) return null;
-    const d = new Date(snap.resetsAt * 1000);
-    return `${d.getMonth() + 1}月${d.getDate()}日`;
-  };
-  const expiry = (ts) => {
-    const d = new Date(ts * 1000);
-    return `${d.getMonth() + 1}/${d.getDate()}`;
-  };
+  const sections = codexRateLimitSections(data);
+  const resetSummary = data?.rateLimitResetCredits;
+  const resets = Array.isArray(resetSummary?.credits) ? resetSummary.credits : [];
+  const resetCount = Number(resetSummary?.availableCount || 0);
+  const credits = main?.credits;
+  const individualLimit = main?.individualLimit;
+  const plan = planLabel(main?.planType || account?.planType);
+  const creditBalance = credits?.unlimited
+    ? "Unlimited"
+    : credits?.hasCredits
+      ? credits.balance || "Available"
+      : "Not available";
 
   const useReset = (id) => {
     setResetMsg(null);
     api
-      .rpc("account/rateLimitResetCredit/consume", { creditId: id })
+      .rpc("account/rateLimitResetCredit/consume", {
+        creditId: id,
+        idempotencyKey: globalThis.crypto.randomUUID(),
+      })
       .then(() => { setResetMsg("Rate limits reset"); load(); })
       .catch((e) => setResetMsg(`Reset failed: ${e.message}`));
   };
@@ -582,57 +592,107 @@ function UsageSection() {
         <div className="flex justify-center py-6 text-(--fg-tertiary)"><Spinner /></div>
       )}
 
-      <Card title="Your plan">
-        <Row title="Pro plan" desc="₱9,990/mo">
-          <button className="rounded-full border border-(--border) px-3 py-1 text-xs hover:bg-(--surface-hover)" onClick={() => api.openExternal("https://chatgpt.com/pricing")}>
-            View plans
-          </button>
-        </Row>
-      </Card>
-
-      <Card title="Credits balance">
-        <Row
-          title={
-            <span>
-              Buy credits or turn on auto-reload to continue using Noma if you hit a limit.{" "}
-              <button className="underline" onClick={() => api.openExternal("https://help.openai.com/en/articles/20000106")}>Learn more</button>
-            </span>
-          }
-        />
-        <Row title="₱0" desc="Current balance">
-          <div className="flex gap-2">
-            <button className="rounded-full border border-(--border) px-3 py-1 text-xs hover:bg-(--surface-hover)" onClick={() => api.openExternal("https://chatgpt.com/billing")}>
-              Set up auto-reload
-            </button>
-            <button className="rounded-full bg-(--fg) px-3 py-1 text-xs font-medium text-(--surface) hover:opacity-90" onClick={() => api.openExternal("https://chatgpt.com/billing")}>
-              Buy credits
-            </button>
-          </div>
-        </Row>
-      </Card>
-
-      {main?.primary && (
-        <Card title="General usage limits">
-          <LimitRow label="Weekly usage limit" pctLeft={pctLeft(main.primary)} reset={resetDate(main.primary)} />
-        </Card>
-      )}
-      {spark?.primary && (
-        <Card title={`${spark.limitName || "GPT-5.3-Codex-Spark"} usage limits`}>
-          <LimitRow label="Weekly usage limit" pctLeft={pctLeft(spark.primary)} reset={resetDate(spark.primary)} />
-        </Card>
-      )}
-
-      {resets.length > 0 && (
-        <Card title="Usage limit resets">
-          {resets.map((c) => (
-            <Row key={c.id} title={c.title || "Full reset"} desc={`Expires ${expiry(c.expiresAt)}`}>
-              <button className="rounded-full border border-(--border) px-3 py-1 text-xs hover:bg-(--surface-hover)" onClick={() => useReset(c.id)}>
-                Use reset
+      {data && (
+        <>
+          <Card title="Your plan">
+            <Row title={plan ? `${plan} plan` : "Plan unavailable"}>
+              <button className="rounded-full border border-(--border) px-3 py-1 text-xs hover:bg-(--surface-hover)" onClick={() => api.openExternal("https://chatgpt.com/pricing")}>
+                View plans
               </button>
             </Row>
-          ))}
-          {resetMsg && <div className="px-4 pb-3 text-xs text-(--fg-tertiary)">{resetMsg}</div>}
-        </Card>
+          </Card>
+
+          {(credits || individualLimit || main?.spendControlReached) && (
+            <Card title="Credits and spend control">
+              {credits && (
+                <Row
+                  title="Credits balance"
+                  desc={credits.unlimited
+                    ? "The account reports unlimited credits."
+                    : credits.hasCredits
+                      ? "Current backend-reported credit balance."
+                      : "No separate credit balance is available for this account."}
+                >
+                  <span className="text-[13px] text-(--fg-secondary)">{creditBalance}</span>
+                </Row>
+              )}
+              {individualLimit && (
+                <Row
+                  title="Monthly usage limit"
+                  desc={`Resets ${codexResetDate(individualLimit.resetsAt, true) || "on the next billing cycle"}`}
+                >
+                  <span className="text-[13px] text-(--fg-secondary)">
+                    {individualLimit.used} / {individualLimit.limit} · {individualLimit.remainingPercent}% left
+                  </span>
+                </Row>
+              )}
+              {main?.spendControlReached && (
+                <Row
+                  title="Spend control reached"
+                  desc="This account has reached its configured spending limit."
+                />
+              )}
+            </Card>
+          )}
+
+          {sections.map((section) => {
+            const windows = codexRateLimitWindows(section.snapshot);
+            if (!windows.length) return null;
+            return (
+              <Card key={section.id} title={section.title}>
+                {windows.map(({ id, label, window }) => (
+                  <LimitRow
+                    key={id}
+                    label={label}
+                    pctLeft={codexRemainingPercent(window)}
+                    reset={codexResetDate(window.resetsAt, true)}
+                  />
+                ))}
+                {section.snapshot.rateLimitReachedType && (
+                  <Row
+                    title="Limit reached"
+                    desc={String(section.snapshot.rateLimitReachedType).replaceAll("_", " ")}
+                  />
+                )}
+              </Card>
+            );
+          })}
+
+          {resetSummary && (
+            <Card title="Usage limit resets">
+              <Row
+                title="Available resets"
+                desc={resets.length < resetCount
+                  ? `${resets.length} of ${resetCount} reset details are currently available.`
+                  : "Earned resets that can restore eligible usage windows."}
+              >
+                <span className="text-[13px] text-(--fg-secondary)">{resetCount}</span>
+              </Row>
+              {resets.map((credit) => (
+                <Row
+                  key={credit.id}
+                  title={credit.title || "Full reset"}
+                  desc={[
+                    credit.description,
+                    credit.expiresAt ? `Expires ${codexResetDate(credit.expiresAt, true)}` : "No expiry reported",
+                  ].filter(Boolean).join(" · ")}
+                >
+                  {credit.status === "available" ? (
+                    <button
+                      className="rounded-full border border-(--border) px-3 py-1 text-xs hover:bg-(--surface-hover)"
+                      onClick={() => useReset(credit.id)}
+                    >
+                      Use reset
+                    </button>
+                  ) : (
+                    <span className="text-xs capitalize text-(--fg-tertiary)">{credit.status}</span>
+                  )}
+                </Row>
+              ))}
+              {resetMsg && <div className="px-4 pb-3 text-xs text-(--fg-tertiary)">{resetMsg}</div>}
+            </Card>
+          )}
+        </>
       )}
 
       <Card title="Cancel plan">

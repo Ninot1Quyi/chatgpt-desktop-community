@@ -70,11 +70,6 @@ contextBridge.exposeInMainWorld("codexBridge", {
     if (r && r.ok === false) throw new Error(r.error);
     return r?.result;
   },
-  agentRuntimeUsage: async (runtime) => {
-    const r = await ipcRenderer.invoke("agent-runtime:usage", { runtime });
-    if (r && r.ok === false) throw new Error(r.error);
-    return r?.result;
-  },
   rolloutActivity: (file) => ipcRenderer.invoke("rollout:activity", { file }),
   captureWebview: (webContentsId) => ipcRenderer.invoke("webview:capture", { webContentsId }),
   saveTempFile: (dataUrl, prefix, ext) => ipcRenderer.invoke("save-temp-file", { dataUrl, prefix, ext }),

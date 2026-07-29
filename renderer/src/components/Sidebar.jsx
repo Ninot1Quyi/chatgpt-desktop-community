@@ -5,7 +5,13 @@ import { useStore, runtimeConnected, planLabel } from "../store.js";
 import { cx } from "../lib/cx.js";
 import { isPathInside } from "../lib/time.js";
 import { externalProjectId, normalizeProjectPath } from "../lib/runtimeProject.js";
-import { openExternal, toggleQuickChat, showItemInFolder, rpc, logout, agentRuntimeUsage } from "../api.js";
+import {
+  codexRateLimitSections,
+  codexRateLimitWindows,
+  codexRemainingPercent,
+  codexResetDate,
+} from "../lib/codexUsage.js";
+import { openExternal, toggleQuickChat, showItemInFolder, rpc, logout } from "../api.js";
 import { Menu, Dialog, Spinner, IconButton } from "./ui.jsx";
 import { EXTERNAL_RUNTIMES, RUNTIMES, runtimeMeta } from "../lib/runtimes.jsx";
 import {
@@ -902,9 +908,15 @@ function shortAge(ts) {
 // ---------------------------------------------------------------------------
 let usageCache = null;
 function UsageNudge() {
+  const codexConnected = useStore((s) => runtimeConnected(s, "codex"));
   const [usage, setUsage] = useState(usageCache);
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => {
+    if (!codexConnected) {
+      usageCache = null;
+      setUsage(null);
+      return undefined;
+    }
     let live = true;
     const load = () =>
       rpc("account/rateLimits/read", {})
@@ -917,7 +929,7 @@ function UsageNudge() {
     load();
     const t = setInterval(load, 5 * 60 * 1000);
     return () => { live = false; clearInterval(t); };
-  }, []);
+  }, [codexConnected]);
 
   const primary = usage?.primary;
   if (!primary || dismissed) return null;
@@ -1014,9 +1026,8 @@ function Footer() {
   );
 }
 
-// Provider popup: one tab per vendor. Connected tabs show the account card
-// (avatar / id / account / usage); disconnected tabs show a centered login
-// button only.
+// Provider popup: one tab per vendor. Codex shows its account and limits;
+// CLI vendors only show their locally detected credential state.
 function ProviderDialog({ open, onClose }) {
   const account = useStore((s) => s.account);
   const externalAuth = useStore((s) => s.externalAuth);
@@ -1089,42 +1100,24 @@ function ProviderLogin({ runtime, meta }) {
   );
 }
 
-// Account card for a connected vendor: avatar, name/account, plan (right of
-// the name, same type as the name), and usage below.
+// Account card for a connected vendor. Kimi intentionally stays credential-
+// only here: the CLI owns token refresh and Noma does not fetch web profile or
+// quota data.
 function ProviderAccount({ runtime, meta }) {
   const account = useStore((s) => s.account);
   const profile = useStore((s) => s.profile);
   const externalAuth = useStore((s) => s.externalAuth);
   const codex = runtime === "codex";
-  const kimi = runtime === "kimi";
-
-  // Kimi plan + quota come from one /usages payload; fetch it here so the
-  // membership level can sit on the name row.
-  const [kimiData, setKimiData] = useState(null);
-  const [kimiLoaded, setKimiLoaded] = useState(false);
-  useEffect(() => {
-    if (!kimi) return;
-    let live = true;
-    agentRuntimeUsage("kimi")
-      .then((r) => { if (live) { setKimiData(r); setKimiLoaded(true); } })
-      .catch(() => { if (live) setKimiLoaded(true); });
-    return () => { live = false; };
-  }, [kimi]);
-  const kimiLevel = (kimiData?.user?.membership?.level || "").replace(/^LEVEL_/, "");
 
   const name = codex
     ? profile?.name || account?.email || "Codex account"
-    : `${meta?.label} account`;
+    : meta?.label;
   const accountLine = codex
     ? account?.email || "Signed in"
     : runtime === "claude"
       ? externalAuth?.claude?.detail === "oauth_token" ? "OAuth token" : externalAuth?.claude?.detail || "Signed in"
-      : kimiData?.user?.userId || "Signed in";
-  const plan = codex
-    ? planLabel(account?.planType)
-    : kimi && kimiLevel
-      ? kimiLevel[0] + kimiLevel.slice(1).toLowerCase()
-      : null;
+      : externalAuth?.kimi?.detail === "oauth_credentials" ? "OAuth credentials" : "Saved credentials";
+  const plan = codex ? planLabel(account?.planType) : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -1144,9 +1137,9 @@ function ProviderAccount({ runtime, meta }) {
       </div>
       {codex
         ? <CodexUsage />
-        : kimi
-          ? <KimiUsage data={kimiData} loaded={kimiLoaded} />
-          : <UsageUnavailable label="Claude Code" />}
+        : runtime === "claude"
+          ? <UsageUnavailable label="Claude Code" />
+          : null}
     </div>
   );
 }
@@ -1182,41 +1175,91 @@ function UsageUnavailable({ label }) {
 function CodexUsage() {
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    rpc("account/rateLimits/read", {})
+  const [resetMsg, setResetMsg] = useState(null);
+  const load = () => {
+    setFailed(false);
+    return rpc("account/rateLimits/read", {})
       .then((r) => setData(r))
       .catch(() => setFailed(true));
+  };
+  useEffect(() => {
+    load();
   }, []);
-  const main = data?.rateLimits;
   if (failed) return <UsageUnavailable label="Codex" />;
   if (!data) return <div className="flex justify-center py-3 text-(--fg-tertiary)"><Spinner size={14} /></div>;
-  if (!main?.primary && !main?.secondary) return <UsageUnavailable label="Codex" />;
-  const fmtReset = (snap) => {
-    if (!snap?.resetsAt) return null;
-    const d = new Date(snap.resetsAt * 1000);
-    return `${d.getMonth() + 1}/${d.getDate()}`;
+  const sections = codexRateLimitSections(data)
+    .map((section) => ({
+      ...section,
+      windows: codexRateLimitWindows(section.snapshot),
+    }))
+    .filter((section) => section.windows.length);
+  if (!sections.length) return <UsageUnavailable label="Codex" />;
+  const resetSummary = data?.rateLimitResetCredits;
+  const resetCount = Number(resetSummary?.availableCount || 0);
+  const resets = Array.isArray(resetSummary?.credits) ? resetSummary.credits : [];
+  const useReset = (creditId) => {
+    setResetMsg(null);
+    rpc("account/rateLimitResetCredit/consume", {
+      creditId,
+      idempotencyKey: globalThis.crypto.randomUUID(),
+    })
+      .then(() => {
+        setResetMsg("Rate limits reset");
+        return load();
+      })
+      .catch((error) => setResetMsg(`Reset failed: ${error.message}`));
   };
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5">
-      {main.primary && <UsageBar label="Primary window" pctLeft={100 - (main.primary.usedPercent ?? 0)} reset={fmtReset(main.primary)} />}
-      {main.secondary && <UsageBar label="Weekly limit" pctLeft={100 - (main.secondary.usedPercent ?? 0)} reset={fmtReset(main.secondary)} />}
-    </div>
-  );
-}
-
-// Kimi quota bar (data fetched by ProviderAccount so the plan label can sit
-// on the name row).
-function KimiUsage({ data, loaded }) {
-  if (!loaded) return <div className="flex justify-center py-3 text-(--fg-tertiary)"><Spinner size={14} /></div>;
-  if (!data?.usage) return <UsageUnavailable label="Kimi Code" />;
-  const { usage } = data;
-  const limit = Number(usage.limit) || 0;
-  const remaining = Number(usage.remaining) || 0;
-  const pctLeft = limit > 0 ? (remaining / limit) * 100 : 0;
-  const reset = usage.resetTime ? (() => { const d = new Date(usage.resetTime); return `${d.getMonth() + 1}/${d.getDate()}`; })() : null;
-  return (
-    <div className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5">
-      <UsageBar label="Quota" pctLeft={pctLeft} reset={reset} />
+      {sections.map((section) => (
+        <div key={section.id} className="flex flex-col gap-2">
+          {sections.length > 1 && (
+            <div className="text-[11px] font-medium text-(--fg-secondary)">{section.name}</div>
+          )}
+          {section.windows.map(({ id, label, window }) => (
+            <UsageBar
+              key={id}
+              label={label}
+              pctLeft={codexRemainingPercent(window)}
+              reset={codexResetDate(window.resetsAt)}
+            />
+          ))}
+        </div>
+      ))}
+      {resetSummary && (
+        <div className="flex flex-col gap-2 border-t border-(--border-light) pt-2">
+          <div className="flex items-center justify-between text-[11px] text-(--fg-tertiary)">
+            <span>Usage limit resets</span>
+            <span>{resetCount} available</span>
+          </div>
+          {resets.map((credit) => (
+            <div key={credit.id} className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12px] text-(--fg-secondary)">
+                  {credit.title || "Full reset"}
+                </div>
+                <div className="truncate text-[11px] text-(--fg-tertiary)">
+                  {credit.expiresAt ? `Expires ${codexResetDate(credit.expiresAt, true)}` : credit.status || "No expiry reported"}
+                </div>
+              </div>
+              {credit.status === "available" && (
+                <button
+                  className="shrink-0 rounded-full border border-(--border) px-2.5 py-1 text-[11px] hover:bg-(--surface-hover)"
+                  onClick={() => useReset(credit.id)}
+                >
+                  Use reset
+                </button>
+              )}
+            </div>
+          ))}
+          {resets.length < resetCount && (
+            <div className="text-[11px] text-(--fg-tertiary)">
+              {resetCount - resets.length} reset {resetCount - resets.length === 1 ? "detail is" : "details are"} not available.
+            </div>
+          )}
+          {resetMsg && <div className="text-[11px] text-(--fg-tertiary)">{resetMsg}</div>}
+        </div>
+      )}
     </div>
   );
 }

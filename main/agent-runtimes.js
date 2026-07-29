@@ -266,7 +266,23 @@ function getKimiAuth(homePath, env) {
   try {
     const credDir = path.join(getKimiConfigDir(homePath, env), "credentials");
     const files = fs.readdirSync(credDir).filter((f) => f.endsWith(".json"));
-    return { loggedIn: files.length > 0, detail: files.length ? null : "No saved Kimi credentials" };
+    for (const file of files) {
+      try {
+        const credential = JSON.parse(fs.readFileSync(path.join(credDir, file), "utf8"));
+        const accessToken = typeof credential?.access_token === "string"
+          ? credential.access_token.trim()
+          : "";
+        const refreshToken = typeof credential?.refresh_token === "string"
+          ? credential.refresh_token.trim()
+          : "";
+        // An expired access token is still a usable login when a refresh token
+        // is present: Kimi Code owns refresh/rotation when the runtime starts.
+        if (accessToken || refreshToken) {
+          return { loggedIn: true, detail: "oauth_credentials" };
+        }
+      } catch {}
+    }
+    return { loggedIn: false, detail: "No saved Kimi credentials" };
   } catch {
     return { loggedIn: false, detail: "No saved Kimi credentials" };
   }
@@ -278,35 +294,6 @@ async function getExternalAuthStatus({ homePath, env = process.env } = {}) {
     Promise.resolve(getKimiAuth(homePath, env)),
   ]);
   return { claude, kimi };
-}
-
-// Fetch account/usage info for a signed-in external vendor. Returns null when
-// the vendor has no such endpoint (claude) or credentials are missing.
-// Kimi: GET {baseUrl}/usages with the stored OAuth bearer token — returns
-// { user: { userId, membership }, usage: { limit, used, remaining, resetTime }, limits }.
-async function getExternalUsage(runtime, { homePath, env = process.env } = {}) {
-  if (runtime !== "kimi") return null;
-  try {
-    const credDir = path.join(getKimiConfigDir(homePath, env), "credentials");
-    const file = fs.readdirSync(credDir).find((f) => f.endsWith(".json"));
-    if (!file) return null;
-    const cred = JSON.parse(fs.readFileSync(path.join(credDir, file), "utf8"));
-    if (!cred?.access_token) return null;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10000);
-    try {
-      const res = await fetch("https://api.kimi.com/coding/v1/usages", {
-        headers: { Authorization: `Bearer ${cred.access_token}` },
-        signal: ctrl.signal,
-      });
-      if (!res.ok) return null;
-      return await res.json();
-    } finally {
-      clearTimeout(timer);
-    }
-  } catch {
-    return null;
-  }
 }
 
 // The login flows are interactive (browser + paste-back / device code), so
@@ -332,7 +319,7 @@ function startExternalLogin(runtime, { homePath, env = process.env } = {}) {
 module.exports = {
   CLAUDE_MODELS,
   getExternalAuthStatus,
-  getExternalUsage,
+  getKimiAuth,
   getRuntimeCatalog,
   kimiPromptArgs,
   loadKimiModels,

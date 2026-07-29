@@ -1,6 +1,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const {
+  getKimiAuth,
   kimiPromptArgs,
   validateRun,
 } = require("./agent-runtimes");
@@ -99,4 +103,35 @@ test("Kimi prompt arguments preserve sessions and reject plan mode", () => {
     }, null),
     /does not support plan mode/,
   );
+});
+
+test("Kimi auth requires a saved OAuth token rather than any JSON file", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "noma-kimi-auth-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const configDir = path.join(root, "kimi-home");
+  const credentialsDir = path.join(configDir, "credentials");
+  const env = { KIMI_CODE_HOME: configDir };
+
+  assert.deepEqual(getKimiAuth(root, env), {
+    loggedIn: false,
+    detail: "No saved Kimi credentials",
+  });
+
+  fs.mkdirSync(credentialsDir, { recursive: true });
+  fs.writeFileSync(path.join(credentialsDir, "broken.json"), "{", "utf8");
+  fs.writeFileSync(path.join(credentialsDir, "empty.json"), JSON.stringify({
+    access_token: "",
+    refresh_token: "",
+  }), "utf8");
+  assert.equal(getKimiAuth(root, env).loggedIn, false);
+
+  fs.writeFileSync(path.join(credentialsDir, "kimi-code.json"), JSON.stringify({
+    access_token: "",
+    refresh_token: "refresh-token",
+    expires_at: 0,
+  }), "utf8");
+  assert.deepEqual(getKimiAuth(root, env), {
+    loggedIn: true,
+    detail: "oauth_credentials",
+  });
 });

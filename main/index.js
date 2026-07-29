@@ -11,7 +11,7 @@ const { pathToFileURL } = require("node:url");
 const { resolveCodexBinary } = require("./codex-runtime");
 const { getClaudeConfigDir, listClaudeSessions, readClaudeSession } = require("./claude-history");
 const { getKimiConfigDir, listKimiSessions, readKimiSession } = require("./kimi-history");
-const { getExternalAuthStatus, getExternalUsage, getRuntimeCatalog, runExternalAgent, startExternalLogin } = require("./agent-runtimes");
+const { getExternalAuthStatus, getRuntimeCatalog, runExternalAgent, startExternalLogin } = require("./agent-runtimes");
 const { readRolloutActivity } = require("./rollout-activity");
 const { initUpdater } = require("./updater");
 
@@ -247,6 +247,9 @@ class AppServerBridge {
       return;
     }
     if (msg.method) {
+      if (msg.method === "account/rateLimits/updated" || msg.method === "account/updated") {
+        invalidateCodexRateLimits();
+      }
       this.broadcast("rpc:notification", { method: msg.method, params: msg.params ?? {} });
     }
   }
@@ -285,6 +288,44 @@ class AppServerBridge {
 }
 
 const bridge = new AppServerBridge();
+// The upstream read may take several seconds behind a proxy. Rate-limit and
+// account notifications invalidate this cache immediately, so a longer window
+// keeps Provider/Settings responsive without hiding server-pushed changes.
+const CODEX_RATE_LIMITS_CACHE_MS = 5 * 60 * 1000;
+let codexRateLimitsCache = null;
+let codexRateLimitsCachedAt = 0;
+let codexRateLimitsInFlight = null;
+let codexRateLimitsGeneration = 0;
+
+function invalidateCodexRateLimits() {
+  codexRateLimitsGeneration += 1;
+  codexRateLimitsCache = null;
+  codexRateLimitsCachedAt = 0;
+  codexRateLimitsInFlight = null;
+}
+
+function readCodexRateLimits() {
+  if (codexRateLimitsCache && Date.now() - codexRateLimitsCachedAt < CODEX_RATE_LIMITS_CACHE_MS) {
+    return Promise.resolve(codexRateLimitsCache);
+  }
+  if (codexRateLimitsInFlight) return codexRateLimitsInFlight;
+
+  const generation = codexRateLimitsGeneration;
+  const request = bridge
+    .request("account/rateLimits/read", {})
+    .then((result) => {
+      if (generation === codexRateLimitsGeneration) {
+        codexRateLimitsCache = result;
+        codexRateLimitsCachedAt = Date.now();
+      }
+      return result;
+    })
+    .finally(() => {
+      if (codexRateLimitsInFlight === request) codexRateLimitsInFlight = null;
+    });
+  codexRateLimitsInFlight = request;
+  return request;
+}
 
 // ---------------------------------------------------------------------------
 // Hotkey popout window (quick new thread / quick view), Ctrl+Shift+Space.
@@ -658,7 +699,10 @@ ipcMain.handle("rpc:request", async (_e, { method, params }) => {
         }
       }
     }
-    const result = await bridge.request(method, params);
+    const result = method === "account/rateLimits/read"
+      ? await readCodexRateLimits()
+      : await bridge.request(method, params);
+    if (method === "account/rateLimitResetCredit/consume") invalidateCodexRateLimits();
     if (method === "model/list") rememberCodexModels(result);
     return { ok: true, result };
   } catch (err) {
@@ -670,6 +714,7 @@ ipcMain.handle("rpc:respond", (_e, { id, result, error }) => {
   return true;
 });
 ipcMain.handle("appserver:restart", () => {
+  invalidateCodexRateLimits();
   bridge.killProcess();
   bridge.start();
   return true;
@@ -753,16 +798,6 @@ ipcMain.handle("agent-runtime:auth-status", async () => {
     return {
       ok: true,
       result: await getExternalAuthStatus({ homePath: app.getPath("home") }),
-    };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
-  }
-});
-ipcMain.handle("agent-runtime:usage", async (_e, { runtime } = {}) => {
-  try {
-    return {
-      ok: true,
-      result: await getExternalUsage(String(runtime || ""), { homePath: app.getPath("home") }),
     };
   } catch (error) {
     return { ok: false, error: String(error?.message || error) };
