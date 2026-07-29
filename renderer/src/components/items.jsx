@@ -75,6 +75,10 @@ function cleanUserText(raw) {
 }
 
 function UserMessage({ item }) {
+  const readOnly = useStore((s) => {
+    const conv = s.activeThreadId ? s.conversations[s.activeThreadId] : null;
+    return !!conv?.readOnly;
+  });
   const texts = (item.content || []).filter((c) => c.type === "text").map((c) => c.text);
   const images = (item.content || []).filter((c) => c.type === "localImage" || c.type === "image");
   const mentions = (item.content || []).filter((c) => c.type === "mention" || c.type === "skill");
@@ -92,6 +96,7 @@ function UserMessage({ item }) {
   // Edit-and-resend: roll back the turn containing this message, then send
   // the edited text as a new turn.
   const resend = async () => {
+    if (readOnly) return;
     const s = useStore.getState();
     const threadId = s.activeThreadId;
     const text = draft.trim();
@@ -174,7 +179,9 @@ function UserMessage({ item }) {
         </div>
         <div className="flex h-[26px] items-center gap-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100">
           <HoverAction title="Copy" onClick={copy} icon={copied ? <IconCheck size={13} /> : <IconCopy size={13} />} />
-          <HoverAction title="Edit" onClick={() => { setDraft(full); setEditing(true); }} icon={<IconPencil size={13} />} />
+          {!readOnly && (
+            <HoverAction title="Edit" onClick={() => { setDraft(full); setEditing(true); }} icon={<IconPencil size={13} />} />
+          )}
         </div>
       </div>}
     </div>
@@ -269,6 +276,7 @@ export function TurnActionRow({ turn }) {
   const toast = useStore((s) => s.toast);
   const sendMessage = useStore((s) => s.sendMessage);
   const running = useStore((s) => !!s.activeConversation()?.activeTurnId);
+  const readOnly = useStore((s) => !!s.activeConversation()?.readOnly);
   const [copied, setCopied] = useState(false);
 
   const agentTexts = (turn.items || []).filter((i) => i.type === "agentMessage" && i.text).map((i) => i.text);
@@ -292,9 +300,13 @@ export function TurnActionRow({ turn }) {
   return (
     <div className="fade-in flex items-center gap-0.5 opacity-0 transition-opacity group-hover/turn:opacity-100">
       <ActionIcon title={copied ? "Copied" : "Copy"} onClick={copy} icon={copied ? <IconCheck size={14} /> : <IconCopy size={14} />} />
-      <ActionIcon title="Good response" onClick={() => feedback("thumbs_up")} icon={<IconThumbUp size={14} />} />
-      <ActionIcon title="Bad response" onClick={() => feedback("thumbs_down")} icon={<IconThumbDown size={14} />} />
-      <ActionIcon title="Retry" onClick={retry} disabled={!firstUserText || running} icon={<IconRetry size={14} />} />
+      {!readOnly && (
+        <>
+          <ActionIcon title="Good response" onClick={() => feedback("thumbs_up")} icon={<IconThumbUp size={14} />} />
+          <ActionIcon title="Bad response" onClick={() => feedback("thumbs_down")} icon={<IconThumbDown size={14} />} />
+          <ActionIcon title="Retry" onClick={retry} disabled={!firstUserText || running} icon={<IconRetry size={14} />} />
+        </>
+      )}
     </div>
   );
 }

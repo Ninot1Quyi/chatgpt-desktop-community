@@ -42,7 +42,7 @@ export default function PersonalizationSection() {
   return (
     <>
       <div className="mb-4 px-1 text-[12px] leading-5 text-(--fg-tertiary)">
-        Personality settings are not supported by every model. Codex's tone can be customized in Custom instructions.
+        Personality settings are not supported by every model. Noma's tone can be customized in Custom instructions.
       </div>
 
       <Card>

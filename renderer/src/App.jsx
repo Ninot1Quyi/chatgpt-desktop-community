@@ -1,11 +1,12 @@
 // App shell: sidebar / conversation / right panel layout, drag-resize,
 // global shortcuts, command menu, settings window, connection gate.
 import React, { useEffect, useRef, useState } from "react";
-import { useStore } from "./store.js";
+import { useStore, runtimeConnected } from "./store.js";
 import { cx } from "./lib/cx.js";
 import { COMMANDS, matchAccel, bindingFor, bindingsFor } from "./lib/keys.js";
 import * as api from "./api.js";
 import { panelHook } from "./lib/panelHook.js";
+import { EXTERNAL_RUNTIMES, RUNTIMES, RUNTIME_IDS, runtimeMeta } from "./lib/runtimes.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Conversation, { ConversationHeaderContent, HeaderPanelButtons, HeaderContextButtons } from "./components/Conversation.jsx";import NavViews from "./components/NavViews.jsx";
 import RightPanel, { RightPanelHeader } from "./components/RightPanel.jsx";
@@ -14,17 +15,16 @@ import WinWindowControls from "./components/WinWindowControls.jsx";
 import TerminalTab from "./components/panel/TerminalTab.jsx";
 import Settings from "./components/Settings.jsx";
 import { Toasts, Spinner, IconButton, Menu } from "./components/ui.jsx";
-import { IconSearch, IconChat, IconHeaderSidebar, IconHeaderArrow, IconX, IconGear, IconPlus, IconChevronDown, LucideIcon } from "./components/icons.jsx";
+import { IconSearch, IconChat, IconHeaderSidebar, IconX, IconGear, IconPlus, IconChevronDown, LucideIcon } from "./components/icons.jsx";
 
 export default function App() {
   const init = useStore((s) => s.init);
   const status = useStore((s) => s.status);
-  const account = useStore((s) => s.account);
   const accountChecked = useStore((s) => s.accountChecked);
-  const requiresOpenaiAuth = useStore((s) => s.requiresOpenaiAuth);
+  const externalAuthChecked = useStore((s) => s.externalAuthChecked);
+  const anyConnected = useStore((s) => RUNTIME_IDS.some((id) => runtimeConnected(s, id)));
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
-  const isWin = useStore((s) => s.appInfo?.platform === "win32");
 
   useEffect(() => { init(); }, []);
   // deep-link: ?thread=<id> (Open in new window) — open it once ready.
@@ -47,7 +47,10 @@ export default function App() {
           case "newChat": s.setUi({ navView: "chats" }); s.newChat(); break;
           case "newStandaloneChat": { s.setCwd(null); s.setUi({ navView: "chats" }); s.newChat(); break; }
           case "quickChat": api.toggleQuickChat(); break;
-          case "archiveChat": { if (s.activeThreadId) s.archiveThread(s.activeThreadId); break; }
+          case "archiveChat": {
+            if (s.activeThreadId && !s.activeConversation?.()?.readOnly) s.archiveThread(s.activeThreadId);
+            break;
+          }
           case "openInNewWindow": { if (s.activeThreadId) api.openThreadWindow(s.activeThreadId); break; }
           case "nextRecentChat": {
             const ordered = [...(s.navBack || [])].reverse();
@@ -56,13 +59,19 @@ export default function App() {
           }
           case "nextTab": {
             const tabs = useStore.getState().ui;
-            const order = ["chats", "pull-requests", "sites", "scheduled", "plugins"];
+            const order = ["chats", "pull-requests", "scheduled", "plugins"];
             const i = order.indexOf(tabs.navView);
             s.setUi({ navView: order[(i + 1) % order.length] });
             break;
           }
-          case "renameChat": { if (s.activeThreadId) set({ renameRequest: Date.now() }); break; }
+          case "renameChat": {
+            if (s.activeThreadId && !s.activeConversation?.()?.readOnly) {
+              useStore.setState({ renameRequest: Date.now() });
+            }
+            break;
+          }
           case "togglePin": {
+            if (s.activeConversation?.()?.readOnly) break;
             const cwd = s.activeConversation?.()?.thread?.cwd || s.cwd;
             if (cwd) s.togglePinnedProject(cwd);
             break;
@@ -80,8 +89,6 @@ export default function App() {
           case "openBrowserTab": panelHook.open?.("browser"); break;
           case "openSideChatTab": panelHook.open?.("sidechat"); break;
           case "openReviewTab": panelHook.open?.("review"); break;
-          case "back": s.goBack(); break;
-          case "forward": s.goForward(); break;
           case "closeWindow": window.close(); break;
           case "settings": setUi({ settingsOpen: true }); break;
         }
@@ -97,15 +104,17 @@ export default function App() {
   if (status !== "ready") {
     return <BootScreen status={status} />;
   }
-  if (!accountChecked) {
+  if (!accountChecked || !externalAuthChecked) {
     return <BootScreen status="checking-account" />;
   }
-  if (requiresOpenaiAuth && !account) {
+  // Any connected vendor (Codex account or claude/kimi CLI credentials) is
+  // enough to enter the app.
+  if (!anyConnected) {
     return <AuthScreen />;
   }
 
   return (
-    <div className={cx("app-shell-root relative h-full w-full overflow-hidden", isWin && "win-shell")}>
+    <div className="app-shell-root win-shell relative h-full w-full overflow-hidden">
       <>
       {/* full-height regions; the 46px title bar floats transparently on top
           (sidebar toggle, back/forward, menus, caption buttons). The white
@@ -127,80 +136,70 @@ export default function App() {
             />
           </>
         )}
-        {isWin ? (
-          <div className="mt-[46px] ml-2 flex min-w-0 flex-1 overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)">
-            {/* Windows keeps a second toolbar row below its custom title bar. */}
-            <div className={cx("flex min-w-[360px] flex-1 flex-col", ui.rightOpen && ui.rightExpanded && "hidden")}>
-              <div className="flex h-[46px] shrink-0 items-center gap-1 pl-3 pr-2">
-                {ui.navView === "chats" ? (
-                  <>
-                    <div className="min-w-0 flex-1">
-                      <ConversationHeaderContent />
-                    </div>
-                    <HeaderContextButtons />
-                    {!ui.rightOpen && <HeaderPanelButtons />}
-                  </>
-                ) : (
-                  <>
-                    {ui.navView === "plugins" && <PluginsHeaderTabs />}
-                    <div className="flex-1" />
-                    <NavHeaderActions view={ui.navView} />
-                  </>
-                )}
-              </div>
-              <div className="flex min-h-0 flex-1 flex-col">
-                {ui.navView === "chats" ? <Conversation /> : <NavViews />}
-              </div>
-              {ui.bottomOpen && (
-                <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
-                  <BottomPanel />
-                </div>
+        <div className="mt-[46px] ml-2 flex min-w-0 flex-1 overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)">
+          {/* conversation column: its own toolbar row (official layout — each
+              region carries a 46px toolbar directly below the title bar) */}
+          <div className={cx("flex min-w-[360px] flex-1 flex-col", ui.rightOpen && ui.rightExpanded && "hidden")}>
+            <div className="flex h-[46px] shrink-0 items-center gap-1 pl-3 pr-2">
+              {ui.navView === "chats" ? (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <ConversationHeaderContent />
+                  </div>
+                  <HeaderContextButtons />
+                  {!ui.rightOpen && <HeaderPanelButtons />}
+                </>
+              ) : (
+                <>
+                  {ui.navView === "plugins" && <PluginsHeaderTabs />}
+                  <div className="flex-1" />
+                  <NavHeaderActions view={ui.navView} />
+                </>
               )}
             </div>
-            {ui.rightOpen && (
-              <>
-                {!ui.rightExpanded && <RightPanelDragHandle />}
-                <div
-                  className={cx("slide-in-right flex shrink-0 flex-col border-l border-(--border-light) bg-(--surface)", ui.rightExpanded && "min-w-0 flex-1")}
-                  style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
-                >
-                  <div className="flex h-[46px] shrink-0 items-center pl-2">
-                    <div className="h-full min-w-0 flex-1">
-                      <RightPanelHeader />
-                    </div>
-                    <HeaderPanelButtons />
-                    <div className="w-2 shrink-0" />
-                  </div>
-                  <div className="min-h-0 flex-1">
-                    <RightPanel />
-                  </div>
-                </div>
-              </>
+            <div className="flex min-h-0 flex-1 flex-col">
+              {ui.navView === "chats" ? <Conversation /> : <NavViews />}
+            </div>
+            {ui.bottomOpen && (
+              <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
+                <BottomPanel />
+              </div>
             )}
           </div>
-        ) : (
-          <>
-            <div className={cx("flex min-w-0 flex-1 flex-col bg-(--surface) pt-[46px]", ui.rightOpen && ui.rightExpanded && "hidden")}>
-              {ui.navView === "chats" ? <Conversation /> : <NavViews />}
-              {ui.bottomOpen && (
-                <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
-                  <BottomPanel />
-                </div>
+          {ui.rightOpen && (
+            <>
+              {!ui.rightExpanded && (
+                <DragHandle
+                  onDrag={(dx) => setUi({ rightWidth: clamp(ui.rightWidth - dx, 320, Math.max(340, window.innerWidth - 420)) })}
+                  onEnd={() => {
+                    // snap back into the available space on release
+                    const s = useStore.getState();
+                    const side = s.ui.sidebarOpen ? s.ui.sidebarWidth + 8 : 0;
+                    const max = Math.max(320, window.innerWidth - side - 380);
+                    if (s.ui.rightWidth > max) s.setUi({ rightWidth: max });
+                  }}
+                />
               )}
-            </div>
-            {ui.rightOpen && (
-              <>
-                {!ui.rightExpanded && <RightPanelDragHandle />}
-                <div
-                  className={cx("slide-in-right shrink-0 border-l border-(--border-light)", ui.rightExpanded && "min-w-0 flex-1")}
-                  style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
-                >
+              <div
+                className={cx("slide-in-right flex shrink-0 flex-col border-l border-(--border-light) bg-(--surface)", ui.rightExpanded && "min-w-0 flex-1")}
+                style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
+              >
+                {/* the panel's own toolbar: tab strip + panel buttons at right
+                    (same window-right spot they have when the panel is closed) */}
+                <div className="flex h-[46px] shrink-0 items-center pl-2">
+                  <div className="h-full min-w-0 flex-1">
+                    <RightPanelHeader />
+                  </div>
+                  <HeaderPanelButtons />
+                  <div className="w-2 shrink-0" />
+                </div>
+                <div className="min-h-0 flex-1">
                   <RightPanel />
                 </div>
-              </>
-            )}
-          </>
-        )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
       <GlobalHeader />
       {/* collapsed sidebar: hover the left edge to slide it in (reference
@@ -244,144 +243,44 @@ export default function App() {
 function GlobalHeader() {
   const ui = useStore((s) => s.ui);
   const setUi = useStore((s) => s.setUi);
-  const navBack = useStore((s) => s.navBack);
-  const navFwd = useStore((s) => s.navFwd);
-  const { goBack, goForward } = useStore();
-  // macOS needs the traffic-light inset; Windows has no left-side controls.
-  const isWin = useStore((s) => s.appInfo?.platform === "win32");
   return (
-    <div className={cx("app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1", isWin ? "pl-3" : "pl-[88px]")}>
+    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pl-3">
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
-        title="Toggle sidebar (⌘B)"
+        title="Toggle sidebar (Ctrl+B)"
         onClick={() => setUi({ sidebarOpen: !ui.sidebarOpen })}
       />
-      <IconButton
-        icon={<IconHeaderArrow />}
-        size={16}
-        title="Back"
-        disabled={!navBack.length}
-        onClick={goBack}
-      />
-      <IconButton
-        icon={<IconHeaderArrow className="-scale-x-100" />}
-        size={16}
-        title="Forward"
-        disabled={!navFwd.length}
-        onClick={goForward}
-      />
-      {isWin ? (
-        <>
-          <WinMenuBar />
-          {!ui.sidebarOpen && <HeaderNewChatButton />}
-          <div className="flex-1" />
-          <WinWindowControls />
-        </>
-      ) : (
-        <>
-          {!ui.sidebarOpen && <HeaderNewChatButton />}
-          {ui.sidebarOpen && <div className="shrink-0" style={{ width: Math.max(0, ui.sidebarWidth - 180) }} />}
-          {ui.navView === "chats" ? (
-            <>
-              <div className={cx("min-w-0", ui.rightOpen && ui.rightExpanded ? "w-0" : "flex-1")}>
-                {!(ui.rightOpen && ui.rightExpanded) && <ConversationHeaderContent />}
-              </div>
-              {ui.rightOpen ? (
-                <>
-                  {!ui.rightExpanded && <HeaderContextButtons />}
-                  <div className="w-2 shrink-0" />
-                  <div
-                    className={cx("flex h-full shrink-0 items-center", ui.rightExpanded && "min-w-0 flex-1")}
-                    style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
-                  >
-                    <div className="h-full min-w-0 flex-1">
-                      <RightPanelHeader />
-                    </div>
-                    <HeaderPanelButtons />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <HeaderContextButtons />
-                  <HeaderPanelButtons />
-                  <div className="w-2 shrink-0" />
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              {ui.navView === "plugins" && <PluginsHeaderTabs />}
-              <div className="flex-1" />
-              <NavHeaderActions view={ui.navView} />
-              <div className="w-2 shrink-0" />
-            </>
-          )}
-        </>
+      <WinMenuBar />
+      {/* collapsed sidebar exposes a quick new-chat button (reference header) */}
+      {!ui.sidebarOpen && (
+        <IconButton
+          icon={<LucideIcon name="SquarePen" size={16} />}
+          title="New chat"
+          onClick={() => {
+            const s = useStore.getState();
+            s.setUi({ navView: "chats" });
+            s.newChat();
+          }}
+        />
       )}
+      <div className="flex-1" />
+      <WinWindowControls />
     </div>
   );
 }
 
-function HeaderNewChatButton() {
-  return (
-    <IconButton
-      icon={<LucideIcon name="SquarePen" size={16} />}
-      title="New chat"
-      onClick={() => {
-        const s = useStore.getState();
-        s.setUi({ navView: "chats" });
-        s.newChat();
-      }}
-    />
-  );
-}
-
-function RightPanelDragHandle() {
-  const ui = useStore((s) => s.ui);
-  const setUi = useStore((s) => s.setUi);
-  return (
-    <DragHandle
-      onDrag={(dx) => setUi({ rightWidth: clamp(ui.rightWidth - dx, 320, Math.max(340, window.innerWidth - 420)) })}
-      onEnd={() => {
-        const s = useStore.getState();
-        const side = s.ui.sidebarOpen ? s.ui.sidebarWidth + 8 : 0;
-        const max = Math.max(320, window.innerWidth - side - 380);
-        if (s.ui.rightWidth > max) s.setUi({ rightWidth: max });
-      }}
-    />
-  );
-}
-
-// The peek sidebar's own copy of the window-control buttons (toggle/back/
-// forward), floating over its top edge like the reference peek shows.
+// The peek sidebar's own copy of the sidebar toggle, floating over its top
+// edge like the reference peek shows.
 function PeekHeader() {
   const setUi = useStore((s) => s.setUi);
-  const navBack = useStore((s) => s.navBack);
-  const navFwd = useStore((s) => s.navFwd);
-  const { goBack, goForward } = useStore();
-  const isWin = useStore((s) => s.appInfo?.platform === "win32");
   return (
-    <div className={cx("app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5", isWin ? "pl-3" : "pl-[84px]")}>
+    <div className="app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-3">
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
-        title="Show sidebar (⌘B)"
+        title="Show sidebar (Ctrl+B)"
         onClick={() => setUi({ sidebarOpen: true, sidebarPeek: false })}
-      />
-      <IconButton
-        icon={<IconHeaderArrow />}
-        size={16}
-        title="Back"
-        disabled={!navBack.length}
-        onClick={goBack}
-      />
-      <IconButton
-        icon={<IconHeaderArrow className="-scale-x-100" />}
-        size={16}
-        title="Forward"
-        disabled={!navFwd.length}
-        onClick={goForward}
       />
     </div>
   );
@@ -412,7 +311,7 @@ function PluginsHeaderTabs() {
 }
 
 // Per-page actions at the right edge of the header band (reference: Plugins
-// has refresh + manage gear + Create; Scheduled/Sites just Create; PR none).
+// has refresh + manage gear + Create; Scheduled just Create; PR none).
 function NavHeaderActions({ view }) {
   const setUi = useStore((s) => s.setUi);
   const [createOpen, setCreateOpen] = useState(false);
@@ -480,27 +379,9 @@ function NavHeaderActions({ view }) {
           align="end"
           width={220}
           items={[
-            { id: "task", label: "Create scheduled task", onSelect: () => toast("Create scheduled tasks from a chat by asking Codex") },
+            { id: "task", label: "Create scheduled task", onSelect: () => toast("Create scheduled tasks from a chat by asking Noma") },
           ]}
         />
-      </div>
-    );
-  }
-  if (view === "sites") {
-    return (
-      <div className="app-no-drag flex items-center gap-1.5">
-        <IconButton
-          icon={<LucideIcon name="RefreshCw" size={14} />}
-          title="Refresh"
-          onClick={() => window.dispatchEvent(new CustomEvent("sites:reload"))}
-        />
-        <button
-          className="flex h-7 items-center gap-1.5 rounded-full border border-(--border) px-3 text-sm hover:bg-(--surface-hover)"
-          onClick={() => toast("Ask Codex in a chat to set this up")}
-        >
-          <IconPlus size={12} />
-          Create
-        </button>
       </div>
     );
   }
@@ -529,7 +410,7 @@ function FloatingSidebarToggle() {
     <button
       className="app-no-drag fixed top-[9px] left-[84px] z-30 flex h-7 items-center gap-1 rounded-lg border border-(--border-light) bg-(--surface-raised) px-2 text-xs text-(--fg-secondary) shadow-sm hover:bg-(--surface-hover)"
       onClick={() => setUi({ sidebarOpen: true })}
-      title="Show sidebar (⌘B)"
+      title="Show sidebar (Ctrl+B)"
     >
       ☰ Chats
     </button>
@@ -573,11 +454,11 @@ function BootScreen({ status }) {
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-(--surface)">
       {status === "crashed" ? (
         <>
-          <div className="text-[15px] font-medium text-(--danger)">Codex backend failed to start</div>
+          <div className="text-[15px] font-medium text-(--danger)">Noma backend failed to start</div>
           <div className="max-w-[420px] text-center text-[13px] text-(--fg-tertiary)">
             Tried to launch: <span className="font-mono">{binary || "codex"}</span>
             <br />
-            {backendError || "The bundled Codex runtime could not be started."}
+            {backendError || "The bundled Noma runtime could not be started."}
           </div>
           {binaryCandidates.length > 0 && (
             <details className="max-w-[560px] text-[12px] text-(--fg-tertiary)">
@@ -599,7 +480,7 @@ function BootScreen({ status }) {
           <Spinner size={22} className="text-(--fg-tertiary)" />
           <div className="text-[13px] text-(--fg-tertiary)">
             {status === "starting"
-              ? "Starting Codex…"
+              ? "Starting Noma…"
               : status === "checking-account"
                 ? "Checking account…"
                 : "Connecting…"}
@@ -611,45 +492,83 @@ function BootScreen({ status }) {
 }
 
 function AuthScreen() {
-  const loginStatus = useStore((s) => s.loginStatus);
   const loginError = useStore((s) => s.loginError);
-  const startLogin = useStore((s) => s.startChatgptLogin);
-  const cancelLogin = useStore((s) => s.cancelChatgptLogin);
-  const waiting = loginStatus === "starting" || loginStatus === "waiting" || loginStatus === "completing";
+
+  // External sign-ins complete in a separate console window; poll for them.
+  useEffect(() => {
+    useStore.getState().refreshExternalAuth();
+    const t = setInterval(() => useStore.getState().refreshExternalAuth(), 4000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
     <div className="app-drag flex h-full w-full items-center justify-center bg-(--surface)">
-      <div className="app-no-drag flex w-[380px] flex-col items-center text-center">
+      <div className="app-no-drag flex w-[400px] flex-col items-center text-center">
         <div className="mb-5 flex size-12 items-center justify-center rounded-2xl border border-(--border) bg-(--surface-raised)">
           <IconChat size={24} />
         </div>
-        <h1 className="text-[22px] font-semibold">ChatGPT Desktop Community</h1>
+        <h1 className="text-[22px] font-semibold">Noma</h1>
         <p className="mt-2 max-w-[340px] text-[13px] leading-5 text-(--fg-tertiary)">
-          Sign in with ChatGPT to use your account and models in the local desktop app.
+          Sign in with any provider below to use its account and models in Noma.
         </p>
-        <button
-          className="mt-6 flex h-10 w-full items-center justify-center rounded-xl bg-(--fg) text-[13px] font-medium text-(--surface) disabled:opacity-60"
-          disabled={waiting}
-          onClick={startLogin}
-        >
-          {loginStatus === "starting"
-            ? "Starting sign-in…"
-            : loginStatus === "waiting"
-              ? "Finish signing in in your browser"
-              : loginStatus === "completing"
-                ? "Finishing sign-in…"
-                : "Continue with ChatGPT"}
-        </button>
-        {loginStatus === "waiting" && (
-          <button className="mt-3 text-xs text-(--fg-tertiary) hover:text-(--fg)" onClick={cancelLogin}>
-            Cancel
-          </button>
-        )}
+        <div className="mt-6 flex w-full flex-col gap-2">
+          {RUNTIMES.map((meta) => <AuthVendorRow key={meta.id} meta={meta} />)}
+        </div>
         {loginError && <div className="mt-4 text-[12px] leading-5 text-(--danger)">{loginError}</div>}
         <p className="mt-6 text-[11px] leading-4 text-(--fg-faint)">
-          Authentication is handled and stored locally by the bundled Codex runtime.
+          Credentials are handled and stored locally by each provider's own runtime.
         </p>
       </div>
+    </div>
+  );
+}
+
+// One provider row on the sign-in screen: icon, name, status, connect button.
+function AuthVendorRow({ meta }) {
+  const connected = useStore((s) => runtimeConnected(s, meta.id));
+  const loginStatus = useStore((s) => s.loginStatus);
+  const startLogin = useStore((s) => s.startChatgptLogin);
+  const cancelLogin = useStore((s) => s.cancelChatgptLogin);
+  const startExternalLogin = useStore((s) => s.startExternalLogin);
+  const codex = meta.id === "codex";
+  const waiting = codex && (loginStatus === "starting" || loginStatus === "waiting" || loginStatus === "completing");
+  const codexLabel = loginStatus === "starting"
+    ? "Starting…"
+    : loginStatus === "waiting"
+      ? "In browser…"
+      : loginStatus === "completing"
+        ? "Finishing…"
+        : "Connect";
+
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-(--border-light) bg-(--surface-under) px-4 py-3 text-left">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center">{meta.icon(20)}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-medium">{meta.label}</div>
+        <div className="text-[11px] text-(--fg-tertiary)">
+          {connected
+            ? "Connected"
+            : codex
+              ? "Sign in with your ChatGPT account"
+              : `Sign in via the ${meta.label} CLI (opens a window)`}
+        </div>
+      </div>
+      {connected ? (
+        <LucideIcon name="Check" size={16} className="shrink-0 text-(--success)" />
+      ) : (
+        <button
+          className="flex h-7 shrink-0 items-center rounded-lg bg-(--fg) px-3 text-[12px] font-medium text-(--surface) disabled:opacity-60"
+          disabled={waiting}
+          onClick={() => (codex ? startLogin() : startExternalLogin(meta.id))}
+        >
+          {codex ? codexLabel : "Connect"}
+        </button>
+      )}
+      {!connected && codex && loginStatus === "waiting" && (
+        <button className="shrink-0 text-xs text-(--fg-tertiary) hover:text-(--fg)" onClick={cancelLogin}>
+          Cancel
+        </button>
+      )}
     </div>
   );
 }
@@ -659,6 +578,8 @@ function CommandMenu() {
   const open = useStore((s) => s.ui.commandMenuOpen);
   const setUi = useStore((s) => s.setUi);
   const threads = useStore((s) => s.threads);
+  // External history sources, registry-driven (fixed registry = stable hooks).
+  const externalThreads = EXTERNAL_RUNTIMES.map((r) => useStore((s) => s[r.stateKeys.threads]));
   const { openThread, newChat } = useStore();
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
@@ -666,7 +587,7 @@ function CommandMenu() {
   useEffect(() => { if (open) { setQ(""); setIdx(0); } }, [open]);
   if (!open) return null;
 
-  const filtered = threads
+  const filtered = [...threads, ...externalThreads.flat()]
     .filter((t) => {
       const hay = `${t.name || ""} ${t.preview || ""} ${t.cwd || ""}`.toLowerCase();
       return hay.includes(q.toLowerCase());
@@ -709,7 +630,9 @@ function CommandMenu() {
             <span className="flex h-6 w-6 items-center justify-center rounded-md bg-(--accent-soft) text-(--accent)">＋</span>
             New chat
           </button>
-          {filtered.map((t, i) => (
+          {filtered.map((t, i) => {
+            const meta = runtimeMeta(t.source);
+            return (
             <button
               key={t.id}
               className={cx(
@@ -719,10 +642,18 @@ function CommandMenu() {
               onMouseEnter={() => setIdx(i)}
               onClick={() => pick(t)}
             >
-              <IconChat size={14} className="shrink-0 text-(--fg-tertiary)" />
+              {meta
+                ? meta.icon(14, "shrink-0")
+                : <IconChat size={14} className="shrink-0 text-(--fg-tertiary)" />}
               <span className="truncate">{t.name || (t.preview || "").split("\n")[0] || "New chat"}</span>
+              {meta && (
+                <span className="ml-auto shrink-0 text-[10px] text-(--fg-faint)">
+                  {meta.label}
+                </span>
+              )}
             </button>
-          ))}
+            );
+          })}
           {filtered.length === 0 && (
             <div className="px-4 py-6 text-center text-[13px] text-(--fg-tertiary)">No matches</div>
           )}

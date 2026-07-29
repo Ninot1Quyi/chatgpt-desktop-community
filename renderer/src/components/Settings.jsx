@@ -2,11 +2,17 @@
 // Overlay replaces the whole app while open (not a modal); Esc or
 // "Back to app" closes it.
 import React, { useEffect, useMemo, useState } from "react";
-import { useStore, normalizePermission } from "../store.js";
+import { useStore, normalizePermission, runtimeConnected, planLabel } from "../store.js";
 import * as api from "../api.js";
 import { cx } from "../lib/cx.js";
-import { COMMANDS, bindingFor, eventToAccel } from "../lib/keys.js";
+import {
+  codexRateLimitSections,
+  codexRateLimitWindows,
+  codexRemainingPercent,
+  codexResetDate,
+} from "../lib/codexUsage.js";
 import { basename, isPathInside } from "../lib/time.js";
+import { COMMANDS, bindingFor, eventToAccel, isWindowsAccelerator } from "../lib/keys.js";
 import { Spinner } from "./ui.jsx";
 import {
   IconArchive,
@@ -23,7 +29,9 @@ import {
   IconTrash,
   LucideIcon,
 } from "./icons.jsx";
-import { Card, Row, Toggle, Dropdown, Segmented, lsGet, lsSet } from "./settings/shared.jsx";
+import { RUNTIMES, runtimeMeta } from "../lib/runtimes.jsx";
+import { SortableList } from "./SortableList.jsx";
+import { Card, Row, Toggle, Dropdown, Segmented, Btn, lsGet, lsSet } from "./settings/shared.jsx";
 import ProfileSection from "./settings/ProfileSection.jsx";
 import AppearanceSection from "./settings/AppearanceSection.jsx";
 import VoiceSection from "./settings/VoiceSection.jsx";
@@ -282,12 +290,10 @@ const PERMISSION_ROWS = [
   },
 ];
 
-const openDestinations = (isWin) => [
+const OPEN_DESTINATIONS = [
   { id: "editor", label: "Editor default" },
   { id: "vscode", label: "VS Code" },
-  isWin
-    ? { id: "explorer", label: "File Explorer" }
-    : { id: "finder", label: "Finder" },
+  { id: "explorer", label: "File Explorer" },
 ];
 
 function GeneralSection() {
@@ -295,14 +301,10 @@ function GeneralSection() {
   const setPermission = useStore((s) => s.setPermission);
   const bottomOpen = useStore((s) => s.ui.bottomOpen);
   const setUi = useStore((s) => s.setUi);
-  const isWin = useStore((s) => s.appInfo?.platform === "win32");
-  const destinations = openDestinations(isWin);
-  const [openDest, setOpenDest] = useState(() => lsGet("settings.openDestination", "editor"));
-  const [menuBar, setMenuBar] = useState(() => lsGet("settings.showInMenuBar", true));
-
-  useEffect(() => {
-    if (!destinations.some(({ id }) => id === openDest)) setOpenDest("editor");
-  }, [isWin, openDest]);
+  const [openDest, setOpenDest] = useState(() => {
+    const saved = lsGet("settings.openDestination", "editor");
+    return OPEN_DESTINATIONS.some(({ id }) => id === saved) ? saved : "editor";
+  });
 
   return (
     <>
@@ -318,7 +320,7 @@ function GeneralSection() {
         <Row title="Default file open destination" desc="Where files and folders open by default">
           <Dropdown
             value={openDest}
-            options={destinations}
+            options={OPEN_DESTINATIONS}
             onChange={(v) => {
               setOpenDest(v);
               lsSet("settings.openDestination", v);
@@ -327,15 +329,6 @@ function GeneralSection() {
         </Row>
         <Row title="Language" desc="Language for the app UI">
           <Dropdown value="en" options={[{ id: "en", label: "English (United States)" }]} onChange={() => {}} disabled />
-        </Row>
-        <Row title="Show in menu bar" desc="Keep ChatGPT in the macOS menu bar when the main window is closed">
-          <Toggle
-            on={menuBar}
-            onChange={(v) => {
-              setMenuBar(v);
-              lsSet("settings.showInMenuBar", v);
-            }}
-          />
         </Row>
         <Row title="Bottom panel" desc="Show the bottom panel control in the app header">
           <Toggle on={bottomOpen} onChange={(v) => setUi({ bottomOpen: v })} />
@@ -370,10 +363,28 @@ function GeneralSection() {
           />
         </Row>
       </Card>
+      <RuntimeOrderCard />
       <Card title="Updates">
         <UpdateRow />
       </Card>
     </>
+  );
+}
+
+// Drag-to-reorder card for sidebar vendor sections; the row data and visuals
+// come from the runtime registry, the drag behavior from SortableList.
+function RuntimeOrderCard() {
+  const runtimeOrder = useStore((s) => s.runtimeOrder);
+  const setRuntimeOrder = useStore((s) => s.setRuntimeOrder);
+  const items = runtimeOrder.map((id) => {
+    const meta = runtimeMeta(id);
+    return { id, label: meta?.label || id, icon: meta?.icon(14) };
+  });
+  return (
+    <Card title="Sidebar">
+      <Row title="Vendor order" desc="Drag to reorder the vendor sections in the sidebar" />
+      <SortableList items={items} onChange={setRuntimeOrder} />
+    </Card>
   );
 }
 
@@ -484,7 +495,7 @@ function ShortcutsSection() {
       <Card>
         {rows.map(([id, label, def, desc, extras]) => {
           const current = bindingFor(id, keybindings);
-          const isCustom = !!keybindings[id];
+          const isCustom = !!keybindings[id] && isWindowsAccelerator(keybindings[id]);
           const chips = [...(current ? [current] : []), ...(extras || [])];
           return (
             <div key={id} className="flex items-center justify-between gap-4 px-4 py-2.5">
@@ -525,7 +536,7 @@ function ShortcutsSection() {
         {rows.length === 0 && <div className="px-4 py-3 text-[12px] text-(--fg-faint)">No matching shortcuts</div>}
       </Card>
       <div className="px-1 text-[11px] text-(--fg-faint)">
-        Click a shortcut to remap it. Non-editable: Enter (send), Shift+Enter (new line), ⌘⇧Space (hotkey window), ⌘⌥N (quick chat).
+        Click a shortcut to remap it. Non-editable: Enter (send), Shift+Enter (new line), Ctrl+Shift+Space (hotkey window), Ctrl+Alt+N (quick chat).
       </div>
     </>
   );
@@ -536,10 +547,12 @@ function ShortcutsSection() {
 // layout, data from account/rateLimits/read).
 // ---------------------------------------------------------------------------
 function UsageSection() {
+  const account = useStore((s) => s.account);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [resetMsg, setResetMsg] = useState(null);
   const load = () => {
+    setError(null);
     api
       .rpc("account/rateLimits/read", {})
       .then((r) => setData(r))
@@ -548,24 +561,26 @@ function UsageSection() {
   useEffect(() => { load(); }, []);
 
   const main = data?.rateLimits;
-  const spark = data?.rateLimitsByLimitId?.codex_bengalfox;
-  const resets = data?.rateLimitResetCredits?.credits || [];
-
-  const pctLeft = (snap) => Math.max(0, 100 - (snap?.usedPercent ?? 0));
-  const resetDate = (snap) => {
-    if (!snap?.resetsAt) return null;
-    const d = new Date(snap.resetsAt * 1000);
-    return `${d.getMonth() + 1}月${d.getDate()}日`;
-  };
-  const expiry = (ts) => {
-    const d = new Date(ts * 1000);
-    return `${d.getMonth() + 1}/${d.getDate()}`;
-  };
+  const sections = codexRateLimitSections(data);
+  const resetSummary = data?.rateLimitResetCredits;
+  const resets = Array.isArray(resetSummary?.credits) ? resetSummary.credits : [];
+  const resetCount = Number(resetSummary?.availableCount || 0);
+  const credits = main?.credits;
+  const individualLimit = main?.individualLimit;
+  const plan = planLabel(main?.planType || account?.planType);
+  const creditBalance = credits?.unlimited
+    ? "Unlimited"
+    : credits?.hasCredits
+      ? credits.balance || "Available"
+      : "Not available";
 
   const useReset = (id) => {
     setResetMsg(null);
     api
-      .rpc("account/rateLimitResetCredit/consume", { creditId: id })
+      .rpc("account/rateLimitResetCredit/consume", {
+        creditId: id,
+        idempotencyKey: globalThis.crypto.randomUUID(),
+      })
       .then(() => { setResetMsg("Rate limits reset"); load(); })
       .catch((e) => setResetMsg(`Reset failed: ${e.message}`));
   };
@@ -577,57 +592,107 @@ function UsageSection() {
         <div className="flex justify-center py-6 text-(--fg-tertiary)"><Spinner /></div>
       )}
 
-      <Card title="Your plan">
-        <Row title="Pro plan" desc="₱9,990/mo">
-          <button className="rounded-full border border-(--border) px-3 py-1 text-xs hover:bg-(--surface-hover)" onClick={() => api.openExternal("https://chatgpt.com/pricing")}>
-            View plans
-          </button>
-        </Row>
-      </Card>
-
-      <Card title="Credits balance">
-        <Row
-          title={
-            <span>
-              Buy credits or turn on auto-reload to continue using Codex if you hit a limit.{" "}
-              <button className="underline" onClick={() => api.openExternal("https://help.openai.com/en/articles/20000106")}>Learn more</button>
-            </span>
-          }
-        />
-        <Row title="₱0" desc="Current balance">
-          <div className="flex gap-2">
-            <button className="rounded-full border border-(--border) px-3 py-1 text-xs hover:bg-(--surface-hover)" onClick={() => api.openExternal("https://chatgpt.com/billing")}>
-              Set up auto-reload
-            </button>
-            <button className="rounded-full bg-(--fg) px-3 py-1 text-xs font-medium text-(--surface) hover:opacity-90" onClick={() => api.openExternal("https://chatgpt.com/billing")}>
-              Buy credits
-            </button>
-          </div>
-        </Row>
-      </Card>
-
-      {main?.primary && (
-        <Card title="General usage limits">
-          <LimitRow label="Weekly usage limit" pctLeft={pctLeft(main.primary)} reset={resetDate(main.primary)} />
-        </Card>
-      )}
-      {spark?.primary && (
-        <Card title={`${spark.limitName || "GPT-5.3-Codex-Spark"} usage limits`}>
-          <LimitRow label="Weekly usage limit" pctLeft={pctLeft(spark.primary)} reset={resetDate(spark.primary)} />
-        </Card>
-      )}
-
-      {resets.length > 0 && (
-        <Card title="Usage limit resets">
-          {resets.map((c) => (
-            <Row key={c.id} title={c.title || "Full reset"} desc={`Expires ${expiry(c.expiresAt)}`}>
-              <button className="rounded-full border border-(--border) px-3 py-1 text-xs hover:bg-(--surface-hover)" onClick={() => useReset(c.id)}>
-                Use reset
+      {data && (
+        <>
+          <Card title="Your plan">
+            <Row title={plan ? `${plan} plan` : "Plan unavailable"}>
+              <button className="rounded-full border border-(--border) px-3 py-1 text-xs hover:bg-(--surface-hover)" onClick={() => api.openExternal("https://chatgpt.com/pricing")}>
+                View plans
               </button>
             </Row>
-          ))}
-          {resetMsg && <div className="px-4 pb-3 text-xs text-(--fg-tertiary)">{resetMsg}</div>}
-        </Card>
+          </Card>
+
+          {(credits || individualLimit || main?.spendControlReached) && (
+            <Card title="Credits and spend control">
+              {credits && (
+                <Row
+                  title="Credits balance"
+                  desc={credits.unlimited
+                    ? "The account reports unlimited credits."
+                    : credits.hasCredits
+                      ? "Current backend-reported credit balance."
+                      : "No separate credit balance is available for this account."}
+                >
+                  <span className="text-[13px] text-(--fg-secondary)">{creditBalance}</span>
+                </Row>
+              )}
+              {individualLimit && (
+                <Row
+                  title="Monthly usage limit"
+                  desc={`Resets ${codexResetDate(individualLimit.resetsAt, true) || "on the next billing cycle"}`}
+                >
+                  <span className="text-[13px] text-(--fg-secondary)">
+                    {individualLimit.used} / {individualLimit.limit} · {individualLimit.remainingPercent}% left
+                  </span>
+                </Row>
+              )}
+              {main?.spendControlReached && (
+                <Row
+                  title="Spend control reached"
+                  desc="This account has reached its configured spending limit."
+                />
+              )}
+            </Card>
+          )}
+
+          {sections.map((section) => {
+            const windows = codexRateLimitWindows(section.snapshot);
+            if (!windows.length) return null;
+            return (
+              <Card key={section.id} title={section.title}>
+                {windows.map(({ id, label, window }) => (
+                  <LimitRow
+                    key={id}
+                    label={label}
+                    pctLeft={codexRemainingPercent(window)}
+                    reset={codexResetDate(window.resetsAt, true)}
+                  />
+                ))}
+                {section.snapshot.rateLimitReachedType && (
+                  <Row
+                    title="Limit reached"
+                    desc={String(section.snapshot.rateLimitReachedType).replaceAll("_", " ")}
+                  />
+                )}
+              </Card>
+            );
+          })}
+
+          {resetSummary && (
+            <Card title="Usage limit resets">
+              <Row
+                title="Available resets"
+                desc={resets.length < resetCount
+                  ? `${resets.length} of ${resetCount} reset details are currently available.`
+                  : "Earned resets that can restore eligible usage windows."}
+              >
+                <span className="text-[13px] text-(--fg-secondary)">{resetCount}</span>
+              </Row>
+              {resets.map((credit) => (
+                <Row
+                  key={credit.id}
+                  title={credit.title || "Full reset"}
+                  desc={[
+                    credit.description,
+                    credit.expiresAt ? `Expires ${codexResetDate(credit.expiresAt, true)}` : "No expiry reported",
+                  ].filter(Boolean).join(" · ")}
+                >
+                  {credit.status === "available" ? (
+                    <button
+                      className="rounded-full border border-(--border) px-3 py-1 text-xs hover:bg-(--surface-hover)"
+                      onClick={() => useReset(credit.id)}
+                    >
+                      Use reset
+                    </button>
+                  ) : (
+                    <span className="text-xs capitalize text-(--fg-tertiary)">{credit.status}</span>
+                  )}
+                </Row>
+              ))}
+              {resetMsg && <div className="px-4 pb-3 text-xs text-(--fg-tertiary)">{resetMsg}</div>}
+            </Card>
+          )}
+        </>
       )}
 
       <Card title="Cancel plan">
@@ -673,21 +738,33 @@ function AccountSection() {
   const codexHome = useStore((s) => s.codexHome);
   const binary = useStore((s) => s.binary);
   const appInfo = useStore((s) => s.appInfo);
+
+  // Keep vendor sign-in status fresh while this page is open — external
+  // logins complete in a separate console window.
+  useEffect(() => {
+    useStore.getState().refreshExternalAuth();
+    const t = setInterval(() => useStore.getState().refreshExternalAuth(), 5000);
+    return () => clearInterval(t);
+  }, []);
+
   return (
     <>
+      <Card title="Connected accounts">
+        {RUNTIMES.map((meta) => <VendorAccountRow key={meta.id} meta={meta} />)}
+      </Card>
       <Card title="Account">
         <Row title="Email">
           <span className="text-[13px] text-(--fg-secondary)">{account?.email || "Not signed in"}</span>
         </Row>
         <Row title="Plan">
-          <span className="text-[13px] capitalize text-(--fg-secondary)">{account?.planType || "—"}</span>
+          <span className="text-[13px] text-(--fg-secondary)">{planLabel(account?.planType) || "—"}</span>
         </Row>
       </Card>
       <Card title="Backend">
         <InfoRow label="CLI path" value={binary} />
         <InfoRow label="Codex home" value={codexHome} />
-        <InfoRow label="Client" value={`codex-desktop-rebuilt v${appInfo?.version ?? "?"}`} />
-        <Row title="Restart backend" desc="Restart the Codex backend process.">
+        <InfoRow label="Client" value={`Noma v${appInfo?.version ?? "?"}`} />
+        <Row title="Restart backend" desc="Restart the Noma backend process.">
           <button
             className="rounded-lg border border-(--border) px-3 py-1.5 text-[13px] hover:bg-(--surface-hover)"
             onClick={() => api.restartAppServer()}
@@ -697,6 +774,31 @@ function AccountSection() {
         </Row>
       </Card>
     </>
+  );
+}
+
+// One provider row: icon, name, connection status, Connect/Switch button.
+function VendorAccountRow({ meta }) {
+  const account = useStore((s) => s.account);
+  const connected = useStore((s) => runtimeConnected(s, meta.id));
+  const startChatgptLogin = useStore((s) => s.startChatgptLogin);
+  const startExternalLogin = useStore((s) => s.startExternalLogin);
+  const codex = meta.id === "codex";
+  const status = codex
+    ? account?.email || (connected ? "Connected" : "Not connected")
+    : connected ? "Connected" : "Not connected";
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center">{meta.icon(18)}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px]">{meta.label}</div>
+        <div className="mt-0.5 truncate text-[12px] text-(--fg-tertiary)">{status}</div>
+      </div>
+      {connected && <LucideIcon name="Check" size={14} className="shrink-0 text-(--success)" />}
+      <Btn onClick={() => (codex ? startChatgptLogin() : startExternalLogin(meta.id))}>
+        {connected ? "Switch" : "Connect"}
+      </Btn>
+    </div>
   );
 }
 

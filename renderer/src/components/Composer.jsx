@@ -2,7 +2,7 @@
 // selectors, context chips (home), queued pills, send/stop.
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useStore, PERMISSIONS, normalizePermission } from "../store.js";
+import { useStore, PERMISSIONS, normalizePermission, runtimeConnected } from "../store.js";
 import * as api from "../api.js";
 import { cx } from "../lib/cx.js";
 import { basename } from "../lib/time.js";
@@ -285,8 +285,8 @@ export default function Composer({ centered = false, quick = false }) {
       run: () => useStore.getState().toast("Feedback submission isn't wired in this build", "warn") },
     { id: "goal", label: "Goal", desc: "Set a goal to keep pursuing", icon: <IconCmdGoal size={16} />,
       run: () => useStore.getState().setUi({ goalDialogOpen: true }) },
-    { id: "init", label: "Init", desc: "Create an AGENTS.md file with instructions for Codex", icon: <IconCmdInit size={16} />,
-      run: () => doSendRef.current?.("Create an AGENTS.md file with instructions for Codex") },
+    { id: "init", label: "Init", desc: "Create an AGENTS.md file with instructions for Noma", icon: <IconCmdInit size={16} />,
+      run: () => doSendRef.current?.("Create an AGENTS.md file with instructions for Noma") },
     { id: "mcp", label: "MCP", desc: "Show MCP server status", icon: <IconCmdMcp size={16} />,
       run: () => useStore.getState().setUi({ settingsOpen: true, settingsSection: "connections" }) },
     { id: "memories", label: "Memories", desc: "Use on, generate on", icon: <IconCmdMemories size={16} />,
@@ -300,7 +300,7 @@ export default function Composer({ centered = false, quick = false }) {
       run: () => {
         const s = useStore.getState();
         s.setPlanMode(!s.planMode);
-        s.toast(s.planMode ? "Plan mode off" : "Plan mode on — Codex will propose a plan first");
+        s.toast(s.planMode ? "Plan mode off" : "Plan mode on — Noma will propose a plan first");
       } },
     { id: "reasoning", label: "Reasoning", desc: effChipLabel || "Default", icon: <IconCmdReasoning size={16} />,
       run: () => window.dispatchEvent(new CustomEvent("composer:open-model-menu")) },
@@ -1303,6 +1303,10 @@ function effortLabel(e) {
 // ---------------------------------------------------------------------------
 function ModelChip() {
   const models = useStore((s) => s.models);
+  const modelsByRuntime = useStore((s) => s.modelsByRuntime);
+  const runtimeCatalog = useStore((s) => s.runtimeCatalog);
+  const runtime = useStore((s) => s.runtime);
+  const activeThreadId = useStore((s) => s.activeThreadId);
   const model = useStore((s) => s.model);
   const effort = useStore((s) => s.effort);
   const serviceTier = useStore((s) => s.serviceTier);
@@ -1313,6 +1317,12 @@ function ModelChip() {
   const [open, setOpen] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [closedWidth, setClosedWidth] = useState(null);
+  // Only vendors with an active sign-in show up in the picker.
+  const connected = {
+    codex: useStore((s) => runtimeConnected(s, "codex")),
+    claude: useStore((s) => runtimeConnected(s, "claude")),
+    kimi: useStore((s) => runtimeConnected(s, "kimi")),
+  };
 
   // "/model" and "/reasoning" slash commands open this menu.
   useEffect(() => {
@@ -1323,7 +1333,21 @@ function ModelChip() {
 
   const current = models.find((m) => m.model === model);
   const effLabel = effortLabel(effort || current?.defaultReasoningEffort || null);
-  const modelName = shortModelName(current?.displayName || model) || "Model";
+  const providerName = runtime === "claude" ? "Claude" : runtime === "kimi" ? "Kimi" : "Codex";
+  const rawModelName = shortModelName(current?.displayName || model) || "Model";
+  const modelName = rawModelName.replace(/^Claude\s+/i, "");
+  const chipName = `${providerName} · ${modelName}`;
+  const locked = !!activeThreadId && !activeThreadId.startsWith("local-thread:");
+  const modelGroups = ["codex", "claude", "kimi"]
+    .filter((id) => (!locked || id === runtime)
+      && connected[id]
+      && runtimeCatalog[id]?.available !== false
+      && (modelsByRuntime[id] || []).length > 0)
+    .map((id) => ({
+      id,
+      label: id === "claude" ? "Claude Code" : id === "kimi" ? "Kimi Code" : "Codex",
+      models: modelsByRuntime[id] || [],
+    }));
 
   React.useLayoutEffect(() => {
     const el = ref.current;
@@ -1332,7 +1356,7 @@ function ModelChip() {
     el.style.width = "max-content";
     setClosedWidth(el.getBoundingClientRect().width);
     el.style.width = width;
-  }, [modelName, effLabel]);
+  }, [chipName, effLabel]);
 
   return (
     <>
@@ -1349,7 +1373,7 @@ function ModelChip() {
           transition: "width 320ms cubic-bezier(.23,1,.32,1)",
         }}
       >
-        <span className="tabular-nums font-normal text-(--fg)">{modelName}</span>
+        <span className="tabular-nums font-normal text-(--fg)">{chipName}</span>
         {effLabel && <span className="font-normal text-(--fg-tertiary)">{effLabel}</span>}
         <IconComposerChevronDown className="me-0.5 size-3.5 shrink-0 text-(--fg-tertiary)" />
       </button>
@@ -1358,6 +1382,8 @@ function ModelChip() {
           anchor={() => ref.current?.getBoundingClientRect()}
           onClose={() => setOpen(false)}
           models={models}
+          modelGroups={modelGroups}
+          runtime={runtime}
           current={current}
           model={model}
           modelName={modelName}
@@ -1377,7 +1403,7 @@ function ModelChip() {
 
 // The reasoning menu: Model / Effort / Speed rows whose submenus fly out on
 // hover (like the reference client).
-function ModelMenu({ anchor, onClose, models, current, model, modelName, effLabel, effort, serviceTier, setModel, setEffort, setServiceTier, advanced, setAdvanced }) {
+function ModelMenu({ anchor, onClose, models, modelGroups, runtime, current, model, modelName, effLabel, effort, serviceTier, setModel, setEffort, setServiceTier, advanced, setAdvanced }) {
   const ref = useRef(null);
   const [fly, setFly] = useState(null); // {kind, topViewport}
   const closeTimer = useRef(null);
@@ -1474,19 +1500,26 @@ function ModelMenu({ anchor, onClose, models, current, model, modelName, effLabe
           containerTop={ref.current?.getBoundingClientRect().top ?? 0}
           containerLeft={pos?.left ?? 0}
           containerWidth={W}
-          width={fly.kind === "model" ? 280 : fly.kind === "effort" ? 204.0234375 : 233}
+          width={fly.kind === "model" ? 320 : fly.kind === "effort" ? 204.0234375 : 233}
           onEnter={stay}
           onLeave={scheduleHide}
         >
           {fly.kind === "model" && (
             <>
-              {models.filter((m) => !m.hidden).map((m) => (
-                <FlyOption
-                  key={m.model}
-                  label={shortModelName(m.displayName || m.model)}
-                  checked={m.model === model}
-                  onClick={pick(() => setModel(m.model))}
-                />
+              {modelGroups.map((group) => (
+                <div key={group.id}>
+                  <div className="flex items-center justify-between px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-(--fg-faint)">
+                    <span>{group.label}</span>
+                  </div>
+                  {group.models.filter((m) => !m.hidden).map((m) => (
+                    <FlyOption
+                      key={`${group.id}:${m.model}`}
+                      label={shortModelName(m.displayName || m.model)}
+                      checked={group.id === runtime && m.model === model}
+                      onClick={pick(() => setModel(m.model, group.id))}
+                    />
+                  ))}
+                </div>
               ))}
             </>
           )}
@@ -1541,7 +1574,7 @@ function FlyPanel({ kind, anchorTop, containerTop, containerLeft, containerWidth
     <div
       ref={ref}
       role="menu"
-      className="model-flyout absolute z-50 overflow-hidden rounded-[15px] p-1"
+      className="model-flyout absolute z-50 max-h-[min(420px,calc(100vh-16px))] overflow-y-auto rounded-[15px] p-1"
       style={{ left, top, width }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}

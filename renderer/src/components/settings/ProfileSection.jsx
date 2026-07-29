@@ -2,7 +2,7 @@
 // activity insights — all from the app-server where available.
 import React, { useEffect, useMemo, useState } from "react";
 import * as api from "../../api.js";
-import { useStore } from "../../store.js";
+import { useStore, planLabel } from "../../store.js";
 import { cx } from "../../lib/cx.js";
 import { Card, Segmented } from "./shared.jsx";
 import { Spinner } from "../ui.jsx";
@@ -87,7 +87,7 @@ export default function ProfileSection() {
   }, []);
 
   const summary = usage?.summary || {};
-  const plan = account?.planType ? account.planType : null;
+  const plan = planLabel(account?.planType);
 
   // Last ~12 months, aggregated from the daily buckets.
   const months = useMemo(() => {
