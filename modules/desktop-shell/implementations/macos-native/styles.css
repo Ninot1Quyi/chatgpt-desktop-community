@@ -1,0 +1,8 @@
+.desktop-shell-macos {
+  background: transparent;
+}
+
+.desktop-shell-macos .right-panel-root {
+  background: var(--surface-under);
+  padding-top: 46px;
+}

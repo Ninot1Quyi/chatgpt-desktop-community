@@ -2,8 +2,23 @@ import { create } from "zustand";
 import * as api from "./api.js";
 import { panelHook } from "./lib/panelHook.js";
 import { applyAppearance } from "./lib/appearance.js";
-import { externalProjectId, isProjectPathInside, normalizeProjectPath } from "./lib/runtimeProject.js";
-import { RUNTIME_IDS } from "./lib/runtimes.jsx";
+import {
+  RUNTIME_IDS,
+  externalProjectId,
+  isProjectPathInside,
+  normalizeProjectPath,
+} from "@modules/agent-runtimes";
+import {
+  LEGACY_PREF_KEYS,
+  PREF_KEYS,
+  createPreferencesSlice,
+  persist,
+  prefValue,
+  stored,
+} from "@modules/preferences/state";
+import { createConversationState } from "@modules/conversations/state";
+import { createProjectsNavigationState } from "@modules/projects-navigation/state";
+import { createAgentRuntimeState } from "@modules/agent-runtimes/state";
 
 // ---------------------------------------------------------------------------
 // Permission presets → (approvalPolicy, approvalsReviewer, sandbox, sandboxPolicy)
@@ -58,22 +73,6 @@ export function planLabel(planType) {
   return PLAN_LABELS[key] || key[0].toUpperCase() + key.slice(1);
 }
 
-const stored = (k, fallback) => {
-  try {
-    const v = localStorage.getItem(k);
-    return v == null ? fallback : JSON.parse(v);
-  } catch {
-    return fallback;
-  }
-};
-const hasStored = (k) => {
-  try { return localStorage.getItem(k) != null; } catch { return false; }
-};
-const persist = (k, v) => {
-  try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
-  // mirror to a file backup; localStorage does not survive hard kills
-  try { api.prefsWrite(k, v); } catch {}
-};
 const threadPlanKey = (threadId) => `thread.plan.${threadId}`;
 
 let toastSeq = 0;
@@ -92,48 +91,9 @@ export const useStore = create((set, get) => ({
   loginStatus: "idle",
   loginError: null,
   loginId: null,
-  runtimeCatalog: {},
-  modelsByRuntime: { codex: [], claude: [], kimi: [] },
-  models: [],
-
-  // ---- thread list ----
-  threads: [],
-  threadsCursor: null,
-  threadsLoading: false,
-  archivedView: false,
-  searchTerm: "",
-  claudeThreads: [],
-  claudeThreadsLoading: false,
-  claudeThreadsError: null,
-  claudeConfigDir: null,
-  kimiThreads: [],
-  kimiThreadsLoading: false,
-  kimiThreadsError: null,
-  kimiConfigDir: null,
-  // external vendor sign-in state: { claude: {loggedIn, detail}, kimi: {...} }
-  // (codex sign-in is the `account` object; see runtimeConnected)
-  externalAuth: {},
-  externalAuthChecked: false,
-
-  // ---- conversations ----
-  activeThreadId: null,
-  conversations: {}, // threadId -> Conversation
-  pendingNewThread: false,
-
-  // ---- composer prefs ----
-  cwd: stored("composer.cwd", null),
-  runtime: stored("composer.runtime", "codex"),
-  modelSelections: stored("composer.models", { codex: stored("composer.model", null) }),
-  model: stored("composer.model", null),
-  effort: stored("composer.effort", null),
-  serviceTier: stored("composer.serviceTier", null), // null = Standard; "priority" = Fast
-  permission: stored("composer.permission", "ask"),
-  mode: stored("composer.mode", "codex"), // codex | chatgpt (product switcher)
-  planMode: stored("composer.planMode", false),
-  queue: [], // messages queued while a turn runs
-
-  // ---- approvals (server-initiated requests) ----
-  approvals: [], // {reqId, kind, threadId, turnId, itemId, title, detail, raw}
+  ...createAgentRuntimeState(),
+  ...createProjectsNavigationState(set, get),
+  ...createConversationState(stored),
 
   // ---- ui ----
   ui: {
@@ -155,15 +115,14 @@ export const useStore = create((set, get) => ({
     keybindings: stored("ui.keybindings", {}), // command id -> accelerator string
   },
   toasts: [],
-  navBack: [], // recently-viewed threadId stack (Ctrl+Tab cycling)
-  gs: {}, // shared Codex project/assignment metadata (Noma pins are separate)
-  runtimeOrder: stored("noma.runtimeOrder", RUNTIME_IDS), // sidebar vendor section order
-  pinnedThreadIds: stored("noma.pinnedThreadIds", []),
-  pinnedProjectIds: stored("noma.pinnedProjectIds", []),
-  pinnedProjectPaths: stored("noma.pinnedProjectPaths", []),
-  _nomaPinsInitialized: hasStored("noma.pinnedThreadIds")
-    || hasStored("noma.pinnedProjectIds")
-    || hasStored("noma.pinnedProjectPaths"),
+  ...createPreferencesSlice(set, get, {
+    externalProjectId,
+    isProjectPathInside,
+    normalizeProjectPath,
+    runtimeForThread,
+    runtimeIds: RUNTIME_IDS,
+    samePath,
+  }),
   profile: null, // { name, username, photo(dataUrl) } from /wham/profiles/me
   renameRequest: 0, // bump to open the thread rename dialog (⌃R)
   draftAt: 0, // when the current new-chat draft was opened (seconds)
@@ -176,52 +135,6 @@ export const useStore = create((set, get) => ({
     persist("ui.keybindings", next);
   },
 
-  togglePinnedProject(cwd, requestedRuntime = null) {
-    if (!cwd) return;
-    const gs = get().gs || {};
-    const local = gs["local-projects"] || {};
-    let hit = null;
-    let hitRootLength = -1;
-    for (const entry of Object.entries(local)) {
-      for (const rootPath of entry[1].rootPaths || []) {
-        if (isProjectPathInside(cwd, rootPath) && normalizeProjectPath(rootPath).length > hitRootLength) {
-          hit = entry;
-          hitRootLength = normalizeProjectPath(rootPath).length;
-        }
-      }
-    }
-    const activeThreadId = get().activeThreadId;
-    const runtime = requestedRuntime
-      || (activeThreadId
-        ? runtimeForThread(get().activeConversation?.()?.thread, activeThreadId)
-        : get().runtime);
-    if (runtime === "claude" || runtime === "kimi") {
-      return get().togglePinnedProjectId(externalProjectId(runtime, cwd, hit?.[0] || null));
-    }
-    if (hit) return get().togglePinnedProjectId(hit[0]);
-    const cur = get().pinnedProjectPaths;
-    const next = cur.some((candidate) => samePath(candidate, cwd))
-      ? cur.filter((candidate) => !samePath(candidate, cwd))
-      : [...cur, cwd];
-    set({ pinnedProjectPaths: next });
-    persist("noma.pinnedProjectPaths", next);
-  },
-
-  togglePinnedProjectId(projectId) {
-    if (!projectId) return;
-    const cur = get().pinnedProjectIds;
-    const next = cur.includes(projectId) ? cur.filter((id) => id !== projectId) : [...cur, projectId];
-    set({ pinnedProjectIds: next });
-    persist("noma.pinnedProjectIds", next);
-  },
-
-  togglePinnedThread(threadId) {
-    if (!threadId) return;
-    const cur = get().pinnedThreadIds;
-    const next = cur.includes(threadId) ? cur.filter((id) => id !== threadId) : [...cur, threadId];
-    set({ pinnedThreadIds: next });
-    persist("noma.pinnedThreadIds", next);
-  },
 
   // =======================================================================
   // boot
@@ -246,16 +159,27 @@ export const useStore = create((set, get) => ({
           effort: "composer.effort" in prefs ? prefs["composer.effort"] : s.effort,
           serviceTier: "composer.serviceTier" in prefs ? prefs["composer.serviceTier"] : s.serviceTier,
           permission: "composer.permission" in prefs ? prefs["composer.permission"] : s.permission,
-          pinnedThreadIds: "noma.pinnedThreadIds" in prefs ? prefs["noma.pinnedThreadIds"] : s.pinnedThreadIds,
-          pinnedProjectIds: "noma.pinnedProjectIds" in prefs ? prefs["noma.pinnedProjectIds"] : s.pinnedProjectIds,
-          pinnedProjectPaths: "noma.pinnedProjectPaths" in prefs ? prefs["noma.pinnedProjectPaths"] : s.pinnedProjectPaths,
-          runtimeOrder: "noma.runtimeOrder" in prefs ? prefs["noma.runtimeOrder"] : s.runtimeOrder,
-          _nomaPinsInitialized: s._nomaPinsInitialized
-            || "noma.pinnedThreadIds" in prefs
-            || "noma.pinnedProjectIds" in prefs
-            || "noma.pinnedProjectPaths" in prefs,
+          pinnedThreadIds: prefValue(prefs, "pinnedThreadIds", s.pinnedThreadIds),
+          pinnedProjectIds: prefValue(prefs, "pinnedProjectIds", s.pinnedProjectIds),
+          pinnedProjectPaths: prefValue(prefs, "pinnedProjectPaths", s.pinnedProjectPaths),
+          runtimeOrder: prefValue(prefs, "runtimeOrder", s.runtimeOrder),
+          _pinsInitialized: s._pinsInitialized
+            || PREF_KEYS.pinnedThreadIds in prefs
+            || PREF_KEYS.pinnedProjectIds in prefs
+            || PREF_KEYS.pinnedProjectPaths in prefs
+            || LEGACY_PREF_KEYS.pinnedThreadIds in prefs
+            || LEGACY_PREF_KEYS.pinnedProjectIds in prefs
+            || LEGACY_PREF_KEYS.pinnedProjectPaths in prefs,
           ui: { ...s.ui, ...uiPatch },
         }));
+        for (const name of Object.keys(PREF_KEYS)) {
+          if (
+            !(PREF_KEYS[name] in prefs) &&
+            LEGACY_PREF_KEYS[name] in prefs
+          ) {
+            persist(PREF_KEYS[name], prefs[LEGACY_PREF_KEYS[name]]);
+          }
+        }
       }
     } catch {}
     api.onStatus(({ status, codexHome, binary, binaryCandidates, error }) => {
@@ -278,10 +202,10 @@ export const useStore = create((set, get) => ({
       }
     });
     // Shared Codex state is read only for project metadata and assignments.
-    // Pins are migrated once, then owned exclusively by Noma's prefs file.
+    // Pins are migrated once, then owned by the community client prefs file.
     const applyGlobalState = (value) => {
       const gs = value || {};
-      if (!get()._nomaPinsInitialized) {
+      if (!get()._pinsInitialized) {
         const pinnedThreadIds = [...new Set(gs["pinned-thread-ids"] || [])];
         const pinnedProjectIds = [...new Set(gs["pinned-project-ids"] || [])];
         const pinnedProjectPaths = [...new Set(get().ui.pinnedProjects || [])];
@@ -290,11 +214,11 @@ export const useStore = create((set, get) => ({
           pinnedThreadIds,
           pinnedProjectIds,
           pinnedProjectPaths,
-          _nomaPinsInitialized: true,
+          _pinsInitialized: true,
         });
-        persist("noma.pinnedThreadIds", pinnedThreadIds);
-        persist("noma.pinnedProjectIds", pinnedProjectIds);
-        persist("noma.pinnedProjectPaths", pinnedProjectPaths);
+        persist(PREF_KEYS.pinnedThreadIds, pinnedThreadIds);
+        persist(PREF_KEYS.pinnedProjectIds, pinnedProjectIds);
+        persist(PREF_KEYS.pinnedProjectPaths, pinnedProjectPaths);
         return;
       }
       set({ gs });
@@ -429,7 +353,7 @@ export const useStore = create((set, get) => ({
     try {
       const result = await api.rpc("account/login/start", { type: "chatgpt" });
       if (result?.type !== "chatgpt" || !result.authUrl || !result.loginId) {
-        throw new Error("The Noma backend returned an invalid login response.");
+        throw new Error("The ChatGPT Desktop Community backend returned an invalid login response.");
       }
       set({ loginId: result.loginId, loginStatus: "waiting" });
       await api.openExternal(result.authUrl);
@@ -533,8 +457,8 @@ export const useStore = create((set, get) => ({
   // =======================================================================
   async openThread(threadId) {
     const cur = get().activeThreadId;
-    if (cur && cur !== threadId) {
-      set((s) => ({ navBack: [...s.navBack, cur] }));
+    if (cur && cur !== threadId && !get()._navigating) {
+      set((s) => ({ navBack: [...s.navBack, cur], navFwd: [] }));
     }
     // opening a thread always lands on the chat view (reference behavior)
     get().setUi({ navView: "chats" });
@@ -1201,13 +1125,6 @@ export const useStore = create((set, get) => ({
   setMode(mode) {
     set({ mode });
     persist("composer.mode", mode);
-  },
-  setRuntimeOrder(order) {
-    const known = RUNTIME_IDS;
-    // keep only known runtimes, then append any missing ones at the end
-    const next = [...new Set([...(order || []).filter((r) => known.includes(r)), ...known])];
-    set({ runtimeOrder: next });
-    persist("noma.runtimeOrder", next);
   },
   setPlanMode(v) {
     set({ planMode: !!v });

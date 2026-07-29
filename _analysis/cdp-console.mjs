@@ -1,7 +1,10 @@
 // Reload the page and capture console + exception output for N ms.
 const waitMs = Number(process.argv[2] || 6000);
-const targets = await fetch("http://localhost:9222/json").then((r) => r.json());
-const page = targets.find((t) => t.type === "page");
+const port = Number(process.argv[3] || 9222);
+const targets = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json());
+const page = targets.find((target) =>
+  target.type === "page" && !target.url.includes("window="),
+) || targets.find((target) => target.type === "page");
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
 

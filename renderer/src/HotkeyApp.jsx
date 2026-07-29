@@ -3,8 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { useStore } from "./store.js";
 import { hideHotkey, onHotkeyShown, toggleHotkeyPin, showMainWindow } from "./api.js";
-import Composer from "./components/Composer.jsx";
-import { ItemView, ApprovalCard, PlanWidget } from "./components/items.jsx";
+import {
+  ApprovalCard,
+  Composer,
+  ItemView,
+  PlanWidget,
+} from "@modules/conversations";
 import { Spinner } from "./components/ui.jsx";
 import { IconPip, IconMinus } from "./components/icons.jsx";
 

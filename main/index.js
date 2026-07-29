@@ -8,32 +8,39 @@ const fs = require("node:fs");
 const crypto = require("node:crypto");
 const os = require("node:os");
 const { pathToFileURL } = require("node:url");
-const { resolveCodexBinary } = require("./codex-runtime");
-const { getClaudeConfigDir, listClaudeSessions, readClaudeSession } = require("./claude-history");
-const { getKimiConfigDir, listKimiSessions, readKimiSession } = require("./kimi-history");
-const { getExternalAuthStatus, getRuntimeCatalog, runExternalAgent, startExternalLogin } = require("./agent-runtimes");
+const { resolveCodexBinary } = require("@modules/runtime-locator");
+const agentRuntimeHost = require("@modules/agent-runtime-host");
+const {
+  configureApplicationStorage,
+  hotkeyWindowOptions,
+  installApplicationLifecycle,
+  installMainWindowBehavior,
+  mainWindowOptions,
+  normalizeProtocolPath,
+  quickChatWindowOptions,
+  registerDesktopShellHandlers,
+  registerGlobalShortcuts,
+  setHotkeyAlwaysOnTop,
+} = require("@modules/desktop-shell");
+const {
+  registerAgentRuntimeHandlers,
+} = require("@modules/agent-runtimes");
 const { readRolloutActivity } = require("./rollout-activity");
-const { initUpdater } = require("./updater");
+const { initUpdater } = require("@modules/updater");
+const { registerPreferenceHandlers } = require("@modules/preferences");
+const {
+  registerGlobalStateHandlers,
+} = require("@modules/projects-navigation");
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 const communityIconPath = path.join(__dirname, "..", "assets", "community-icon.png");
-
-// Noma used to share "codex-desktop-rebuilt" with the predecessor app. When
-// both applications were running, Chromium raced over the same Cache/GPUCache
-// directories and Windows rejected the second process with ERROR_ACCESS_DENIED.
-// Keep app preferences in Roaming AppData and Chromium session/cache data in
-// Local AppData, with a separate profile for source development.
-const appDataPath = app.getPath("appData");
-const legacyUserDataPath = path.join(appDataPath, "codex-desktop-rebuilt");
-const storageProfile = isDev ? "Noma Dev" : "Noma";
-const nomaUserDataPath = path.join(appDataPath, storageProfile);
-const localAppDataPath = process.env.LOCALAPPDATA || appDataPath;
-const nomaSessionDataPath = path.join(localAppDataPath, storageProfile, "Session Data");
-fs.mkdirSync(nomaUserDataPath, { recursive: true });
-fs.mkdirSync(nomaSessionDataPath, { recursive: true });
-app.setName("Noma");
-app.setPath("userData", nomaUserDataPath);
-app.setPath("sessionData", nomaSessionDataPath);
+const preloadPath = path.join(__dirname, "preload.cjs");
+const { legacyPreferencePaths } = configureApplicationStorage({
+  app,
+  env: process.env,
+  fs,
+  isDev,
+});
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) app.quit();
@@ -148,7 +155,11 @@ class AppServerBridge {
       id,
       method: "initialize",
       params: {
-        clientInfo: { name: "codex_desktop_rebuilt", title: "Codex (rebuilt)", version: app.getVersion() },
+        clientInfo: {
+          name: "chatgpt_desktop_community",
+          title: "ChatGPT Desktop Community",
+          version: app.getVersion(),
+        },
         capabilities: { experimentalApi: true },
       },
     });
@@ -333,6 +344,7 @@ function readCodexRateLimits() {
 let hotkeyWindow = null;
 
 function createHotkeyWindow() {
+  const shellOptions = hotkeyWindowOptions({ preloadPath });
   hotkeyWindow = new BrowserWindow({
     width: 576,
     height: 652,
@@ -343,14 +355,15 @@ function createHotkeyWindow() {
     alwaysOnTop: true,
     fullscreenable: false,
     show: false,
+    ...shellOptions,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      ...shellOptions.webPreferences,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
     },
   });
-  hotkeyWindow.setAlwaysOnTop(true);
+  setHotkeyAlwaysOnTop(hotkeyWindow, true);
   bridge.addListener(hotkeyWindow.webContents);
   const url = isDev
     ? `${process.env.ELECTRON_RENDERER_URL}?window=hotkey`
@@ -384,7 +397,7 @@ ipcMain.handle("hotkey:toggle", () => { toggleHotkeyWindow(); return true; });
 ipcMain.handle("hotkey:toggle-pin", () => {
   if (!hotkeyWindow) return false;
   const on = !hotkeyWindow.isAlwaysOnTop();
-  hotkeyWindow.setAlwaysOnTop(on);
+  setHotkeyAlwaysOnTop(hotkeyWindow, on);
   return on;
 });
 ipcMain.handle("app:show-main", () => {
@@ -399,19 +412,21 @@ ipcMain.handle("app:show-main", () => {
 let quickChatWindow = null;
 
 function createQuickChatWindow() {
+  const shellOptions = quickChatWindowOptions({
+    iconPath: communityIconPath,
+    preloadPath,
+  });
   quickChatWindow = new BrowserWindow({
     width: 560,
     height: 700,
     minWidth: 400,
     minHeight: 400,
-    frame: false,
-    autoHideMenuBar: true,
-    icon: communityIconPath,
+    ...shellOptions,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#181818" : "#ffffff",
     show: false,
-    title: "ChatGPT",
+    title: "ChatGPT Desktop Community",
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      ...shellOptions.webPreferences,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -456,38 +471,7 @@ ipcMain.handle("power:prevent-sleep", (_e, on) => {
   return true;
 });
 
-// ---------------------------------------------------------------------------
-// Windows in-window menu bar (WinMenuBar) support. Edit roles are forwarded
-// to the sender's webContents; zoom/reload/devtools act on the sender window.
-// ---------------------------------------------------------------------------
-const EDIT_ROLES = new Set(["undo", "redo", "cut", "copy", "paste", "pasteAndMatchStyle", "selectAll"]);
-ipcMain.handle("edit:role", (e, role) => {
-  if (!EDIT_ROLES.has(role)) return false;
-  e.sender[role]();
-  return true;
-});
-
-ipcMain.handle("view:zoom", (e, direction) => {
-  const wc = e.sender;
-  if (direction === "reset") wc.setZoomFactor(1);
-  else wc.setZoomFactor(Math.min(3, Math.max(0.5, wc.getZoomFactor() + (direction === "in" ? 0.1 : -0.1))));
-  return true;
-});
-
-ipcMain.handle("view:reload", (e) => { e.sender.reload(); return true; });
-ipcMain.handle("view:toggle-devtools", (e) => { e.sender.toggleDevTools(); return true; });
-ipcMain.handle("window:close", (e) => { BrowserWindow.fromWebContents(e.sender)?.close(); return true; });
-
-// Custom Windows caption buttons (the transparent window draws no native ones).
-ipcMain.handle("window:minimize", (e) => { BrowserWindow.fromWebContents(e.sender)?.minimize(); return true; });
-ipcMain.handle("window:toggle-maximize", (e) => {
-  const win = BrowserWindow.fromWebContents(e.sender);
-  if (!win) return false;
-  win.isMaximized() ? win.unmaximize() : win.maximize();
-  return true;
-});
-ipcMain.handle("window:is-maximized", (e) => !!BrowserWindow.fromWebContents(e.sender)?.isMaximized());
-ipcMain.handle("window:get-bounds", (e) => BrowserWindow.fromWebContents(e.sender)?.getBounds() ?? null);
+registerDesktopShellHandlers({ BrowserWindow, ipcMain });
 
 // ---------------------------------------------------------------------------
 // Window
@@ -509,21 +493,20 @@ if (hasSingleInstanceLock) {
 
 function createMainWindow(query) {
   const dark = nativeTheme.shouldUseDarkColors;
+  const shellOptions = mainWindowOptions({
+    dark,
+    iconPath: communityIconPath,
+    preloadPath,
+  });
   const win = new BrowserWindow({
     width: 1280,
     height: 820,
     minWidth: 720,
     minHeight: 600,
-    // Windows-only branch: hidden native title bar; the renderer draws the
-    // caption buttons (WinWindowControls) and menu bar (WinMenuBar). No
-    // `transparent` here — it breaks -webkit-app-region dragging on Windows.
-    titleBarStyle: "hidden",
-    autoHideMenuBar: true,
-    icon: communityIconPath,
-    backgroundColor: dark ? "#1a1c22" : "#edf1f7",
+    ...shellOptions,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      ...shellOptions.webPreferences,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -535,9 +518,7 @@ function createMainWindow(query) {
   else mainWindow = win;
 
   win.once("ready-to-show", () => win.show());
-  // keep the custom caption buttons' maximize/restore icon in sync
-  win.on("maximize", () => win.webContents.send("window:maximize-changed", true));
-  win.on("unmaximize", () => win.webContents.send("window:maximize-changed", false));
+  installMainWindowBehavior(win);
   win.on("page-title-updated", (e) => e.preventDefault());
   win.on("closed", () => {
     if (win === mainWindow) mainWindow = null;
@@ -576,99 +557,19 @@ ipcMain.handle("window:open-thread", (_e, { threadId }) => {
   return true;
 });
 
-// ---------------------------------------------------------------------------
-// Renderer prefs backup (userData/renderer-prefs.json). Chromium commits
-// localStorage lazily, so a hard kill — or app.quit() racing the flush on
-// window close — wipes it; mirror every persisted key to a JSON file and
-// hydrate the renderer from it at startup.
-// ---------------------------------------------------------------------------
-const PREFS_PATH = path.join(app.getPath("userData"), "renderer-prefs.json");
-const LEGACY_PREFS_PATH = path.join(legacyUserDataPath, "renderer-prefs.json");
-
-// Preserve existing Noma preferences, but never copy the legacy Chromium
-// cache/session directories that caused the cross-application lock conflict.
-if (!fs.existsSync(PREFS_PATH) && fs.existsSync(LEGACY_PREFS_PATH)) {
-  try {
-    const legacyPrefs = JSON.parse(fs.readFileSync(LEGACY_PREFS_PATH, "utf8"));
-    fs.writeFileSync(PREFS_PATH, JSON.stringify(legacyPrefs));
-  } catch (err) {
-    console.warn("[prefs] legacy migration skipped:", err.message);
-  }
-}
-
-function readPrefs() {
-  try {
-    return JSON.parse(fs.readFileSync(PREFS_PATH, "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-ipcMain.handle("prefs:read", () => readPrefs());
-
-let prefsPending = {};
-let prefsWriteTimer = null;
-ipcMain.handle("prefs:write", (_e, { key, value }) => {
-  prefsPending[key] = value;
-  clearTimeout(prefsWriteTimer);
-  prefsWriteTimer = setTimeout(() => {
-    const pending = prefsPending;
-    prefsPending = {};
-    try {
-      const next = { ...readPrefs(), ...pending };
-      const tmp = `${PREFS_PATH}.tmp-${process.pid}`;
-      fs.writeFileSync(tmp, JSON.stringify(next));
-      fs.renameSync(tmp, PREFS_PATH);
-    } catch (err) {
-      console.error("[prefs] write failed:", err.message);
-    }
-  }, 150);
-  return true;
+registerPreferenceHandlers({
+  fs,
+  ipcMain,
+  legacyPreferencePaths,
+  userDataPath: app.getPath("userData"),
 });
 
-// ---------------------------------------------------------------------------
-// Codex global state (%USERPROFILE%\.codex\.codex-global-state.json). The
-// official desktop app keeps its sidebar projects, pins, and assignments here.
-// same file so both apps render identical sidebars and stay in sync.
-// ---------------------------------------------------------------------------
-const GS_PATH = path.join(app.getPath("home"), ".codex", ".codex-global-state.json");
-
-function readGlobalState() {
-  try {
-    return JSON.parse(fs.readFileSync(GS_PATH, "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-ipcMain.handle("gs:read", () => readGlobalState());
-
-// Shallow-merge top-level keys, written back atomically (compact JSON, same
-// layout the official app uses).
-ipcMain.handle("gs:patch", (_e, patch) => {
-  try {
-    const next = { ...readGlobalState(), ...(patch || {}) };
-    const tmp = `${GS_PATH}.tmp-${process.pid}`;
-    fs.writeFileSync(tmp, JSON.stringify(next));
-    fs.renameSync(tmp, GS_PATH);
-    return true;
-  } catch (err) {
-    console.error("[gs] patch failed:", err.message);
-    return false;
-  }
+registerGlobalStateHandlers({
+  broadcast: (channel, payload) => bridge.broadcast(channel, payload),
+  fs,
+  homePath: app.getPath("home"),
+  ipcMain,
 });
-
-// The official app replaces the file atomically, so watch the directory.
-let gsWatchTimer = null;
-try {
-  fs.watch(path.dirname(GS_PATH), (_evt, name) => {
-    if (name !== path.basename(GS_PATH)) return;
-    clearTimeout(gsWatchTimer);
-    gsWatchTimer = setTimeout(() => bridge.broadcast("gs:changed", {}), 150);
-  });
-} catch (err) {
-  console.error("[gs] watch failed:", err.message);
-}
 
 // ---------------------------------------------------------------------------
 // IPC
@@ -743,107 +644,17 @@ ipcMain.handle("shell:open-external", (_e, url) => {
 });
 ipcMain.handle("app:info", () => ({
   version: app.getVersion(),
+  buildTarget: __BUILD_TARGET__,
   home: app.getPath("home"),
   temp: app.getPath("temp"),
   username: process.env.USERNAME || os.userInfo().username,
   hostname: os.hostname().split(".")[0],
   theme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
 }));
-ipcMain.handle("claude-history:list", async () => {
-  try {
-    const configDir = getClaudeConfigDir(app.getPath("home"));
-    return { ok: true, result: await listClaudeSessions({ configDir }) };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
-  }
-});
-ipcMain.handle("claude-history:read", async (_e, { sessionId } = {}) => {
-  try {
-    const configDir = getClaudeConfigDir(app.getPath("home"));
-    return { ok: true, result: await readClaudeSession({ configDir, sessionId }) };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
-  }
-});
-ipcMain.handle("kimi-history:list", async () => {
-  try {
-    const configDir = getKimiConfigDir(app.getPath("home"));
-    return { ok: true, result: await listKimiSessions({ configDir }) };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
-  }
-});
-ipcMain.handle("kimi-history:read", async (_e, { sessionId } = {}) => {
-  try {
-    const configDir = getKimiConfigDir(app.getPath("home"));
-    return { ok: true, result: await readKimiSession({ configDir, sessionId }) };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
-  }
-});
-
-const externalRuns = new Map();
-ipcMain.handle("agent-runtime:catalog", async () => {
-  try {
-    return {
-      ok: true,
-      result: await getRuntimeCatalog({ homePath: app.getPath("home") }),
-    };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
-  }
-});
-ipcMain.handle("agent-runtime:auth-status", async () => {
-  try {
-    return {
-      ok: true,
-      result: await getExternalAuthStatus({ homePath: app.getPath("home") }),
-    };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
-  }
-});
-ipcMain.handle("agent-runtime:login", async (_e, { runtime } = {}) => {
-  try {
-    return {
-      ok: true,
-      result: startExternalLogin(String(runtime || ""), { homePath: app.getPath("home") }),
-    };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
-  }
-});
-ipcMain.handle("agent-runtime:send", async (_e, request = {}) => {
-  const runId = String(request.runId || "");
-  try {
-    if (!/^[0-9a-f-]{36}$/i.test(runId)) throw new Error("Invalid runtime request ID");
-    if (typeof request.prompt !== "string" || request.prompt.length > 1024 * 1024) {
-      throw new Error("Invalid runtime prompt");
-    }
-    const homePath = app.getPath("home");
-    const claudeConfigDir = getClaudeConfigDir(homePath);
-    const kimiConfigDir = getKimiConfigDir(homePath);
-    const result = await runExternalAgent(request, {
-      homePath,
-      kimiConfigDir,
-      onSpawn: (child) => externalRuns.set(runId, child),
-    });
-    const history = result.runtime === "claude"
-      ? await readClaudeSession({ configDir: claudeConfigDir, sessionId: result.sessionId })
-      : await readKimiSession({ configDir: kimiConfigDir, sessionId: result.sessionId });
-    return { ok: true, result: history };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
-  } finally {
-    externalRuns.delete(runId);
-  }
-});
-ipcMain.handle("agent-runtime:cancel", (_e, { runId } = {}) => {
-  const child = externalRuns.get(String(runId || ""));
-  if (!child) return false;
-  child.kill();
-  externalRuns.delete(String(runId));
-  return true;
+registerAgentRuntimeHandlers({
+  app,
+  host: agentRuntimeHost,
+  ipcMain,
 });
 ipcMain.handle("rollout:activity", (_e, { file }) => {
   try {
@@ -967,10 +778,7 @@ app.whenReady().then(() => {
     try {
       const url = new URL(request.url);
       let filePath = decodeURIComponent(url.pathname);
-      // Windows drive paths arrive as "/D:/..." — the leading slash is the URL
-      // path separator, not part of the filesystem path. Leaving it in makes
-      // pathToFileURL produce file:///D:/D:/... (drive duplicated).
-      if (/^\/[A-Za-z]:[/\\]/.test(filePath)) filePath = filePath.slice(1);
+      filePath = normalizeProtocolPath(filePath);
       const ext = path.extname(filePath).toLowerCase();
       if (!LOCAL_FILE_EXTS.has(ext) || !path.isAbsolute(filePath)) {
         return new Response("forbidden", { status: 403 });
@@ -996,8 +804,22 @@ app.whenReady().then(() => {
   createHotkeyWindow();
   createQuickChatWindow();
   const { globalShortcut } = require("electron");
-  globalShortcut.register("Control+Shift+Space", toggleHotkeyWindow);
-  globalShortcut.register("Control+Alt+N", toggleQuickChatWindow);
+  registerGlobalShortcuts(globalShortcut, {
+    toggleHotkeyWindow,
+    toggleQuickChatWindow,
+  });
+  installApplicationLifecycle({
+    app,
+    createMainWindow: () => {
+      if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
+      else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    },
+    iconPath: communityIconPath,
+    isDev,
+  });
 });
 
 app.on("window-all-closed", () => {

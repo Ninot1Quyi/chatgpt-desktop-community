@@ -5,7 +5,9 @@ node_modules/
 
 # Renderer builds and Windows packaging output
 dist-renderer/
+dist-main/
 release/
+.build-meta/
 *.asar
 *.asar.unpacked/
 builder-debug.yml

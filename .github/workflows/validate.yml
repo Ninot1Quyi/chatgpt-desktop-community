@@ -1,0 +1,45 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - codex-communicate-windows
+      - codex/module-platform-build
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win32-x64
+          - os: macos-14
+            target: darwin-arm64
+          - os: macos-14
+            target: darwin-x64
+          - os: macos-14
+            target: darwin-universal
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -- --target=${{ matrix.target }}
+      - run: node _analysis/bundle-selection-check.mjs --target=${{ matrix.target }}

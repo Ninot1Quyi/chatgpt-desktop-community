@@ -1,8 +1,11 @@
 // Minimal CDP probe: evaluate an expression in the first page target.
 const expr = process.argv[2] || "document.body.innerText.slice(0, 3000)";
+const port = Number(process.argv[3] || 9222);
 
-const targets = await fetch("http://localhost:9222/json").then((r) => r.json());
-const page = targets.find((t) => t.type === "page");
+const targets = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json());
+const page = targets.find((target) =>
+  target.type === "page" && !target.url.includes("window="),
+) || targets.find((target) => target.type === "page");
 if (!page) { console.error("no page target"); process.exit(1); }
 
 const ws = new WebSocket(page.webSocketDebuggerUrl);

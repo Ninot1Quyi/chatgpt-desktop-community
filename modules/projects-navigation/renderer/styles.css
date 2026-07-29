@@ -1,0 +1,6 @@
+.text-fade-truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, black 78%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 78%, transparent 100%);
+}
