@@ -38,7 +38,9 @@ A fun example of the trend: [“oh no, i started making one of these apps” —
 - Clipboard image paste, attachment previews, project context, model and reasoning selection, and queued messages
 - Review, Files, Terminal, Browser, and Side Chat panels
 - Pull request, scheduled task, site, and plugin navigation surfaces
+- Codex, Claude Code, and Kimi Code authentication, history, models, and usage
 - Light, dark, and system appearance modes
+- Native macOS and Windows desktop shells from one modular codebase
 
 The interface is under active development. Protocol changes in `codex app-server` may require matching updates here.
 
@@ -48,9 +50,31 @@ To install and use the app, download a prebuilt version from the [latest release
 
 ### Development
 
-Recommended: use ChatGPT Desktop, Claude Code, or Cursor and say:
+Install dependencies, then choose an explicit build target:
 
-> Clone [Ninot1Quyi/chatgpt-desktop-community](https://github.com/Ninot1Quyi/chatgpt-desktop-community), then start it.
+```sh
+npm ci
+npm run dev -- --target=win32-x64
+# or: darwin-arm64, darwin-x64, darwin-universal
+```
+
+The same target argument is required by `npm run build`, `npm start`, and
+`npm run package`. `npm test` validates module contracts, platform boundaries,
+legacy preference migration, and shared behavior.
+
+### Architecture
+
+Business capabilities live in `modules/` (`conversations`,
+`projects-navigation`, `settings`, `workspace-panels`, `agent-runtimes`,
+`preferences`, and `updater`). A module has one shared implementation unless
+that capability genuinely differs by host system. Those differences stay
+inside the module's `implementations/` directory.
+
+`build/targets.mjs` composes the desktop shell, shortcuts, terminal, runtime
+locator, host copy, agent CLI host, and distribution implementation for each
+target. Vite, esbuild, runtime staging, and electron-builder all consume that
+single selection. Unselected implementations are checked against the actual
+bundle inputs and cannot enter a target's package.
 
 ## Privacy and security
 
@@ -61,8 +85,9 @@ Recommended: use ChatGPT Desktop, Claude Code, or Cursor and say:
 
 ## Current limitations
 
-- macOS is the only platform regularly exercised.
-- There is no signed installer or automatic update channel yet.
+- Release CI produces a Windows x64 NSIS installer and a macOS universal
+  DMG/ZIP. Local macOS packages are unsigned unless signing credentials are
+  supplied.
 - The Browser panel provides practical embedded navigation, but it does not reproduce every browser-control feature of the official client.
 - Compatibility can lag behind newly released app-server methods or notification shapes.
 - This remains an independent community implementation, so visual and behavioral differences are expected for now; the goal is complete visual and behavioral parity.
@@ -71,7 +96,8 @@ Recommended: use ChatGPT Desktop, Claude Code, or Cursor and say:
 
 Humans and AI agents are welcome to share code, report bugs, and open pull requests.
 
-Please keep private data out of contributions and run `npm run build` before submitting code.
+Please keep private data out of contributions. Run `npm test` and build the
+affected targets before submitting code.
 
 ## Trademark notice
 

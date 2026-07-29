@@ -2,12 +2,26 @@
 import { spawn } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import codexRuntime from "../main/codex-runtime.js";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+  mainAliases,
+  readTargetArg,
+  resolveTarget,
+} from "../build/targets.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const { binary: BIN } = codexRuntime.resolveCodexBinary({
-  resourcesPath: path.join(repoRoot, "release", "codex-runtime-stage"),
+const target = resolveTarget(readTargetArg(process.argv.slice(2)));
+const locatorImport = await import(pathToFileURL(
+  mainAliases(target)["@modules/runtime-locator"],
+).href);
+const locator = locatorImport.default || locatorImport;
+const { binary: BIN } = locator.resolveCodexBinary({
+  resourcesPath: path.join(
+    repoRoot,
+    "release",
+    "codex-runtime-stage",
+    target.runtimeTarget,
+  ),
   homePath: os.homedir(),
 });
 const proc = spawn(BIN, ["-c", "features.code_mode_host=true", "app-server", "--analytics-default-enabled"], {

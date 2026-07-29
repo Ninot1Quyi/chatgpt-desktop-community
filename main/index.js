@@ -1,19 +1,49 @@
 // Electron main process: window management + codex app-server stdio bridge.
 // Clean-room reimplementation. The app-server (codex CLI) owns all auth —
-// it reads ~/.codex/auth.json itself; we never touch credentials here.
+// it reads %USERPROFILE%\.codex\auth.json itself; we never touch credentials here.
 const { app, BrowserWindow, ipcMain, protocol, net, dialog, shell, nativeTheme } = require("electron");
 const { spawn, execFile } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs");
 const crypto = require("node:crypto");
+const os = require("node:os");
 const { pathToFileURL } = require("node:url");
-const { resolveCodexBinary } = require("./codex-runtime");
+const { resolveCodexBinary } = require("@modules/runtime-locator");
+const agentRuntimeHost = require("@modules/agent-runtime-host");
+const {
+  configureApplicationStorage,
+  hotkeyWindowOptions,
+  installApplicationLifecycle,
+  installMainWindowBehavior,
+  mainWindowOptions,
+  normalizeProtocolPath,
+  quickChatWindowOptions,
+  registerDesktopShellHandlers,
+  registerGlobalShortcuts,
+  setHotkeyAlwaysOnTop,
+} = require("@modules/desktop-shell");
+const {
+  registerAgentRuntimeHandlers,
+} = require("@modules/agent-runtimes");
 const { readRolloutActivity } = require("./rollout-activity");
-const { initUpdater } = require("./updater");
+const { initUpdater } = require("@modules/updater");
+const { registerPreferenceHandlers } = require("@modules/preferences");
+const {
+  registerGlobalStateHandlers,
+} = require("@modules/projects-navigation");
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
-const isMac = process.platform === "darwin";
 const communityIconPath = path.join(__dirname, "..", "assets", "community-icon.png");
+const preloadPath = path.join(__dirname, "preload.cjs");
+const { legacyPreferencePaths } = configureApplicationStorage({
+  app,
+  env: process.env,
+  fs,
+  isDev,
+});
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) app.quit();
 
 // When the app is launched detached (or its parent terminal closes), stdout/stderr
 // point at a broken pipe and console.* throws EPIPE synchronously on Windows,
@@ -33,11 +63,6 @@ for (const stream of [process.stdout, process.stderr]) {
     if (!err || err.code !== "EPIPE") throw err;
   });
 }
-
-// Keep our Electron storage separate from the official app (same productName
-// would otherwise share ~/Library/Application Support/Codex).
-app.setName("codex-desktop-rebuilt");
-app.setPath("userData", path.join(app.getPath("appData"), "codex-desktop-rebuilt"));
 
 // ---------------------------------------------------------------------------
 // Local file protocol (codex-file://local/<encodeURIComponent(abspath)>)
@@ -130,7 +155,11 @@ class AppServerBridge {
       id,
       method: "initialize",
       params: {
-        clientInfo: { name: "codex_desktop_rebuilt", title: "Codex (rebuilt)", version: app.getVersion() },
+        clientInfo: {
+          name: "chatgpt_desktop_community",
+          title: "ChatGPT Desktop Community",
+          version: app.getVersion(),
+        },
         capabilities: { experimentalApi: true },
       },
     });
@@ -229,6 +258,9 @@ class AppServerBridge {
       return;
     }
     if (msg.method) {
+      if (msg.method === "account/rateLimits/updated" || msg.method === "account/updated") {
+        invalidateCodexRateLimits();
+      }
       this.broadcast("rpc:notification", { method: msg.method, params: msg.params ?? {} });
     }
   }
@@ -267,13 +299,52 @@ class AppServerBridge {
 }
 
 const bridge = new AppServerBridge();
+// The upstream read may take several seconds behind a proxy. Rate-limit and
+// account notifications invalidate this cache immediately, so a longer window
+// keeps Provider/Settings responsive without hiding server-pushed changes.
+const CODEX_RATE_LIMITS_CACHE_MS = 5 * 60 * 1000;
+let codexRateLimitsCache = null;
+let codexRateLimitsCachedAt = 0;
+let codexRateLimitsInFlight = null;
+let codexRateLimitsGeneration = 0;
+
+function invalidateCodexRateLimits() {
+  codexRateLimitsGeneration += 1;
+  codexRateLimitsCache = null;
+  codexRateLimitsCachedAt = 0;
+  codexRateLimitsInFlight = null;
+}
+
+function readCodexRateLimits() {
+  if (codexRateLimitsCache && Date.now() - codexRateLimitsCachedAt < CODEX_RATE_LIMITS_CACHE_MS) {
+    return Promise.resolve(codexRateLimitsCache);
+  }
+  if (codexRateLimitsInFlight) return codexRateLimitsInFlight;
+
+  const generation = codexRateLimitsGeneration;
+  const request = bridge
+    .request("account/rateLimits/read", {})
+    .then((result) => {
+      if (generation === codexRateLimitsGeneration) {
+        codexRateLimitsCache = result;
+        codexRateLimitsCachedAt = Date.now();
+      }
+      return result;
+    })
+    .finally(() => {
+      if (codexRateLimitsInFlight === request) codexRateLimitsInFlight = null;
+    });
+  codexRateLimitsInFlight = request;
+  return request;
+}
 
 // ---------------------------------------------------------------------------
-// Hotkey popout window (quick new thread / quick view), ⌘⇧Space to toggle.
+// Hotkey popout window (quick new thread / quick view), Ctrl+Shift+Space.
 // ---------------------------------------------------------------------------
 let hotkeyWindow = null;
 
 function createHotkeyWindow() {
+  const shellOptions = hotkeyWindowOptions({ preloadPath });
   hotkeyWindow = new BrowserWindow({
     width: 576,
     height: 652,
@@ -284,14 +355,15 @@ function createHotkeyWindow() {
     alwaysOnTop: true,
     fullscreenable: false,
     show: false,
+    ...shellOptions,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      ...shellOptions.webPreferences,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
     },
   });
-  if (isMac) hotkeyWindow.setAlwaysOnTop(true, "floating");
+  setHotkeyAlwaysOnTop(hotkeyWindow, true);
   bridge.addListener(hotkeyWindow.webContents);
   const url = isDev
     ? `${process.env.ELECTRON_RENDERER_URL}?window=hotkey`
@@ -325,8 +397,7 @@ ipcMain.handle("hotkey:toggle", () => { toggleHotkeyWindow(); return true; });
 ipcMain.handle("hotkey:toggle-pin", () => {
   if (!hotkeyWindow) return false;
   const on = !hotkeyWindow.isAlwaysOnTop();
-  if (isMac) hotkeyWindow.setAlwaysOnTop(on, "floating");
-  else hotkeyWindow.setAlwaysOnTop(on);
+  setHotkeyAlwaysOnTop(hotkeyWindow, on);
   return on;
 });
 ipcMain.handle("app:show-main", () => {
@@ -336,32 +407,26 @@ ipcMain.handle("app:show-main", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Quick chat window (⌘⌥N): a compact ChatGPT-mode conversation window.
+// Quick chat window (Ctrl+Alt+N): a compact conversation window.
 // ---------------------------------------------------------------------------
 let quickChatWindow = null;
 
 function createQuickChatWindow() {
+  const shellOptions = quickChatWindowOptions({
+    iconPath: communityIconPath,
+    preloadPath,
+  });
   quickChatWindow = new BrowserWindow({
     width: 560,
     height: 700,
     minWidth: 400,
     minHeight: 400,
-    ...(isMac
-      ? {
-          titleBarStyle: "hiddenInset",
-          trafficLightPosition: { x: 16, y: 16 },
-          vibrancy: "menu",
-        }
-      : {
-          frame: false,
-          autoHideMenuBar: true,
-          icon: communityIconPath,
-        }),
+    ...shellOptions,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#181818" : "#ffffff",
     show: false,
-    title: "ChatGPT",
+    title: "ChatGPT Desktop Community",
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      ...shellOptions.webPreferences,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -406,37 +471,7 @@ ipcMain.handle("power:prevent-sleep", (_e, on) => {
   return true;
 });
 
-// ---------------------------------------------------------------------------
-// Windows in-window menu bar (WinMenuBar) support. Edit roles are forwarded
-// to the sender's webContents; zoom/reload/devtools act on the sender window.
-// ---------------------------------------------------------------------------
-const EDIT_ROLES = new Set(["undo", "redo", "cut", "copy", "paste", "pasteAndMatchStyle", "selectAll"]);
-ipcMain.handle("edit:role", (e, role) => {
-  if (!EDIT_ROLES.has(role)) return false;
-  e.sender[role]();
-  return true;
-});
-
-ipcMain.handle("view:zoom", (e, direction) => {
-  const wc = e.sender;
-  if (direction === "reset") wc.setZoomFactor(1);
-  else wc.setZoomFactor(Math.min(3, Math.max(0.5, wc.getZoomFactor() + (direction === "in" ? 0.1 : -0.1))));
-  return true;
-});
-
-ipcMain.handle("view:reload", (e) => { e.sender.reload(); return true; });
-ipcMain.handle("view:toggle-devtools", (e) => { e.sender.toggleDevTools(); return true; });
-ipcMain.handle("window:close", (e) => { BrowserWindow.fromWebContents(e.sender)?.close(); return true; });
-
-// Custom Windows caption buttons (the transparent window draws no native ones).
-ipcMain.handle("window:minimize", (e) => { BrowserWindow.fromWebContents(e.sender)?.minimize(); return true; });
-ipcMain.handle("window:toggle-maximize", (e) => {
-  const win = BrowserWindow.fromWebContents(e.sender);
-  if (!win) return false;
-  win.isMaximized() ? win.unmaximize() : win.maximize();
-  return true;
-});
-ipcMain.handle("window:is-maximized", (e) => !!BrowserWindow.fromWebContents(e.sender)?.isMaximized());
+registerDesktopShellHandlers({ BrowserWindow, ipcMain });
 
 // ---------------------------------------------------------------------------
 // Window
@@ -446,30 +481,32 @@ let mainWindow = null;
 // quits only when every main-style window is gone.
 const threadWindows = new Set();
 
+if (hasSingleInstanceLock) {
+  app.on("second-instance", () => {
+    const win = mainWindow || [...threadWindows][0];
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  });
+}
+
 function createMainWindow(query) {
   const dark = nativeTheme.shouldUseDarkColors;
+  const shellOptions = mainWindowOptions({
+    dark,
+    iconPath: communityIconPath,
+    preloadPath,
+  });
   const win = new BrowserWindow({
     width: 1280,
     height: 820,
     minWidth: 720,
     minHeight: 600,
-    ...(isMac
-      ? {
-          titleBarStyle: "hiddenInset",
-          trafficLightPosition: { x: 16, y: 16 },
-          transparent: true,
-          backgroundColor: "#00000000",
-          vibrancy: "menu",
-        }
-      : {
-          titleBarStyle: "hidden",
-          autoHideMenuBar: true,
-          icon: communityIconPath,
-          backgroundColor: dark ? "#1a1c22" : "#edf1f7",
-        }),
+    ...shellOptions,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      ...shellOptions.webPreferences,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -481,9 +518,7 @@ function createMainWindow(query) {
   else mainWindow = win;
 
   win.once("ready-to-show", () => win.show());
-  // keep the custom caption buttons' maximize/restore icon in sync
-  win.on("maximize", () => win.webContents.send("window:maximize-changed", true));
-  win.on("unmaximize", () => win.webContents.send("window:maximize-changed", false));
+  installMainWindowBehavior(win);
   win.on("page-title-updated", (e) => e.preventDefault());
   win.on("closed", () => {
     if (win === mainWindow) mainWindow = null;
@@ -522,86 +557,19 @@ ipcMain.handle("window:open-thread", (_e, { threadId }) => {
   return true;
 });
 
-// ---------------------------------------------------------------------------
-// Renderer prefs backup (userData/renderer-prefs.json). Chromium commits
-// localStorage lazily, so a hard kill — or app.quit() racing the flush on
-// window close — wipes it; mirror every persisted key to a JSON file and
-// hydrate the renderer from it at startup.
-// ---------------------------------------------------------------------------
-const PREFS_PATH = path.join(app.getPath("userData"), "renderer-prefs.json");
-
-function readPrefs() {
-  try {
-    return JSON.parse(fs.readFileSync(PREFS_PATH, "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-ipcMain.handle("prefs:read", () => readPrefs());
-
-let prefsPending = {};
-let prefsWriteTimer = null;
-ipcMain.handle("prefs:write", (_e, { key, value }) => {
-  prefsPending[key] = value;
-  clearTimeout(prefsWriteTimer);
-  prefsWriteTimer = setTimeout(() => {
-    const pending = prefsPending;
-    prefsPending = {};
-    try {
-      const next = { ...readPrefs(), ...pending };
-      const tmp = `${PREFS_PATH}.tmp-${process.pid}`;
-      fs.writeFileSync(tmp, JSON.stringify(next));
-      fs.renameSync(tmp, PREFS_PATH);
-    } catch (err) {
-      console.error("[prefs] write failed:", err.message);
-    }
-  }, 150);
-  return true;
+registerPreferenceHandlers({
+  fs,
+  ipcMain,
+  legacyPreferencePaths,
+  userDataPath: app.getPath("userData"),
 });
 
-// ---------------------------------------------------------------------------
-// Codex global state (~/.codex/.codex-global-state.json). The official desktop// app keeps its sidebar projects / pins / thread assignments here; we share the
-// same file so both apps render identical sidebars and stay in sync.
-// ---------------------------------------------------------------------------
-const GS_PATH = path.join(app.getPath("home"), ".codex", ".codex-global-state.json");
-
-function readGlobalState() {
-  try {
-    return JSON.parse(fs.readFileSync(GS_PATH, "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-ipcMain.handle("gs:read", () => readGlobalState());
-
-// Shallow-merge top-level keys, written back atomically (compact JSON, same
-// layout the official app uses).
-ipcMain.handle("gs:patch", (_e, patch) => {
-  try {
-    const next = { ...readGlobalState(), ...(patch || {}) };
-    const tmp = `${GS_PATH}.tmp-${process.pid}`;
-    fs.writeFileSync(tmp, JSON.stringify(next));
-    fs.renameSync(tmp, GS_PATH);
-    return true;
-  } catch (err) {
-    console.error("[gs] patch failed:", err.message);
-    return false;
-  }
+registerGlobalStateHandlers({
+  broadcast: (channel, payload) => bridge.broadcast(channel, payload),
+  fs,
+  homePath: app.getPath("home"),
+  ipcMain,
 });
-
-// The official app replaces the file atomically, so watch the directory.
-let gsWatchTimer = null;
-try {
-  fs.watch(path.dirname(GS_PATH), (_evt, name) => {
-    if (name !== path.basename(GS_PATH)) return;
-    clearTimeout(gsWatchTimer);
-    gsWatchTimer = setTimeout(() => bridge.broadcast("gs:changed", {}), 150);
-  });
-} catch (err) {
-  console.error("[gs] watch failed:", err.message);
-}
 
 // ---------------------------------------------------------------------------
 // IPC
@@ -609,9 +577,35 @@ try {
 // Errors are returned as values ({ ok:false }) instead of rejecting: a rejected
 // ipcMain.handle makes Electron log "Error occurred in handler" on every failed
 // RPC (e.g. rate-limit polls when chatgpt.com is unreachable), spamming the console.
+let codexModelIds = new Set();
+function rememberCodexModels(result) {
+  if (Array.isArray(result?.data)) {
+    codexModelIds = new Set(result.data.map((model) => model?.model).filter(Boolean));
+  }
+}
+
 ipcMain.handle("rpc:request", async (_e, { method, params }) => {
   try {
-    return { ok: true, result: await bridge.request(method, params) };
+    if (method === "thread/start" || method === "turn/start") {
+      if (!codexModelIds.size) {
+        rememberCodexModels(await bridge.request("model/list", { limit: 100 }));
+      }
+      const requestedModels = [
+        params?.model,
+        params?.collaborationMode?.settings?.model,
+      ].filter(Boolean);
+      for (const model of requestedModels) {
+        if (!codexModelIds.has(model)) {
+          throw new Error(`Model "${model}" does not belong to the Codex runtime`);
+        }
+      }
+    }
+    const result = method === "account/rateLimits/read"
+      ? await readCodexRateLimits()
+      : await bridge.request(method, params);
+    if (method === "account/rateLimitResetCredit/consume") invalidateCodexRateLimits();
+    if (method === "model/list") rememberCodexModels(result);
+    return { ok: true, result };
   } catch (err) {
     return { ok: false, error: String((err && err.message) || err) };
   }
@@ -621,6 +615,7 @@ ipcMain.handle("rpc:respond", (_e, { id, result, error }) => {
   return true;
 });
 ipcMain.handle("appserver:restart", () => {
+  invalidateCodexRateLimits();
   bridge.killProcess();
   bridge.start();
   return true;
@@ -649,10 +644,18 @@ ipcMain.handle("shell:open-external", (_e, url) => {
 });
 ipcMain.handle("app:info", () => ({
   version: app.getVersion(),
-  platform: process.platform,
+  buildTarget: __BUILD_TARGET__,
   home: app.getPath("home"),
+  temp: app.getPath("temp"),
+  username: process.env.USERNAME || os.userInfo().username,
+  hostname: os.hostname().split(".")[0],
   theme: nativeTheme.shouldUseDarkColors ? "dark" : "light",
 }));
+registerAgentRuntimeHandlers({
+  app,
+  host: agentRuntimeHost,
+  ipcMain,
+});
 ipcMain.handle("rollout:activity", (_e, { file }) => {
   try {
     return readRolloutActivity(file, path.join(app.getPath("home"), ".codex", "sessions"));
@@ -673,7 +676,7 @@ ipcMain.handle("webview:capture", async (_e, { webContentsId }) => {
 // ---------------------------------------------------------------------------
 // ChatGPT profile (display name + avatar). Fetched through Electron's net
 // stack (Chromium TLS fingerprint — passes Cloudflare where plain node fails).
-// The access token is read from ~/.codex/auth.json and never leaves main.
+// The access token is read from %USERPROFILE%\.codex\auth.json and never leaves main.
 // ---------------------------------------------------------------------------
 let profileCache = null;
 let profileCacheAt = 0;
@@ -770,16 +773,12 @@ ipcMain.handle("save-temp-file", (_e, { dataUrl, prefix = "codex-annotate", ext 
 // App lifecycle
 // ---------------------------------------------------------------------------
 app.whenReady().then(() => {
-  if (isDev && process.platform === "darwin") app.dock.setIcon(communityIconPath);
-
+  if (!hasSingleInstanceLock) return;
   protocol.handle("codex-file", (request) => {
     try {
       const url = new URL(request.url);
       let filePath = decodeURIComponent(url.pathname);
-      // Windows drive paths arrive as "/D:/..." — the leading slash is the URL
-      // path separator, not part of the filesystem path. Leaving it in makes
-      // pathToFileURL produce file:///D:/D:/... (drive duplicated).
-      if (/^\/[A-Za-z]:[/\\]/.test(filePath)) filePath = filePath.slice(1);
+      filePath = normalizeProtocolPath(filePath);
       const ext = path.extname(filePath).toLowerCase();
       if (!LOCAL_FILE_EXTS.has(ext) || !path.isAbsolute(filePath)) {
         return new Response("forbidden", { status: 403 });
@@ -805,12 +804,21 @@ app.whenReady().then(() => {
   createHotkeyWindow();
   createQuickChatWindow();
   const { globalShortcut } = require("electron");
-  globalShortcut.register("CommandOrControl+Shift+Space", toggleHotkeyWindow);
-  globalShortcut.register("CommandOrControl+Alt+N", toggleQuickChatWindow);
-
-  app.on("activate", () => {
-    if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
-    else mainWindow.show();
+  registerGlobalShortcuts(globalShortcut, {
+    toggleHotkeyWindow,
+    toggleQuickChatWindow,
+  });
+  installApplicationLifecycle({
+    app,
+    createMainWindow: () => {
+      if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
+      else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    },
+    iconPath: communityIconPath,
+    isDev,
   });
 });
 

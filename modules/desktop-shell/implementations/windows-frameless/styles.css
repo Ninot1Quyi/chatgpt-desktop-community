@@ -1,0 +1,23 @@
+.desktop-shell-windows {
+  background: var(--win-shell-bg, var(--surface-under));
+}
+
+.win-shell {
+  background: linear-gradient(155deg, #f2eef7 0%, #edf1f7 52%, #f7f2ec 100%);
+}
+
+.win-shell .app-sidebar {
+  background: transparent;
+}
+
+.dark .win-shell {
+  background: linear-gradient(155deg, #1e2028 0%, #1a1c22 52%, #221f1c 100%);
+}
+
+.dark .win-shell .app-sidebar {
+  background: transparent;
+}
+
+.desktop-shell-windows .right-panel-root {
+  background: var(--surface);
+}

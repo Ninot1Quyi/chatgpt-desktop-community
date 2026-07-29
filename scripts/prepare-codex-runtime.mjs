@@ -34,10 +34,20 @@ const PACKAGE_TARGETS = {
   "darwin-x64": ["darwin-x64"],
   "win32-x64": ["win32-x64"],
 };
+const packageTarget = process.argv[2];
+const runtimeKeys = PACKAGE_TARGETS[packageTarget];
+if (!runtimeKeys) {
+  throw new Error(`Usage: node scripts/prepare-codex-runtime.mjs <${Object.keys(PACKAGE_TARGETS).join("|")}>`);
+}
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cacheDir = path.join(repoRoot, "release", "codex-runtime-cache");
-const stageRoot = path.join(repoRoot, "release", "codex-runtime-stage");
+const stageRoot = path.join(
+  repoRoot,
+  "release",
+  "codex-runtime-stage",
+  packageTarget,
+);
 const resourceDir = path.join(stageRoot, "codex-runtime");
 
 function sha256(filePath) {
@@ -122,12 +132,6 @@ async function extractRuntime(key) {
     sha256: runtime.sha256,
     target: runtime.target,
   };
-}
-
-const packageTarget = process.argv[2];
-const runtimeKeys = PACKAGE_TARGETS[packageTarget];
-if (!runtimeKeys) {
-  throw new Error(`Usage: node scripts/prepare-codex-runtime.mjs <${Object.keys(PACKAGE_TARGETS).join("|")}>`);
 }
 
 await rm(stageRoot, { recursive: true, force: true });

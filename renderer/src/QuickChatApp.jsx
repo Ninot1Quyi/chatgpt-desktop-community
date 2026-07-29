@@ -3,8 +3,7 @@
 // compact Message ChatGPT composer at the bottom.
 import React, { useEffect, useMemo } from "react";
 import { useStore } from "./store.js";
-import Conversation from "./components/Conversation.jsx";
-import Composer from "./components/Composer.jsx";
+import { Composer, Conversation } from "@modules/conversations";
 import { IconButton, Toasts } from "./components/ui.jsx";
 import { IconX, IconBranch, IconTerminal, IconGlobe, IconFolder, IconChat, LucideIcon } from "./components/icons.jsx";
 

@@ -29,6 +29,47 @@ contextBridge.exposeInMainWorld("codexBridge", {
   openPath: (p) => ipcRenderer.invoke("shell:open-path", p),
   openExternal: (url) => ipcRenderer.invoke("shell:open-external", url),
   getAppInfo: () => ipcRenderer.invoke("app:info"),
+  claudeHistoryList: async () => {
+    const r = await ipcRenderer.invoke("claude-history:list");
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
+  claudeHistoryRead: async (sessionId) => {
+    const r = await ipcRenderer.invoke("claude-history:read", { sessionId });
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
+  kimiHistoryList: async () => {
+    const r = await ipcRenderer.invoke("kimi-history:list");
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
+  kimiHistoryRead: async (sessionId) => {
+    const r = await ipcRenderer.invoke("kimi-history:read", { sessionId });
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
+  agentRuntimeCatalog: async () => {
+    const r = await ipcRenderer.invoke("agent-runtime:catalog");
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
+  agentRuntimeSend: async (request) => {
+    const r = await ipcRenderer.invoke("agent-runtime:send", request);
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
+  agentRuntimeCancel: (runId) => ipcRenderer.invoke("agent-runtime:cancel", { runId }),
+  agentRuntimeAuthStatus: async () => {
+    const r = await ipcRenderer.invoke("agent-runtime:auth-status");
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
+  agentRuntimeLogin: async (runtime) => {
+    const r = await ipcRenderer.invoke("agent-runtime:login", { runtime });
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
   rolloutActivity: (file) => ipcRenderer.invoke("rollout:activity", { file }),
   captureWebview: (webContentsId) => ipcRenderer.invoke("webview:capture", { webContentsId }),
   saveTempFile: (dataUrl, prefix, ext) => ipcRenderer.invoke("save-temp-file", { dataUrl, prefix, ext }),
