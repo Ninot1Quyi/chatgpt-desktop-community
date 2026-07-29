@@ -21,6 +21,7 @@ import BrowserTab from "./panel/BrowserTab.jsx";
 import EnvironmentPanel from "./panel/EnvironmentPanel.jsx";
 import { FileIcon } from "./panel/FileIcon.jsx";
 import { openFileInPanel, usePanelStore } from "./state.js";
+import { shellTitleCommand } from "@modules/terminal";
 
 // ---------------------------------------------------------------------------
 // Tab model
@@ -62,7 +63,10 @@ function useShellTitle() {
   useEffect(() => {
     if (shellTitleCache) return undefined;
     let live = true;
-    api.rpc("command/exec", { command: ["sh", "-c", "printf '%s@%s' \"$(whoami)\" \"$(hostname -s)\""], timeoutMs: 5000 })
+    api.rpc("command/exec", {
+      command: shellTitleCommand,
+      timeoutMs: 5000,
+    })
       .then((r) => {
         const out = String(r?.stdout ?? r?.output ?? "").trim();
         if (live && out) { shellTitleCache = out; setT(out); }

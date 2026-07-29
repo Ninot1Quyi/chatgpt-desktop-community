@@ -168,6 +168,7 @@ test("distribution implementations expose one builder contract", async () => {
     });
     assert.ok(result.builderPlatform);
     assert.ok(result.builderTargets.length);
+    assert.equal(typeof result.finalizeArtifacts, "function");
     assert.ok(result.config.artifactName.includes(id));
   }
 });

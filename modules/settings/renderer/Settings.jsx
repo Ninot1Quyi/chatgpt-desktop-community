@@ -370,10 +370,52 @@ function GeneralSection() {
         </Row>
       </Card>
       <RuntimeOrderCard />
+      <DiagnosticsCard />
       <Card title="Updates">
         <UpdateRow />
       </Card>
     </>
+  );
+}
+
+function DiagnosticsCard() {
+  const [info, setInfo] = useState(null);
+  const [openError, setOpenError] = useState("");
+
+  useEffect(() => {
+    let live = true;
+    api.getDiagnosticsInfo()
+      .then((value) => live && setInfo(value))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const openLogs = async () => {
+    setOpenError("");
+    try {
+      const error = await api.openDiagnosticsLogs();
+      if (error) setOpenError(error);
+    } catch (error) {
+      setOpenError(error?.message || String(error));
+    }
+  };
+
+  const buttonClass =
+    "flex h-7 shrink-0 items-center rounded-full border border-(--border) px-3 text-sm hover:bg-(--surface-hover)";
+
+  return (
+    <Card title="Diagnostics">
+      <Row
+        title="Application logs"
+        desc={openError || info?.logFile || "Startup and renderer errors are recorded automatically"}
+      >
+        <button className={buttonClass} onClick={openLogs}>
+          Open logs folder
+        </button>
+      </Row>
+    </Card>
   );
 }
 
@@ -407,6 +449,7 @@ function UpdateRow() {
   const status = st?.status || "idle";
   const desc =
     status === "dev" ? "Updates are only available in packaged builds" :
+    status === "disabled" ? "Updates are disabled in this portable build" :
     status === "checking" ? "Checking for updates…" :
     status === "available" ? `Version ${st.version} found, downloading…` :
     status === "downloading" ? `Downloading update — ${st.percent ?? 0}%` :
@@ -421,7 +464,11 @@ function UpdateRow() {
       {status === "downloaded" ? (
         <button className={btnCls} onClick={() => api.installUpdate()}>Restart to update</button>
       ) : (
-        <button className={btnCls} disabled={busy || status === "dev"} onClick={() => api.checkForUpdates()}>
+        <button
+          className={btnCls}
+          disabled={busy || status === "dev" || status === "disabled"}
+          onClick={() => api.checkForUpdates()}
+        >
           {busy ? "Working…" : "Check for updates"}
         </button>
       )}

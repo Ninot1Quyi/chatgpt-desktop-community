@@ -266,16 +266,39 @@ export const useStore = create((set, get) => ({
         await get().loadThreads();
       }
     } catch (e) {
+      api.reportDiagnostic("bootstrap_failed", {
+        message: e.message,
+      }, "error");
       get().toast(`Initialization failed: ${e.message}`, "error");
     }
   },
 
   async refreshAccountAndModels(refreshToken = false) {
-    const [acct, models] = await Promise.all([
-      api.rpc("account/read", { refreshToken }).catch(() => null),
-      api.rpc("model/list", { limit: 100 }).catch(() => null),
+    api.reportDiagnostic("account_refresh_started", {
+      forceCredentialRefresh: refreshToken,
+    });
+    const startedAt = Date.now();
+    const [accountResult, modelsResult] = await Promise.allSettled([
+      api.rpc("account/read", { refreshToken }),
+      api.rpc("model/list", { limit: 100 }),
     ]);
+    const acct = accountResult.status === "fulfilled" ? accountResult.value : null;
+    const models = modelsResult.status === "fulfilled" ? modelsResult.value : null;
     const account = acct?.account ?? null;
+    const refreshFailed =
+      accountResult.status === "rejected" || modelsResult.status === "rejected";
+    api.reportDiagnostic("account_refresh_completed", {
+      accountAvailable: !!account,
+      accountError: accountResult.status === "rejected"
+        ? accountResult.reason?.message || String(accountResult.reason)
+        : null,
+      durationMs: Date.now() - startedAt,
+      modelCount: Array.isArray(models?.data) ? models.data.length : 0,
+      modelsError: modelsResult.status === "rejected"
+        ? modelsResult.reason?.message || String(modelsResult.reason)
+        : null,
+      requiresOpenaiAuth: acct?.requiresOpenaiAuth ?? null,
+    }, refreshFailed ? "warn" : "info");
     set({
       account,
       accountChecked: true,
@@ -328,27 +351,72 @@ export const useStore = create((set, get) => ({
   },
 
   async startExternalLogin(runtime) {
+    api.reportDiagnostic("runtime_login_started", { runtime });
     try {
       await api.agentRuntimeLogin(runtime);
+      api.reportDiagnostic("runtime_login_window_opened", { runtime });
       get().toast(`Complete the ${runtimeLabel(runtime)} sign-in in the window that just opened`, "info");
     } catch (error) {
+      api.reportDiagnostic("runtime_login_failed", {
+        message: error.message,
+        runtime,
+      }, "error");
       get().toast(error.message, "error");
     }
   },
 
   async refreshExternalAuth() {
+    api.reportDiagnostic("external_auth_refresh_started");
     const status = await api.agentRuntimeAuthStatus().catch(() => null);
-    set({
+    api.reportDiagnostic("external_auth_refresh_completed", {
+      claudeLoggedIn: !!status?.claude?.loggedIn,
+      kimiLoggedIn: !!status?.kimi?.loggedIn,
+      statusAvailable: !!status,
+    }, status ? "info" : "warn");
+    set((state) => ({
       externalAuth: {
         claude: status?.claude || null,
         kimi: status?.kimi || null,
       },
       externalAuthChecked: true,
-    });
+      ...(!status?.kimi?.loggedIn
+        ? {
+          externalAccounts: { ...state.externalAccounts, kimi: null },
+          externalAccountErrors: { ...state.externalAccountErrors, kimi: null },
+        }
+        : {}),
+    }));
+  },
+
+  async refreshExternalAccount(runtime, { refresh = false } = {}) {
+    set((state) => ({
+      externalAccountLoading: { ...state.externalAccountLoading, [runtime]: true },
+      externalAccountErrors: { ...state.externalAccountErrors, [runtime]: null },
+    }));
+    try {
+      const account = await api.agentRuntimeAccount(runtime, refresh);
+      set((state) => ({
+        externalAccounts: { ...state.externalAccounts, [runtime]: account },
+      }));
+      return account;
+    } catch (error) {
+      set((state) => ({
+        externalAccountErrors: {
+          ...state.externalAccountErrors,
+          [runtime]: String(error?.message || error),
+        },
+      }));
+      return null;
+    } finally {
+      set((state) => ({
+        externalAccountLoading: { ...state.externalAccountLoading, [runtime]: false },
+      }));
+    }
   },
 
   async startChatgptLogin() {
     if (get().loginStatus === "starting") return;
+    api.reportDiagnostic("chatgpt_login_started");
     set({ loginStatus: "starting", loginError: null, loginId: null });
     try {
       const result = await api.rpc("account/login/start", { type: "chatgpt" });
@@ -356,8 +424,12 @@ export const useStore = create((set, get) => ({
         throw new Error("The ChatGPT Desktop Community backend returned an invalid login response.");
       }
       set({ loginId: result.loginId, loginStatus: "waiting" });
+      api.reportDiagnostic("chatgpt_login_waiting_for_browser");
       await api.openExternal(result.authUrl);
     } catch (error) {
+      api.reportDiagnostic("chatgpt_login_failed", {
+        message: error.message,
+      }, "error");
       set({ loginStatus: "idle", loginError: error.message, loginId: null });
     }
   },
@@ -375,6 +447,11 @@ export const useStore = create((set, get) => ({
   // =======================================================================
   async loadThreads({ append = false } = {}) {
     const { threadsCursor, archivedView, searchTerm } = get();
+    api.reportDiagnostic("thread_list_started", {
+      append,
+      archived: archivedView,
+      hasSearch: !!searchTerm,
+    });
     set({ threadsLoading: true });
     try {
       const res = await api.rpc("thread/list", {
@@ -391,7 +468,16 @@ export const useStore = create((set, get) => ({
         threadsCursor: res?.nextCursor ?? null,
         threadsLoading: false,
       }));
+      api.reportDiagnostic("thread_list_completed", {
+        append,
+        count: data.length,
+        hasNextPage: !!res?.nextCursor,
+      });
     } catch (e) {
+      api.reportDiagnostic("thread_list_failed", {
+        append,
+        message: e.message,
+      }, "error");
       set({ threadsLoading: false });
       get().toast(`Failed to load chats: ${e.message}`, "error");
     }
@@ -1391,6 +1477,10 @@ export const useStore = create((set, get) => ({
         }
         break;
       case "account/login/completed":
+        api.reportDiagnostic("chatgpt_login_completed_notification", {
+          message: params.success ? null : params.error,
+          success: !!params.success,
+        }, params.success ? "info" : "error");
         if (!params.success) {
           set({
             loginStatus: "idle",
@@ -1403,13 +1493,19 @@ export const useStore = create((set, get) => ({
         s.refreshAccountAndModels(true)
           .then((account) => {
             if (!account) throw new Error("Sign-in completed, but no local account was returned.");
+            api.reportDiagnostic("chatgpt_login_account_ready");
             set({ loginStatus: "idle", loginId: null });
             s.setMode("chatgpt");
             api.showMainWindow();
             api.profileRead(true).then((p) => p && set({ profile: p })).catch(() => {});
             s.loadThreads();
           })
-          .catch((error) => set({ loginStatus: "idle", loginError: error.message, loginId: null }));
+          .catch((error) => {
+            api.reportDiagnostic("chatgpt_login_account_failed", {
+              message: error.message,
+            }, "error");
+            set({ loginStatus: "idle", loginError: error.message, loginId: null });
+          });
         break;
       case "account/updated":
         s.refreshAccountAndModels(false);

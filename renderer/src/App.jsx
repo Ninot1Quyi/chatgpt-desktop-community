@@ -13,6 +13,7 @@ import {
 } from "@modules/agent-runtimes";
 import { Toasts, Spinner } from "./components/ui.jsx";
 import { IconChat, IconSearch, LucideIcon } from "./components/icons.jsx";
+import { reportDiagnostic } from "@modules/diagnostics";
 
 const Settings = React.lazy(() => import("@modules/settings"));
 
@@ -23,12 +24,23 @@ export default function App() {
   const externalAuthChecked = useStore((state) => state.externalAuthChecked);
   const anyConnected = useStore((state) =>
     RUNTIME_IDS.some((id) => runtimeConnected(state, id)));
+  const connectedRuntimes = useStore((state) =>
+    RUNTIME_IDS.filter((id) => runtimeConnected(state, id)).join(","));
   const setUi = useStore((state) => state.setUi);
   const settingsOpen = useStore((state) => state.ui.settingsOpen);
 
   useEffect(() => {
     init();
   }, []);
+
+  useEffect(() => {
+    reportDiagnostic("app_state", {
+      accountChecked,
+      connectedRuntimes: connectedRuntimes ? connectedRuntimes.split(",") : [],
+      externalAuthChecked,
+      status,
+    });
+  }, [accountChecked, connectedRuntimes, externalAuthChecked, status]);
 
   useEffect(() => {
     if (status !== "ready") return;

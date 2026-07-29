@@ -3,6 +3,11 @@ const path = require("node:path");
 const { execFile, spawn } = require("node:child_process");
 const crypto = require("node:crypto");
 const { getKimiConfigDir, readIndex } = require("./kimi-history.cjs");
+const {
+  fetchKimiAccount,
+  generatedAvatar,
+  parseKimiAccountPayload,
+} = require("./kimi-account.cjs");
 
 const CLAUDE_MODELS = [
   { model: "sonnet", displayName: "Claude Sonnet", description: "Balanced Claude Code model" },
@@ -287,6 +292,29 @@ function getKimiAuth(homePath, env) {
   }
 }
 
+const kimiVersionCache = new Map();
+async function getKimiAccount({
+  homePath,
+  env = process.env,
+  forceRefresh = false,
+  host,
+} = {}) {
+  const binary = requireHost(host).resolveKimiBinary(homePath, env);
+  if (!binary) throw new Error("Kimi Code CLI was not found");
+  let clientVersion = kimiVersionCache.get(binary);
+  if (!clientVersion) {
+    const { stdout } = await execFileUtf8(binary, ["--version"], { timeout: 5000 });
+    clientVersion = String(stdout || "").trim().split(/\s+/).at(-1) || "unknown";
+    kimiVersionCache.set(binary, clientVersion);
+  }
+  return fetchKimiAccount({
+    clientVersion,
+    configDir: getKimiConfigDir(homePath, env),
+    env,
+    forceRefresh,
+  });
+}
+
 async function getExternalAuthStatus({
   homePath,
   env = process.env,
@@ -322,10 +350,13 @@ module.exports = {
   ...require("./kimi-history.cjs"),
   CLAUDE_MODELS,
   getExternalAuthStatus,
+  getKimiAccount,
   getKimiAuth,
   getRuntimeCatalog,
+  generatedAvatar,
   kimiPromptArgs,
   loadKimiModels,
+  parseKimiAccountPayload,
   runExternalAgent,
   startExternalLogin,
   validateRun,

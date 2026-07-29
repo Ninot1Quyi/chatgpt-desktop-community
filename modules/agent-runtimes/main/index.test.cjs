@@ -4,10 +4,13 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const {
+  generatedAvatar,
   getKimiAuth,
   kimiPromptArgs,
+  parseKimiAccountPayload,
   validateRun,
 } = require("./index.cjs");
+const { fetchKimiAccount } = require("./kimi-account.cjs");
 
 const catalog = {
   claude: {
@@ -134,4 +137,152 @@ test("Kimi auth requires a saved OAuth token rather than any JSON file", (t) => 
     loggedIn: true,
     detail: "oauth_credentials",
   });
+});
+
+const kimiUsageFixture = {
+  user: {
+    userId: "user_123456789",
+    region: "REGION_CN",
+    membership: { level: "LEVEL_ADVANCED" },
+  },
+  usage: {
+    limit: "100",
+    used: "93",
+    remaining: "7",
+    resetTime: "2026-08-01T10:32:45.952887Z",
+  },
+  limits: [{
+    window: { duration: 300, timeUnit: "TIME_UNIT_MINUTE" },
+    detail: {
+      limit: "100",
+      remaining: "80",
+      resetTime: "2026-07-29T11:32:45.952887Z",
+    },
+  }],
+  parallel: { limit: "30", used: "4", remaining: "26" },
+  totalQuota: {
+    monthly: { limit: "1000", remaining: "640" },
+    accessToken: "must-not-cross-ipc",
+  },
+  boosterWallet: {
+    status: "STATUS_ACTIVE",
+    allowTopup: true,
+    balance: {
+      type: "BOOSTER",
+      amount: "25000000",
+      amountLeft: "12500000",
+      currency: "CNY",
+    },
+    topupLimit: { currency: "CNY", priceInCents: "300000" },
+    autoRefillCharge: { currency: "CNY", priceInCents: "5000" },
+    autoRefillThreshold: { currency: "CNY", priceInCents: "2000" },
+    monthlyChargeLimit: { currency: "CNY", priceInCents: "10000" },
+    monthlyUsed: { currency: "CNY", priceInCents: "3500" },
+  },
+  authentication: { method: "METHOD_ACCESS_TOKEN", scope: "FEATURE_CODING" },
+  subType: "TYPE_PURCHASE",
+  domain: "DOMAIN_NEXUS",
+};
+
+test("Kimi account parser preserves every reported quota dimension", () => {
+  const account = parseKimiAccountPayload(kimiUsageFixture);
+  assert.deepEqual(account.profile, {
+    id: "user_123456789",
+    username: "user_123456789",
+    usernameSource: "account_id",
+    avatar: null,
+    avatarSource: "generated",
+    region: "REGION_CN",
+    membershipLevel: "LEVEL_ADVANCED",
+    businessId: null,
+  });
+  assert.deepEqual(account.usage.summary, {
+    label: "Weekly limit",
+    used: 93,
+    limit: 100,
+    remaining: 7,
+    resetAt: "2026-08-01T10:32:45.952887Z",
+    resetInSeconds: null,
+    window: null,
+  });
+  assert.equal(account.usage.limits[0].label, "5 hour limit");
+  assert.equal(account.usage.limits[0].used, 20);
+  assert.deepEqual(account.usage.parallel, { limit: 30, used: 4, remaining: 26 });
+  assert.deepEqual(account.usage.totalQuota, {
+    monthly: { limit: "1000", remaining: "640" },
+  });
+  assert.deepEqual(account.usage.boosterWallet, {
+    status: "STATUS_ACTIVE",
+    allowTopup: true,
+    balance: {
+      type: "BOOSTER",
+      totalCents: 25,
+      remainingCents: 13,
+      currency: "CNY",
+    },
+    topupLimit: { cents: 300000, currency: "CNY" },
+    autoRefillCharge: { cents: 5000, currency: "CNY" },
+    autoRefillThreshold: { cents: 2000, currency: "CNY" },
+    monthlyChargeLimitEnabled: true,
+    monthlyChargeLimit: { cents: 10000, currency: "CNY" },
+    monthlyUsed: { cents: 3500, currency: "CNY" },
+  });
+  assert.equal(generatedAvatar(account.profile.id).startsWith("data:image/svg+xml;base64,"), true);
+});
+
+test("Kimi account fetch refreshes expired CLI credentials without exposing tokens", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "community-kimi-account-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const credentialsDir = path.join(root, "credentials");
+  fs.mkdirSync(credentialsDir, { recursive: true });
+  const credentialFile = path.join(credentialsDir, "kimi-code.json");
+  fs.writeFileSync(credentialFile, JSON.stringify({
+    access_token: "expired-access",
+    refresh_token: "refresh-one",
+    expires_at: 1,
+    expires_in: 3600,
+    scope: "kimi-code",
+    token_type: "Bearer",
+  }), "utf8");
+
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push(String(url));
+    if (String(url).endsWith("/api/oauth/token")) {
+      assert.equal(String(options.body).includes("refresh-one"), true);
+      return new Response(JSON.stringify({
+        access_token: "fresh-access",
+        refresh_token: "refresh-two",
+        expires_in: 3600,
+        scope: "kimi-code",
+        token_type: "Bearer",
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    assert.equal(options.headers.Authorization, "Bearer fresh-access");
+    return new Response(JSON.stringify(kimiUsageFixture), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+
+  const account = await fetchKimiAccount({
+    clientVersion: "0.29.0",
+    configDir: root,
+    fetchImpl,
+    now: () => 2_000_000,
+  });
+  assert.deepEqual(calls, [
+    "https://auth.kimi.com/api/oauth/token",
+    "https://api.kimi.com/coding/v1/usages",
+  ]);
+  assert.equal(account.profile.avatarSource, "generated");
+  assert.equal(account.profile.avatar.startsWith("data:image/svg+xml;base64,"), true);
+  assert.equal(JSON.stringify(account).includes("fresh-access"), false);
+  assert.equal(JSON.stringify(account).includes("refresh-two"), false);
+  const saved = JSON.parse(fs.readFileSync(credentialFile, "utf8"));
+  assert.equal(saved.access_token, "fresh-access");
+  assert.equal(saved.refresh_token, "refresh-two");
 });
