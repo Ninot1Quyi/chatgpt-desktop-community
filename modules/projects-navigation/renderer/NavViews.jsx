@@ -10,6 +10,7 @@ import { IconPlus, IconSearch, IconMore, IconChevronDown, IconSkillCube, IconSki
 import { LucideIcon } from "@app/components/lucide/index.jsx";
 import { Markdown } from "@modules/conversations";
 import { openFileInPanel } from "@modules/workspace-panels/state";
+import { pluginRequestParams } from "./plugin-rpc.mjs";
 
 const toast = (message) => useStore.getState().toast(message);
 
@@ -955,7 +956,13 @@ function PluginCard({ plugin, onOverflow, onChanged, onOpenDetail }) {
       ) : (
         <button
           className="h-6 shrink-0 rounded-full border border-(--border) px-2.5 text-[11px] hover:bg-(--surface-hover)"
-          onClick={(e) => { e.stopPropagation(); api.rpc("plugin/install", { pluginId: plugin.id }).then(reload).catch((err) => toast(`Install failed: ${err.message}`)); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            Promise.resolve()
+              .then(() => api.rpc("plugin/install", pluginRequestParams(plugin)))
+              .then(reload)
+              .catch((err) => toast(`Install failed: ${err.message}`));
+          }}
         >
           Install
         </button>
@@ -1259,7 +1266,13 @@ function PersonalPluginRow({ plugin, onOverflow, onChanged, onOpenDetail }) {
       ) : (
         <button
           className="h-6 shrink-0 rounded-full border border-(--border) px-2.5 text-[11px] hover:bg-(--surface-hover)"
-          onClick={(e) => { e.stopPropagation(); api.rpc("plugin/install", { pluginId: plugin.id }).then(reload).catch((err) => toast(`Install failed: ${err.message}`)); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            Promise.resolve()
+              .then(() => api.rpc("plugin/install", pluginRequestParams(plugin)))
+              .then(reload)
+              .catch((err) => toast(`Install failed: ${err.message}`));
+          }}
         >
           Install
         </button>
@@ -1793,11 +1806,8 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
   useEffect(() => {
     let live = true;
     setDetail(null);
-    const params =
-      plugin._marketplace === "openai-curated-remote"
-        ? { pluginName: slug, remoteMarketplaceName: plugin._marketplace }
-        : { pluginName: slug, marketplacePath: plugin._marketplacePath };
-    api.rpc("plugin/read", params)
+    Promise.resolve()
+      .then(() => api.rpc("plugin/read", pluginRequestParams(plugin)))
       .then((r) => live && setDetail(r?.plugin || r || null))
       .catch(() => live && setDetail({}));
     return () => { live = false; };
@@ -1820,7 +1830,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
   const install = async () => {
     setBusy(true);
     try {
-      await api.rpc("plugin/install", { pluginId: plugin.id });
+      await api.rpc("plugin/install", pluginRequestParams(plugin));
       await reload();
       onBack();
     } catch (e) {
