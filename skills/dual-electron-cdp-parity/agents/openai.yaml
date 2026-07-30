@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dual Electron CDP Parity"
+  short_description: "Compare Electron apps through CDP"
+  default_prompt: "Use $dual-electron-cdp-parity to compare official and replica Electron UI parity through CDP."

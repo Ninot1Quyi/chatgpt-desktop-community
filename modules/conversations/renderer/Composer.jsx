@@ -14,6 +14,12 @@ import {
   skillName,
 } from "@modules/projects-navigation/plugin-views";
 import {
+  composerDraftKey,
+  emptyComposerDraft,
+  readComposerDraft,
+  writeComposerDraft,
+} from "./composer-drafts.mjs";
+import {
   IconArrowUp, IconStop, IconFolder, IconBranch, IconChevronDown,
   IconX, IconImage, IconFile, IconList, IconCheck, IconChevronRight, IconChevronLeft,
   IconShield, IconSparkle, IconMonitor, IconPaperclip, LucideIcon,
@@ -22,10 +28,87 @@ import {
   IconCmdInit, IconCmdMcp, IconCmdMemories, IconCmdModel, IconCmdPlan,
   IconCmdReasoning, IconCmdSide, IconCmdStatus,
   IconComposerPlus, IconComposerMic, IconComposerChevronDown, IconComposerChevronRight, IconGoalChevron, IconSkillCheck, IconModelPower, IconCircleXFill,
+  IconNavSites,
 } from "@app/components/icons.jsx";
 import { panelHook } from "@app/lib/panelHook.js";
 
 const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"];
+const DEFAULT_GPT_LIVE_VOICE = "marin";
+const SUPPORTED_GPT_LIVE_VOICES = new Set([
+  "alloy",
+  "ash",
+  "ballad",
+  "coral",
+  "echo",
+  "marin",
+  "sage",
+  "shimmer",
+  "verse",
+]);
+
+function getGptLiveVoice() {
+  try {
+    const storedVoice = globalThis.localStorage?.getItem("voice.gptLive.voice");
+    const voice = storedVoice == null ? null : JSON.parse(storedVoice);
+    return SUPPORTED_GPT_LIVE_VOICES.has(voice) ? voice : DEFAULT_GPT_LIVE_VOICE;
+  } catch {
+    try {
+      const voice = globalThis.localStorage?.getItem("voice.gptLive.voice");
+      return SUPPORTED_GPT_LIVE_VOICES.has(voice) ? voice : DEFAULT_GPT_LIVE_VOICE;
+    } catch {
+      return DEFAULT_GPT_LIVE_VOICE;
+    }
+  }
+}
+
+function getPreferredMicrophoneId() {
+  try {
+    const storedMicrophone = globalThis.localStorage?.getItem("voice.microphone");
+    const microphone = storedMicrophone == null ? null : JSON.parse(storedMicrophone);
+    return microphone && microphone !== "default" ? microphone : null;
+  } catch {
+    try {
+      const microphone = globalThis.localStorage?.getItem("voice.microphone");
+      return microphone && microphone !== "default" ? microphone : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function base64FromBytes(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 8192) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return btoa(bin);
+}
+
+function audioChunkFromPcm(pcm, sampleRate, numChannels = 1) {
+  const bytes = new Uint8Array(pcm.buffer);
+  return {
+    data: base64FromBytes(bytes),
+    numChannels,
+    sampleRate,
+    samplesPerChannel: Math.floor(pcm.length / Math.max(1, numChannels)),
+  };
+}
+
+function audioChunkFromRealtimeParams(params) {
+  const audio = params?.audio;
+  if (audio && typeof audio === "object" && typeof audio.data === "string") {
+    return {
+      data: audio.data,
+      numChannels: Math.max(1, Number(audio.numChannels) || 1),
+      sampleRate: Math.max(1, Number(audio.sampleRate) || 24000),
+      samplesPerChannel: Number(audio.samplesPerChannel) || null,
+    };
+  }
+  const data = params?.audioBase64 || params?.delta || (typeof audio === "string" ? audio : null);
+  return typeof data === "string"
+    ? { data, numChannels: 1, sampleRate: 24000, samplesPerChannel: null }
+    : null;
+}
 
 // Uniform icon cell for the "/" menu. The extracted reference glyphs have
 // inconsistent viewBoxes — some clip their paths, some underfill — so each
@@ -63,12 +146,25 @@ export default function Composer({ centered = false, quick = false }) {
   const permission = useStore((s) => s.permission);
   const sendMessage = useStore((s) => s.sendMessage);
   const interrupt = useStore((s) => s.interrupt);
-  const clearQueue = useStore((s) => s.clearQueue);
+  const removeQueuedMessage = useStore((s) => s.removeQueuedMessage);
+  const draftAt = useStore((s) => s.draftAt);
+  const cwd = useStore((s) => s.cwd);
 
   const queue = queueAll.filter((q) => q.threadId === activeThreadId);
   const running = !!conv?.activeTurnId;
+  const draftKey = useMemo(
+    () => composerDraftKey(activeThreadId, draftAt, conv?.thread?.cwd || cwd),
+    [activeThreadId, conv?.thread?.cwd, cwd, draftAt],
+  );
+  const initialDraftRef = useRef(null);
+  if (!initialDraftRef.current) {
+    initialDraftRef.current = quick
+      ? emptyComposerDraft()
+      : readComposerDraft(globalThis.localStorage, draftKey);
+  }
+  const loadedDraftKeyRef = useRef(draftKey);
 
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialDraftRef.current.text);
   const composerPrefill = useStore((s) => s.composerPrefill);
 
   // Consume a prefill request (e.g. skill detail "Try now" / Plugins "Create").
@@ -104,9 +200,9 @@ export default function Composer({ centered = false, quick = false }) {
   // /init sends a canned prompt without requiring typed text.
   const doSendRef = useRef(null);
   const browserTab = usePanelStore((s) => s.tabs.find((t) => t.kind === "browser" && t.url));
-  const [images, setImages] = useState([]);
-  const [files, setFiles] = useState([]);
-  const [mentions, setMentions] = useState([]);
+  const [images, setImages] = useState(initialDraftRef.current.images);
+  const [files, setFiles] = useState(initialDraftRef.current.files);
+  const [mentions, setMentions] = useState(initialDraftRef.current.mentions);
   const [dragOver, setDragOver] = useState(false);
   const [menu, setMenu] = useState(null); // {kind:'slash'|'mention', query, start}
   const [menuIdx, setMenuIdx] = useState(0);
@@ -117,6 +213,26 @@ export default function Composer({ centered = false, quick = false }) {
   const anyFileRef = useRef(null);
 
   const canSend = text.trim().length > 0 || images.length > 0 || files.length > 0 || mentions.length > 0;
+
+  useEffect(() => {
+    if (quick) return;
+    if (loadedDraftKeyRef.current !== draftKey) {
+      loadedDraftKeyRef.current = draftKey;
+      const draft = readComposerDraft(globalThis.localStorage, draftKey);
+      setText(draft.text);
+      setImages(draft.images);
+      setFiles(draft.files);
+      setMentions(draft.mentions);
+      setMenu(null);
+      return;
+    }
+    writeComposerDraft(globalThis.localStorage, draftKey, {
+      text,
+      images,
+      files,
+      mentions,
+    });
+  }, [draftKey, files, images, mentions, quick, text]);
 
   // Detect a trailing /command, @mention, or $skill token and open the
   // matching menu.
@@ -271,8 +387,16 @@ export default function Composer({ centered = false, quick = false }) {
     { id: "review", label: "Code review", desc: "Review uncommitted changes or compare against a branch", icon: <IconCmdCodeReview size={16} />,
       run: () => useStore.getState().setUi({ rightOpen: true, rightTab: "review" }) },
     isThread && {
-      id: "compact", label: "Compact", desc: "Compact this chat's context", icon: <LucideIcon name="ListCollapse" size={16} />,
-      run: async () => { await api.rpc("thread/compact", { threadId: activeThreadId }); useStore.getState().toast("Compacting context…"); } },
+      id: "compact",
+      label: "Compact",
+      desc: running ? "Wait for the current turn to finish" : "Compact this chat's context",
+      disabled: running,
+      disabledMessage: "Wait for the current turn to finish",
+      icon: <LucideIcon name="ListCollapse" size={16} />,
+      run: async () => {
+        await api.rpc("thread/compact/start", { threadId: activeThreadId });
+        useStore.getState().toast("Compacting context…");
+      } },
     isThread && {
       id: "continue", label: "Continue in new chat", desc: "Fork this chat into a new one", icon: <IconCmdFork size={16} />,
       run: async () => {
@@ -353,7 +477,10 @@ export default function Composer({ centered = false, quick = false }) {
   };
 
   const runCommand = (c) => {
-    if (c.disabled) { useStore.getState().toast("Open a chat first", "warn"); return; }
+    if (c.disabled) {
+      useStore.getState().toast(c.disabledMessage || "Open a chat first", "warn");
+      return;
+    }
     setText("");
     setMenu(null);
     Promise.resolve(c.run()).catch((e) => useStore.getState().toast(e.message, "error"));
@@ -368,7 +495,7 @@ export default function Composer({ centered = false, quick = false }) {
     // Strip mention display names back out of the text (they go as mention inputs).
     let outText = text;
     for (const m of mentions) {
-      if (m.kind === "skill") continue;
+      if (m.kind === "skill" || m.kind === "site") continue;
       outText = outText.split(m.name).join(`@${m.name}`);
     }
     // Skill mentions serialize as inline $slug at the end (reference behavior).
@@ -378,7 +505,10 @@ export default function Composer({ centered = false, quick = false }) {
       if (!outText.includes(tag)) outText = `${outText.replace(/\s+$/, "")}${outText.trim() ? " " : ""}${tag} `;
     }
     // Attached (non-image) files ride along as mention inputs with absolute paths.
-    const allMentions = [...mentions, ...files.map((f) => ({ name: basename(f), path: f, kind: "file" }))];
+    const allMentions = [
+      ...mentions.filter((mention) => mention.kind !== "site"),
+      ...files.map((f) => ({ name: basename(f), path: f, kind: "file" })),
+    ];
     sendMessage(outText, images, allMentions, opts); // the store queues it when a turn is running
     setText("");
     setImages([]);
@@ -544,14 +674,14 @@ export default function Composer({ centered = false, quick = false }) {
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
           {queue.map((q, i) => (
             <span
-              key={i}
+              key={q.id || `${q.threadId}:${i}`}
               className="flex h-7 max-w-full items-center gap-1.5 rounded-full border border-(--border) pl-3 pr-1.5 text-xs text-(--fg-secondary)"
             >
               <span className="min-w-0 truncate">{q.text}</span>
               <button
-                title="Clear queued messages"
+                title="Remove queued message"
                 className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-(--fg-tertiary) hover:text-(--danger)"
-                onClick={() => clearQueue(activeThreadId)}
+                onClick={() => removeQueuedMessage(activeThreadId, q.id)}
               >
                 <IconX size={11} />
               </button>
@@ -618,9 +748,10 @@ export default function Composer({ centered = false, quick = false }) {
           </div>
         )}
 
-        {mentions.length > 0 && (
+        {mentions.some((mention) => mention.kind !== "site") && (
           <div className="flex flex-wrap gap-1.5 px-1 pt-1 pb-1.5">
             {mentions.map((m, i) =>
+              m.kind === "site" ? null :
               m.kind === "skill" ? (
                 <span
                   key={i}
@@ -792,17 +923,25 @@ export default function Composer({ centered = false, quick = false }) {
           </div>
         )}
 
-        <textarea
-          ref={taRef}
-          rows={1}
-          value={text}
-          placeholder={useStore((s) => s.mode) === "chatgpt" ? "Message ChatGPT" : "Do anything"}
-          className="mx-1 mt-1.5 mb-1 block min-h-11 w-[calc(100%-8px)] resize-none bg-transparent p-0 text-[14px] leading-5 font-[445] text-(--fg) outline-none placeholder:text-(--fg-faint)"
-          onChange={(e) => { setText(e.target.value); detectMenu(e.target.value, e.target.selectionStart); }}
-          onKeyDown={onKeyDown}
-          onClick={(e) => detectMenu(e.target.value, e.target.selectionStart)}
-          onPaste={onPasteFiles}
-        />
+        <div className="mx-1 mt-1.5 mb-1 flex min-h-11 items-start gap-2">
+          {mentions.some((mention) => mention.kind === "site") && (
+            <span className="mt-px flex shrink-0 items-center gap-1.5 py-0 text-[14px] leading-5 font-medium text-(--accent)">
+              <IconNavSites size={16} />
+              Sites
+            </span>
+          )}
+          <textarea
+            ref={taRef}
+            rows={1}
+            value={text}
+            placeholder={useStore((s) => s.mode) === "chatgpt" ? "Message ChatGPT" : "Do anything"}
+            className="block min-h-11 min-w-0 flex-1 resize-none bg-transparent p-0 text-[14px] leading-5 font-[445] text-(--fg) outline-none placeholder:text-(--fg-faint)"
+            onChange={(e) => { setText(e.target.value); detectMenu(e.target.value, e.target.selectionStart); }}
+            onKeyDown={onKeyDown}
+            onClick={(e) => detectMenu(e.target.value, e.target.selectionStart)}
+            onPaste={onPasteFiles}
+          />
+        </div>
 
         <div className="flex items-center gap-[5px]">
           <AttachButton
@@ -1729,10 +1868,15 @@ function VoiceButton() {
       const t = await api.rpc("thread/start", { cwd, ephemeral: true });
       threadId = t?.thread?.id;
       if (!threadId) throw new Error("could not create a voice thread");
-      await api.rpc("thread/realtime/start", { threadId, outputModality: "audio", voice: "marin" });
+      await api.rpc("thread/realtime/start", { threadId, outputModality: "audio", voice: getGptLiveVoice() });
 
-      // mic → PCM16 mono 24kHz → appendAudio (base64)
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // mic → PCM16 → appendAudio v2 audio chunk
+      const preferredMicrophoneId = getPreferredMicrophoneId();
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: preferredMicrophoneId
+          ? { deviceId: { exact: preferredMicrophoneId } }
+          : true,
+      });
       audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
       const src = audioCtx.createMediaStreamSource(stream);
       const proc = audioCtx.createScriptProcessor(4096, 1, 1);
@@ -1740,10 +1884,10 @@ function VoiceButton() {
         const f = e.inputBuffer.getChannelData(0);
         const pcm = new Int16Array(f.length);
         for (let i = 0; i < f.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, Math.round(f[i] * 32767)));
-        let bin = "";
-        const bytes = new Uint8Array(pcm.buffer);
-        for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
-        api.rpc("thread/realtime/appendAudio", { threadId, audioBase64: btoa(bin) }).catch(() => {});
+        api.rpc("thread/realtime/appendAudio", {
+          threadId,
+          audio: audioChunkFromPcm(pcm, audioCtx.sampleRate, 1),
+        }).catch(() => {});
       };
       src.connect(proc);
       proc.connect(audioCtx.destination);
@@ -1752,14 +1896,20 @@ function VoiceButton() {
       unsubscribe = api.onNotification(({ method, params }) => {
         if (!/realtime/i.test(method)) return;
         gotAudio = true;
-        const b64 = params?.audioBase64 || params?.delta || params?.audio;
-        if (typeof b64 === "string" && b64.length > 16 && audioCtx) {
+        const audio = audioChunkFromRealtimeParams(params);
+        if (audio?.data?.length > 16 && audioCtx) {
           try {
-            const raw = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+            const raw = Uint8Array.from(atob(audio.data), (c) => c.charCodeAt(0));
             const pcm = new Int16Array(raw.buffer);
-            const buf = audioCtx.createBuffer(1, pcm.length, 24000);
-            const data = buf.getChannelData(0);
-            for (let i = 0; i < pcm.length; i++) data[i] = pcm[i] / 32768;
+            const channels = Math.max(1, audio.numChannels || 1);
+            const samplesPerChannel = audio.samplesPerChannel || Math.floor(pcm.length / channels);
+            const buf = audioCtx.createBuffer(channels, samplesPerChannel, audio.sampleRate || 24000);
+            for (let channel = 0; channel < channels; channel += 1) {
+              const data = buf.getChannelData(channel);
+              for (let i = 0; i < samplesPerChannel; i += 1) {
+                data[i] = (pcm[i * channels + channel] || 0) / 32768;
+              }
+            }
             const node = audioCtx.createBufferSource();
             node.buffer = buf;
             node.connect(audioCtx.destination);

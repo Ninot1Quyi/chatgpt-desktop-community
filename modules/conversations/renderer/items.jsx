@@ -1,41 +1,48 @@
 // Renderers for the ThreadItem union, the turn action row, the plan-steps
 // widget and the inline approval cards shown above the composer.
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "@app/lib/cx.js";
 import * as api from "@app/api.js";
 import { localFileUrl, showItemInFolder } from "@app/api.js";
-import { countDiff, parseUnifiedDiff } from "@app/lib/diff.js";
+import { countDiff, diffFileName, parseUnifiedDiff } from "@app/lib/diff.js";
 import { basename, formatDuration } from "@app/lib/time.js";
 import { commandActivity } from "@app/lib/commandActivity.mjs";
 import { useStore } from "@app/store.js";
 import { openFileInPanel } from "@modules/workspace-panels/state";
+import {
+  imageAltForContent,
+  imageSourceForContent,
+  imageViewerZoom,
+} from "./image-viewer.mjs";
 import Markdown from "./Markdown.jsx";
 import { ActivityDisclosure, Spinner, Menu, Dialog } from "@app/components/ui.jsx";
 import {
   IconChevronRight, IconChevronDown, IconTerminal, IconFile,
   IconImage, IconCheck, IconClock, IconShield, IconCopy, IconPencil,
+  IconX, IconPlus, IconMinus,
   IconCpu, IconChat, IconUndo, IconSparkle, LucideIcon,
   IconBookOpen, IconCodeSearching, IconContextCompaction, IconEditFiles, IconGoalChevron,
-  IconListFiles, IconMcpSource, IconRunCommand, IconWebSearch,
+  IconListFiles, IconMcpSource, IconRunCommand, IconWebSearch, IconCmdFork,
 } from "@app/components/icons.jsx";
 import { revealInFileManager } from "@modules/host-copy";
 
 const IconThumbUp = (p) => <LucideIcon name="ThumbsUp" size={p.size || 16} className={p.className} style={p.style} />;
 const IconThumbDown = (p) => <LucideIcon name="ThumbsDown" size={p.size || 16} className={p.className} style={p.style} />;
-const IconRetry = (p) => <LucideIcon name="RotateCcw" size={p.size || 16} className={p.className} style={p.style} />;
+const IconMemoryCitation = (p) => <LucideIcon name="NotebookPen" size={p.size || 16} className={p.className} style={p.style} />;
 
 // ---------------------------------------------------------------------------
 // ItemView: dispatches on ThreadItem.type.
 // `streaming` is true only for the item(s) of the currently-active turn.
 // ---------------------------------------------------------------------------
-export function ItemView({ item, streaming, turnId }) {
+export function ItemView({ item, streaming, turnId, showReasoning = false }) {
+  if (item.type === "reasoning" && !showReasoning) return null;
   if (item.type === "reasoning"
     && !(item.summary?.length || item.content?.length)
     && !streaming) return null;
   const body = (() => {
     switch (item.type) {
       case "userMessage": return <UserMessage item={item} />;
-      case "agentMessage": return <AgentMessage item={item} streaming={streaming} />;
+      case "agentMessage": return <AgentMessage item={item} streaming={streaming} showThinking={showReasoning} />;
       case "reasoning": return <Reasoning item={item} streaming={streaming} />;
       case "plan": return <PlanText item={item} />;
       case "commandExecution": return <CommandCard item={item} streaming={streaming} />;
@@ -47,16 +54,28 @@ export function ItemView({ item, streaming, turnId }) {
       case "imageGeneration": return <ImageGeneration item={item} />;
       case "collabAgentToolCall": return <CollabRow item={item} />;
       case "subAgentActivity": return <SubAgentActivityRow item={item} />;
-      case "contextCompaction": return <Divider label="Context automatically compacted" />;
+      case "contextCompaction": return <ContextCompaction item={item} streaming={streaming} />;
       case "enteredReviewMode": return <Subtle icon={<IconShield size={13} />} text="Entered review mode" />;
       case "exitedReviewMode": return <Subtle icon={<IconShield size={13} />} text="Exited review mode" />;
-      case "hookPrompt": return null;
+      case "hookPrompt": return <HookPrompt item={item} />;
       case "sleep": return <Subtle icon={<IconClock size={13} />} text={`Waiting… ${formatDuration(item.durationMs)}`} />;
       default: return null;
     }
   })();
   if (!body) return null;
   return <div className="fade-in min-w-0" data-item-id={item.id}>{body}</div>;
+}
+
+function ContextCompaction({ item, streaming }) {
+  const pending = item.status === "inProgress"
+    || (streaming && item.status !== "completed" && item.status !== "failed");
+  if (!pending) return <Divider label="Context compacted" />;
+  return (
+    <div className="flex items-center gap-2 text-[12px] text-(--fg-tertiary)">
+      <Spinner size={12} />
+      <span>Compacting context…</span>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +106,7 @@ function UserMessage({ item }) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(full);
+  const [viewerImage, setViewerImage] = useState(null);
 
   const copy = () => {
     navigator.clipboard.writeText(full);
@@ -155,15 +175,25 @@ function UserMessage({ item }) {
       {images.length > 0 && (
         <div className="hide-scrollbar flex max-w-full flex-row-reverse self-end overflow-x-auto">
           <div className="flex min-w-max items-end gap-2">
-            {images.map((c, i) => (
-              <div key={i} className="flex size-20 items-center justify-center rounded-[12.5px] border border-(--border-heavy)">
-                <img
-                  src={c.type === "localImage" ? localFileUrl(c.path) : c.url}
-                  className="h-full w-full rounded-[10px] object-cover"
-                  alt=""
-                />
-              </div>
-            ))}
+            {images.map((c, i) => {
+              const src = imageSourceForContent(c, localFileUrl);
+              const alt = imageAltForContent(c, `User image ${i + 1}`);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className="flex size-20 items-center justify-center rounded-[12.5px] border border-(--border-heavy) outline-none hover:border-(--border-heavy) focus-visible:ring-2 focus-visible:ring-(--accent)"
+                  aria-label={`Open ${alt}`}
+                  onClick={() => setViewerImage({ src, alt })}
+                >
+                  <img
+                    src={src}
+                    className="h-full w-full rounded-[10px] object-cover"
+                    alt=""
+                  />
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -185,8 +215,31 @@ function UserMessage({ item }) {
           )}
         </div>
       </div>}
+      <ImageViewerDialog image={viewerImage} onClose={() => setViewerImage(null)} />
     </div>
   );
+}
+
+function HookPrompt({ item }) {
+  const text = hookPromptText(item);
+  if (!text) return null;
+  return (
+    <div className="flex w-full flex-col items-end justify-end gap-1">
+      <div className="max-w-[77%] rounded-[20px] bg-(--bubble-user) px-3 py-2">
+        <div className="text-[14px] leading-[22px] whitespace-pre-wrap break-words">{text}</div>
+      </div>
+      <div className="text-xs leading-5 text-(--fg-tertiary)">Hook feedback</div>
+    </div>
+  );
+}
+
+function hookPromptText(item) {
+  const fragments = Array.isArray(item.fragments) ? item.fragments : [];
+  const fragmentText = fragments
+    .map((fragment) => typeof fragment === "string" ? fragment : fragment?.text)
+    .filter(Boolean)
+    .join("\n");
+  return fragmentText || item.text || item.prompt || "";
 }
 
 function HoverAction({ icon, title, onClick }) {
@@ -204,14 +257,13 @@ function HoverAction({ icon, title, onClick }) {
 // ---------------------------------------------------------------------------
 // agentMessage — markdown; shimmer while empty.
 // ---------------------------------------------------------------------------
-function AgentMessage({ item, streaming }) {
+function AgentMessage({ item, streaming, showThinking }) {
   if (!item.text) {
-    return streaming ? <span className="shimmer-text text-[14px]">Thinking</span> : null;
+    return streaming && showThinking ? <span className="shimmer-text text-[14px]">Thinking</span> : null;
   }
   return (
     <div className="min-w-0">
       <Markdown>{item.text}</Markdown>
-      {item.memoryCitation && <MemoryCitation citation={item.memoryCitation} />}
     </div>
   );
 }
@@ -241,49 +293,27 @@ function MentionSummary({ mentions }) {
   );
 }
 
-// "N memory citations" collapsible row under an assistant message.
-function MemoryCitation({ citation }) {
-  const [open, setOpen] = useState(false);
-  const entries = citation.entries || [];
-  if (!entries.length) return null;
-  return (
-    <div className="mt-1">
-      <button
-        className="flex items-center gap-1.5 text-xs text-(--fg-tertiary) hover:text-(--fg-secondary)"
-        onClick={() => setOpen(!open)}
-      >
-        <IconChevronRight size={11} className={cx("transition-transform", open && "rotate-90")} />
-        {entries.length} memory citation{entries.length === 1 ? "" : "s"}
-      </button>
-      {open && (
-        <div className="mt-1 flex flex-col gap-1 border-l-2 border-(--border) pl-3">
-          {entries.map((e, i) => (
-            <div key={i} className="text-xs text-(--fg-tertiary)">
-              <span className="font-mono text-(--fg-secondary)">{e.path}:{e.lineStart}-{e.lineEnd}</span>
-              {e.note && <span className="ml-1.5">{e.note}</span>}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // TurnActionRow — copy / thumbs up / thumbs down / retry under a completed
 // assistant turn.
 // ---------------------------------------------------------------------------
 export function TurnActionRow({ turn }) {
   const toast = useStore((s) => s.toast);
-  const sendMessage = useStore((s) => s.sendMessage);
+  const activeThreadId = useStore((s) => s.activeThreadId);
   const running = useStore((s) => !!s.activeConversation()?.activeTurnId);
   const readOnly = useStore((s) => !!s.activeConversation()?.readOnly);
   const [copied, setCopied] = useState(false);
+  const [forking, setForking] = useState(false);
+  const [citationsOpen, setCitationsOpen] = useState(false);
 
   const agentTexts = (turn.items || []).filter((i) => i.type === "agentMessage" && i.text).map((i) => i.text);
   if (agentTexts.length === 0) return null;
-  const firstUser = (turn.items || []).find((i) => i.type === "userMessage");
-  const firstUserText = (firstUser?.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
+  const memoryCitation = [...(turn.items || [])]
+    .reverse()
+    .find((item) => item.type === "agentMessage" && item.memoryCitation?.entries?.length)
+    ?.memoryCitation;
+  const citationEntries = memoryCitation?.entries || [];
+  const timestamp = formatTurnTimestamp(turn.completedAt || turn.startedAt);
 
   const copy = () => {
     navigator.clipboard.writeText(agentTexts.join("\n\n"));
@@ -294,32 +324,89 @@ export function TurnActionRow({ turn }) {
     api.rpc("feedback/upload", { threadId: turn.threadId || useStore.getState().activeThreadId, classification }).catch(() => {});
     toast("Thanks for the feedback");
   };
-  const retry = () => {
-    if (firstUserText) sendMessage(firstUserText);
+  const continueFromHere = async () => {
+    const threadId = turn.threadId || activeThreadId;
+    if (!threadId || forking) return;
+    setForking(true);
+    try {
+      const result = await api.rpc("thread/fork", {
+        threadId,
+        lastTurnId: turn.id,
+      });
+      if (result?.thread?.id) {
+        useStore.getState().openThread(result.thread.id);
+      }
+    } catch (error) {
+      toast(`Could not continue this chat: ${error.message}`, "error");
+    } finally {
+      setForking(false);
+    }
   };
 
   return (
-    <div className="fade-in flex items-center gap-0.5 opacity-0 transition-opacity group-hover/turn:opacity-100">
-      <ActionIcon title={copied ? "Copied" : "Copy"} onClick={copy} icon={copied ? <IconCheck size={14} /> : <IconCopy size={14} />} />
-      {!readOnly && (
-        <>
-          <ActionIcon title="Good response" onClick={() => feedback("thumbs_up")} icon={<IconThumbUp size={14} />} />
-          <ActionIcon title="Bad response" onClick={() => feedback("thumbs_down")} icon={<IconThumbDown size={14} />} />
-          <ActionIcon title="Retry" onClick={retry} disabled={!firstUserText || running} icon={<IconRetry size={14} />} />
-        </>
-      )}
-    </div>
+    <>
+      <div className="fade-in mt-1.5 flex h-5 -translate-x-1 items-center gap-0.5">
+        <div className="flex h-full items-center gap-0.5 opacity-0 transition-opacity group-focus-within/turn:opacity-100 group-hover/turn:opacity-100">
+          <ActionIcon title={copied ? "Copied" : "Copy"} onClick={copy} icon={copied ? <IconCheck size={14} /> : <IconCopy size={14} />} />
+          {!readOnly && (
+            <>
+              <ActionIcon title="Good response" onClick={() => feedback("thumbs_up")} icon={<IconThumbUp size={14} />} />
+              <ActionIcon title="Bad response" onClick={() => feedback("thumbs_down")} icon={<IconThumbDown size={14} />} />
+              <ActionIcon
+                title="Continue in new chat from here"
+                onClick={continueFromHere}
+                disabled={!activeThreadId || running || forking}
+                icon={<IconCmdFork size={14} />}
+              />
+            </>
+          )}
+          {citationEntries.length > 0 && (
+            <ActionIcon
+              title={`${citationEntries.length} memory citation${citationEntries.length === 1 ? "" : "s"}`}
+              onClick={() => setCitationsOpen(true)}
+              icon={<IconMemoryCitation size={14} />}
+            />
+          )}
+        </div>
+        {timestamp && <span className="ml-1.5 text-xs leading-4 text-(--fg-tertiary)">{timestamp}</span>}
+      </div>
+      <Dialog open={citationsOpen} title="Memory citations" onClose={() => setCitationsOpen(false)}>
+        <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
+          {citationEntries.map((entry, index) => (
+            <div key={`${entry.path}:${entry.lineStart}:${index}`} className="rounded-lg bg-(--surface-under) px-3 py-2">
+              <div className="font-mono text-xs text-(--fg-secondary)">
+                {entry.path}:{entry.lineStart}-{entry.lineEnd}
+              </div>
+              {entry.note && <div className="mt-1 text-xs text-(--fg-tertiary)">{entry.note}</div>}
+            </div>
+          ))}
+        </div>
+      </Dialog>
+    </>
   );
+}
+
+function formatTurnTimestamp(timestamp) {
+  const value = Number(timestamp);
+  if (!Number.isFinite(value) || value <= 0) return "";
+  const date = new Date(value > 1e12 ? value : value * 1000);
+  const weekday = new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date);
+  const time = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+  return `${weekday} ${time}`;
 }
 
 function ActionIcon({ icon, title, onClick, disabled }) {
   return (
     <button
       title={title}
+      aria-label={title}
       onClick={onClick}
       disabled={disabled}
       className={cx(
-        "flex h-6 w-6 items-center justify-center rounded-md text-(--fg-tertiary)",
+        "flex h-[26px] w-[26px] items-center justify-center rounded-md text-(--fg-tertiary)",
         disabled ? "opacity-40" : "hover:bg-(--surface-hover) hover:text-(--fg)"
       )}
     >
@@ -338,20 +425,25 @@ function Reasoning({ item, streaming }) {
   return (
     <div>
       <button
-        className="flex items-center gap-1 text-xs text-(--fg-tertiary) hover:text-(--fg-secondary)"
+        type="button"
+        aria-expanded={open}
+        className="inline-flex items-center gap-1 rounded-md border border-transparent text-left text-[14px] leading-[21px] font-[445] text-(--conversation-body) hover:bg-(--surface-hover) hover:text-(--fg)"
         onClick={() => setOpen(!open)}
       >
         {streaming ? (
-          <span className="shimmer-text text-[14px]">Thinking</span>
+          <span className="shimmer-text">Thinking</span>
         ) : (
           <>
-            <IconChevronRight size={12} className={cx("transition-transform", open && "rotate-90")} />
             <span>Thought</span>
+            <IconChevronRight
+              size={14}
+              className={cx("shrink-0 text-(--fg-tertiary) transition-transform", open && "rotate-90")}
+            />
           </>
         )}
       </button>
-      {open && !streaming && text && (
-        <div className="mt-1.5 border-l-2 border-(--border) pl-3 text-xs leading-5 whitespace-pre-wrap text-(--fg-secondary)">
+      {open && text && (
+        <div className="mt-1.5 border-l border-(--border) pl-3 text-[14px] leading-[21px] font-[445] whitespace-pre-wrap text-(--conversation-body)">
           {text}
         </div>
       )}
@@ -462,6 +554,46 @@ function FileChangeCard({ item }) {
   );
 }
 
+export function TurnDiffCard({ diff, changes: fallbackChanges = [] }) {
+  const changes = useMemo(() => {
+    const files = parseUnifiedDiff(diff || "");
+    if (files.length > 0) {
+      return files.map((file) => ({
+        path: diffFileName(file),
+        added: file.added,
+        deleted: file.deleted,
+        diff: "",
+      }));
+    }
+
+    const byPath = new Map();
+    for (const change of fallbackChanges) {
+      if (!change?.path) continue;
+      const count = changeCounts(change);
+      const previous = byPath.get(change.path);
+      byPath.set(change.path, {
+        ...change,
+        added: (previous?.added || 0) + count.add,
+        deleted: (previous?.deleted || 0) + count.del,
+      });
+    }
+    return [...byPath.values()];
+  }, [diff, fallbackChanges]);
+
+  if (changes.length === 0) return null;
+  return <EditedGroupCard item={{ status: "completed" }} changes={changes} turnDiff />;
+}
+
+function changeCounts(change) {
+  if (Number.isFinite(change?.added) || Number.isFinite(change?.deleted)) {
+    return {
+      add: Number(change.added) || 0,
+      del: Number(change.deleted) || 0,
+    };
+  }
+  return countDiff(change?.diff);
+}
+
 // A single edited document: icon box + name + "Document · MD" + Open in split.
 function DocumentCard({ change }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -502,7 +634,7 @@ function DocumentCard({ change }) {
   );
 }
 
-function EditedGroupCard({ item, changes }) {
+function EditedGroupCard({ item, changes, turnDiff = false }) {
   const [showAll, setShowAll] = useState(false);
   const [undoOpen, setUndoOpen] = useState(false);
   const [confirmRevert, setConfirmRevert] = useState(false);
@@ -512,7 +644,7 @@ function EditedGroupCard({ item, changes }) {
   const cwd = useStore((s) => s.activeConversation()?.thread?.cwd || "");
   const totals = changes.reduce(
     (acc, c) => {
-      const { add, del } = countDiff(c.diff);
+      const { add, del } = changeCounts(c);
       acc.add += add; acc.del += del;
       return acc;
     },
@@ -521,7 +653,9 @@ function EditedGroupCard({ item, changes }) {
   const running = item.status === "inProgress";
   const title = running
     ? `Editing ${changes.length === 1 ? basename(changes[0]?.path) : `${changes.length} files`}`
-    : `Edited ${changes.length === 1 ? basename(changes[0]?.path) : `${changes.length} files`}`;
+    : turnDiff && changes.length === 1
+      ? `Edited ${basename(changes[0]?.path)}`
+      : `Edited ${changes.length === 1 ? basename(changes[0]?.path) : `${changes.length} files`}`;
   const visible = showAll ? changes : changes.slice(0, FILE_ROWS_COLLAPSED);
 
   const doRevert = async () => {
@@ -545,7 +679,7 @@ function EditedGroupCard({ item, changes }) {
     setUi({ rightOpen: true, rightTab: "review" });
   };
 
-  if (changes.length === 1) {
+  if (changes.length === 1 && !turnDiff) {
     const change = changes[0];
     return (
       <div className="group/edit flex min-w-0 items-center gap-1.5 text-[14px] leading-[21px] [color:color-mix(in_srgb,var(--fg)_60%,transparent)]">
@@ -559,44 +693,55 @@ function EditedGroupCard({ item, changes }) {
             {basename(change.path)}
           </button>
         </span>
-        {(totals.add > 0 || totals.del > 0) && (
-          <span className="flex shrink-0 gap-1 text-[13px] leading-[19.5px]">
-            {totals.add > 0 && <span className="group-hover/edit:text-(--diff-add-fg)">+{totals.add}</span>}
-            {totals.del > 0 && <span className="group-hover/edit:text-(--diff-del-fg)">-{totals.del}</span>}
-          </span>
-        )}
+        <span className="flex shrink-0 gap-1 text-[13px] leading-[19.5px]">
+          <span className="group-hover/edit:text-(--diff-add-fg)">+{totals.add}</span>
+          <span className="group-hover/edit:text-(--diff-del-fg)">-{totals.del}</span>
+        </span>
         {running && <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />}
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-[12.5px] bg-[rgb(255_255_255/0.5)] dark:bg-[rgb(38_38_38/0.5)]">
+    <div className={cx(
+      "overflow-hidden rounded-[12.5px] bg-[rgb(255_255_255/0.5)] dark:bg-[rgb(38_38_38/0.5)]",
+      turnDiff && "mb-2",
+    )}>
       {/* header */}
-      <div className="flex min-h-[64.5px] items-center gap-2.5 px-3 py-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-[12.5px] bg-[color-mix(in_srgb,var(--surface-under)_92%,transparent)] text-(--fg-secondary)">
+      <div className="group/turn-diff-header relative flex min-h-[64.5px] items-center gap-2.5 px-3 py-3 text-[14px] leading-[21px]">
+        {turnDiff && (
+          <button
+            aria-label="Review changed files"
+            className="absolute inset-0 z-0 bg-transparent hover:bg-white/[0.03] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-(--accent) focus-visible:outline-none"
+            onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
+          />
+        )}
+        <span className="relative z-10 flex size-10 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--surface-under)_92%,transparent)] text-(--fg-secondary)">
           <EditedFilesIcon size={24} />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="relative z-10 min-w-0 flex-1">
           <div className="truncate text-[14px] leading-[21px] font-medium">{title}</div>
-          {(totals.add > 0 || totals.del > 0) && (
-            <div className="flex gap-1 font-mono text-[13px] leading-[19.5px]">
-              <span className="text-(--diff-add-fg)">+{totals.add}</span>{" "}
-              <span className="text-(--diff-del-fg)">-{totals.del}</span>
+          <div className="turn-diff-default-subtitle flex gap-1 text-[13px] leading-[19.5px] group-hover/turn-diff-header:hidden">
+            <span className="text-(--diff-add-fg)">+{totals.add}</span>{" "}
+            <span className="text-(--diff-del-fg)">-{totals.del}</span>
+          </div>
+          {turnDiff && (
+            <div className="hidden items-center gap-1 text-[13px] leading-[19.5px] text-(--fg-secondary) group-hover/turn-diff-header:flex">
+              Review changes <IconChevronRight size={11} />
             </div>
           )}
         </div>
         {!running && changes.length > 0 && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="relative z-10 flex shrink-0 items-center gap-2">
             <button
               ref={undoBtnRef}
-              className="flex h-7 items-center gap-1 rounded-[12.5px] px-2 text-[14px] leading-[18px] text-(--fg-secondary) hover:bg-(--surface-hover)"
+              className="app-no-drag flex h-7 items-center gap-1 rounded-[12.5px] px-[9px] text-[14px] leading-[18px] font-[445] text-(--fg) hover:bg-(--surface-hover)"
               onClick={() => setUndoOpen(true)}
             >
               Undo <IconUndo size={14} />
             </button>
             <button
-              className="flex h-7 items-center rounded-[12.5px] border border-(--border) bg-[rgb(255_255_255/0.96)] px-2 text-[14px] leading-[18px] hover:bg-(--surface-hover)"
+              className="app-no-drag flex h-7 items-center rounded-[12.5px] border border-(--border) bg-black/[0.03] px-2 text-[14px] leading-[18px] font-[445] text-(--fg) hover:bg-black/[0.08] dark:bg-white/[0.03] dark:hover:bg-white/[0.08]"
               onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
             >
               Review
@@ -607,17 +752,17 @@ function EditedGroupCard({ item, changes }) {
       </div>
 
       {/* file rows */}
-      {changes.length > 0 && (
-        <div>
+      {changes.length > 1 && (
+        <div className="border-t border-(--border)">
           {visible.map((c, i) => {
-            const { add, del } = countDiff(c.diff);
+            const { add, del } = changeCounts(c);
             const name = basename(c.path);
             const path = cwd && c.path?.startsWith(`${cwd}/`) ? c.path.slice(cwd.length + 1) : c.path || "";
             const dir = path.slice(0, -name.length);
             return (
               <button
                 key={i}
-                className="flex h-9 w-full items-center gap-0 px-3 py-1 text-left text-[14px] leading-[21px] hover:bg-(--surface-hover)"
+                className="flex h-9 w-full items-center gap-2 bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 text-left text-[14px] leading-[21px] hover:bg-(--surface-hover)"
                 title={c.path}
                 onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
               >
@@ -625,9 +770,9 @@ function EditedGroupCard({ item, changes }) {
                   <span className="inline-flex h-[21px] items-center text-(--fg-secondary)">{dir}</span>
                   <span className="inline-flex h-[21px] items-center">{name}</span>
                 </span>
-                <span className="flex shrink-0 gap-1 font-mono">
-                  {add > 0 && <span className="text-(--diff-add-fg)">+{add} </span>}
-                  {del > 0 && <span className="text-(--diff-del-fg)">-{del}</span>}
+                <span className="flex shrink-0 gap-1">
+                  <span className="text-(--diff-add-fg)">+{add}</span>
+                  <span className="text-(--diff-del-fg)">-{del}</span>
                 </span>
               </button>
             );
@@ -698,9 +843,9 @@ function mcpToolLabel(item) {
 function ToolCallRow({ item }) {
   const [open, setOpen] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
-  const name = item.type === "mcpToolCall" ? mcpToolLabel(item) : item.tool;
+  const name = item.type === "mcpToolCall" ? mcpToolLabel(item) : item.tool || "tool";
   const running = item.status === "inProgress";
-  const failed = item.status === "failed";
+  const failed = item.status === "failed" || item.success === false;
   const nodeRepl = /node.?repl/i.test(`${item.server || ""} ${item.tool || ""}`);
   const sourceLogo = item.source?.logoUrl
     || item.source?.logoUrlDark
@@ -709,6 +854,7 @@ function ToolCallRow({ item }) {
     || null;
   let detail = "";
   try { detail = JSON.stringify(item.arguments, null, 2); } catch {}
+  const output = toolOutputDetail(item);
   return (
     <div className={cx("flex flex-col", open && "gap-1")}>
       <button
@@ -739,19 +885,33 @@ function ToolCallRow({ item }) {
       </button>
       <ActivityDisclosure open={open}>
         <div className="ml-[34px] min-w-0 py-1">
+          {item.namespace && <div className="mb-1 text-[11px] text-(--fg-faint)">Namespace: {item.namespace}</div>}
+          {item.progressMessage && <div className="mb-1 text-xs text-(--fg-tertiary)">{item.progressMessage}</div>}
           {detail && detail !== "{}" && (
             <pre className="max-h-48 overflow-auto font-mono text-xs whitespace-pre-wrap break-all text-(--fg-secondary)">{detail}</pre>
           )}
           {item.error && <div className="mt-1 text-xs text-(--danger)">{item.error.message || String(item.error)}</div>}
-          {item.result && (
+          {output && (
             <pre className="mt-1 max-h-48 overflow-auto font-mono text-xs whitespace-pre-wrap break-all text-(--fg-tertiary)">
-              {safeStringify(item.result.structuredContent ?? item.result.content ?? item.result)}
+              {output}
             </pre>
           )}
         </div>
       </ActivityDisclosure>
     </div>
   );
+}
+
+function toolOutputDetail(item) {
+  if (Array.isArray(item.contentItems) && item.contentItems.length) {
+    return item.contentItems.map((contentItem) => {
+      if (contentItem?.type === "inputText") return contentItem.text || "";
+      if (contentItem?.type === "inputImage") return contentItem.imageUrl || "";
+      return safeStringify(contentItem);
+    }).filter(Boolean).join("\n");
+  }
+  if (!item.result) return "";
+  return safeStringify(item.result.structuredContent ?? item.result.content ?? item.result);
 }
 
 // ---------------------------------------------------------------------------
@@ -767,25 +927,155 @@ function WebSearchRow({ item }) {
 }
 
 function ImageView({ item }) {
+  const [viewerImage, setViewerImage] = useState(null);
+  const src = imageSourceForContent({ type: "localImage", path: item.path }, localFileUrl);
+  const alt = imageAltForContent(item, "Viewed image");
   return (
-    <img src={localFileUrl(item.path)} className="max-h-72 rounded-xl border border-(--border-light)" alt="" />
+    <>
+      <ImageThumbnail
+        src={src}
+        alt={alt}
+        onOpen={() => setViewerImage({ src, alt })}
+      />
+      <ImageViewerDialog image={viewerImage} onClose={() => setViewerImage(null)} />
+    </>
   );
 }
 
 function ImageGeneration({ item }) {
   const running = item.status === "inProgress";
+  const [viewerImage, setViewerImage] = useState(null);
+  const src = item.savedPath
+    ? imageSourceForContent({ type: "localImage", path: item.savedPath }, localFileUrl)
+    : "";
+  const alt = imageAltForContent(item, "Generated image");
   return (
     <div>
       {item.savedPath ? (
-        <button onClick={() => showItemInFolder(item.savedPath)} title={revealInFileManager}>
-          <img src={localFileUrl(item.savedPath)} className="max-h-72 rounded-xl border border-(--border-light)" alt="" />
-        </button>
+        <div className="group/generated-image relative inline-block">
+          <ImageThumbnail
+            src={src}
+            alt={alt}
+            onOpen={() => setViewerImage({ src, alt })}
+          />
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              showItemInFolder(item.savedPath);
+            }}
+            title={revealInFileManager}
+            aria-label={revealInFileManager}
+            className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full border border-white/15 bg-black/65 text-white opacity-0 shadow-lg transition-opacity group-hover/generated-image:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-white/70"
+          >
+            <LucideIcon name="FolderOpen" size={15} />
+          </button>
+        </div>
       ) : running ? (
         <span className="shimmer-text text-[14px]">Generating image</span>
       ) : (
         <Subtle icon={<IconImage size={13} />} text="Image generated" />
       )}
       {item.revisedPrompt && <div className="mt-1 text-xs text-(--fg-tertiary)">{item.revisedPrompt}</div>}
+      <ImageViewerDialog image={viewerImage} onClose={() => setViewerImage(null)} />
+    </div>
+  );
+}
+
+function ImageThumbnail({ src, alt, onOpen }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="block max-w-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-(--accent)"
+      aria-label={`Open ${alt}`}
+    >
+      <img src={src} className="max-h-72 rounded-xl border border-(--border-light)" alt={alt} />
+    </button>
+  );
+}
+
+function ImageViewerDialog({ image, onClose }) {
+  const [zoom, setZoom] = useState(1);
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    if (!image) return undefined;
+    setZoom(1);
+    const previouslyFocused = document.activeElement;
+    const focusTimer = window.setTimeout(() => dialogRef.current?.focus(), 0);
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      } else if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        setZoom((value) => imageViewerZoom(value, "in"));
+      } else if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        setZoom((value) => imageViewerZoom(value, "out"));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus?.();
+    };
+  }, [image, onClose]);
+
+  if (!image?.src) return null;
+
+  return (
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image preview"
+      data-image-viewer
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-8 outline-none"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="absolute top-4 right-4 flex items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
+        <button
+          type="button"
+          className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/70"
+          aria-label="Zoom out"
+          onClick={() => setZoom((value) => imageViewerZoom(value, "out"))}
+        >
+          <IconMinus size={16} />
+        </button>
+        <div className="min-w-12 rounded-full bg-white/10 px-2 py-1 text-center text-xs font-medium text-white">
+          {Math.round(zoom * 100)}%
+        </div>
+        <button
+          type="button"
+          className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/70"
+          aria-label="Zoom in"
+          onClick={() => setZoom((value) => imageViewerZoom(value, "in"))}
+        >
+          <IconPlus size={16} />
+        </button>
+        <button
+          type="button"
+          className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/70"
+          aria-label="Close image preview"
+          onClick={onClose}
+        >
+          <IconX size={16} />
+        </button>
+      </div>
+      <div className="max-h-full max-w-full overflow-auto p-3" onMouseDown={(event) => event.stopPropagation()}>
+        <img
+          src={image.src}
+          alt={image.alt || "Image preview"}
+          className="max-h-[82vh] max-w-[88vw] rounded-xl object-contain shadow-2xl transition-transform duration-150"
+          style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
+        />
+      </div>
     </div>
   );
 }
@@ -945,6 +1235,7 @@ const KIND_META = {
   command: { icon: IconTerminal, badge: "Terminal" },
   fileChange: { icon: IconFile, badge: "Edit files" },
   permissions: { icon: IconShield, badge: "Permissions" },
+  externalPermission: { icon: IconShield, badge: "Kimi Code" },
   userInput: { icon: IconChat, badge: "Question" },
   elicitation: { icon: IconChat, badge: "Request" },
 };
@@ -993,13 +1284,51 @@ export function ApprovalCard({ approval: a }) {
             </pre>
           </>
         )}
+        {a.kind === "externalPermission" && (
+          <>
+            <div className="text-xs text-(--fg-tertiary)">
+              Kimi Code is waiting for your decision before continuing.
+            </div>
+            {a.toolCall?.rawInput !== undefined && (
+              <pre className="mt-1.5 max-h-32 overflow-auto rounded-lg bg-(--code-bg) p-2.5 font-mono text-[11px] whitespace-pre-wrap break-all">
+                {safeStringify(a.toolCall.rawInput)}
+              </pre>
+            )}
+          </>
+        )}
         {a.kind === "userInput" && <UserInputForm approval={a} />}
         {a.kind === "elicitation" && (
           <div className="text-[13px] text-(--fg-secondary)">{a.raw?.message || a.title}</div>
         )}
       </div>
 
-      {a.kind === "userInput" ? null : a.kind === "elicitation" ? (
+      {a.kind === "userInput" ? null : a.kind === "externalPermission" ? (
+        <div className="flex flex-wrap items-center gap-2 px-3.5 pb-3 pt-1.5">
+          {(a.options || []).map((option) => {
+            const reject = String(option.kind || "").startsWith("reject");
+            return (
+              <button
+                key={option.optionId}
+                className={cx(
+                  "rounded-lg px-3 py-1.5 text-[13px] font-medium",
+                  reject
+                    ? "text-(--danger) hover:bg-(--danger-soft)"
+                    : "bg-(--fg) text-(--surface) hover:opacity-85",
+                )}
+                onClick={() => answerApproval(a.reqId, option.optionId)}
+              >
+                {option.name || option.optionId}
+              </button>
+            );
+          })}
+          <button
+            className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-tertiary) hover:bg-(--surface-hover)"
+            onClick={() => answerApproval(a.reqId, null)}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : a.kind === "elicitation" ? (
         <div className="flex items-center gap-2 px-3.5 pb-3 pt-1.5">
           <PrimaryBtn onClick={() => answerApproval(a.reqId, "accept")}>Accept</PrimaryBtn>
           <DangerBtn onClick={() => answerApproval(a.reqId, "decline")}>Decline</DangerBtn>

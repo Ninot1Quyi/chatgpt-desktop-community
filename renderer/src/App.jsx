@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import DesktopShell from "@modules/desktop-shell";
 import { COMMANDS, bindingsFor, matchAccel } from "@modules/shortcuts";
+import { mostRecentThreadId } from "@modules/projects-navigation/state";
 import * as api from "./api.js";
 import { useStore, runtimeConnected } from "./store.js";
 import { cx } from "./lib/cx.js";
@@ -77,8 +78,8 @@ export default function App() {
             if (state.activeThreadId) api.openThreadWindow(state.activeThreadId);
             break;
           case "nextRecentChat": {
-            const ordered = [...(state.navBack || [])].reverse();
-            if (ordered.length) state.openThread(ordered[0]);
+            const threadId = mostRecentThreadId(state.navBack, state.activeThreadId);
+            if (threadId) state.openThread(threadId);
             break;
           }
           case "nextTab": {
@@ -153,8 +154,19 @@ export default function App() {
         return;
       }
     };
+    const onMouseUp = (event) => {
+      if (event.button !== 3 && event.button !== 4) return;
+      event.preventDefault();
+      const state = useStore.getState();
+      if (event.button === 3) state.goBack();
+      else state.goForward();
+    };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
   }, []);
 
   if (status !== "ready") return <BootScreen status={status} />;

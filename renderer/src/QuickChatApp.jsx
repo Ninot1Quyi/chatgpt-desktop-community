@@ -5,14 +5,17 @@ import React, { useEffect, useMemo } from "react";
 import { useStore } from "./store.js";
 import { Composer, Conversation } from "@modules/conversations";
 import { IconButton, Toasts } from "./components/ui.jsx";
-import { IconX, IconBranch, IconTerminal, IconGlobe, IconFolder, IconChat, LucideIcon } from "./components/icons.jsx";
+import {
+  IconX, IconReview, IconPanelTerminal, IconPanelBrowser, IconPanelFiles,
+  IconSideChat, LucideIcon,
+} from "./components/icons.jsx";
 
 const TAB_ROWS = [
-  { id: "review", label: "Review", icon: <IconBranch size={15} /> },
-  { id: "terminal", label: "Terminal", icon: <IconTerminal size={15} /> },
-  { id: "browser", label: "Browser", icon: <IconGlobe size={15} /> },
-  { id: "files", label: "Files", icon: <IconFolder size={15} /> },
-  { id: "sidechat", label: "Side chat", icon: <IconChat size={15} /> },
+  { id: "review", label: "Review", icon: <IconReview size={15} /> },
+  { id: "terminal", label: "Terminal", icon: <IconPanelTerminal size={15} /> },
+  { id: "browser", label: "Browser", icon: <IconPanelBrowser size={15} /> },
+  { id: "files", label: "Files", icon: <IconPanelFiles size={15} /> },
+  { id: "sidechat", label: "Side chat", icon: <IconSideChat size={15} /> },
 ];
 
 export default function QuickChatApp() {

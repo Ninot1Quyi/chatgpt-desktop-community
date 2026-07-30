@@ -2,6 +2,13 @@
   background: transparent;
 }
 
+.desktop-shell-macos .mac-window-drag-surface,
+.desktop-shell-macos .mac-window-drag-surface .app-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  user-select: none;
+}
+
 .desktop-shell-macos .right-panel-root {
   background: var(--surface);
   padding-top: 46px;

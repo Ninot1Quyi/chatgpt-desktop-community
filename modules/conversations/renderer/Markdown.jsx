@@ -5,14 +5,17 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { openExternal, openPath } from "@app/api.js";
 import { useStore } from "@app/store.js";
-import { IconCheck, IconCopy, IconFile, IconGlobe } from "@app/components/icons.jsx";
+import { IconCheck, IconCopy, IconGlobe } from "@app/components/icons.jsx";
+import { FileIcon } from "../../workspace-panels/renderer/panel/FileIcon.jsx";
 
 // Inline code: styled by .md code CSS; file-looking ones become openable
 // chips (like the reference client). react-markdown v10 no longer passes
 // `inline` — block handling lives in the `pre` component instead.
 function InlineCode({ className, children, ...props }) {
   const text = String(children ?? "").replace(/\n$/, "");
-  if (looksLikePath(text)) return <FileChip name={text} />;
+  if (looksLikePath(text)) {
+    return <FileReference path={text} label={fileReferenceLabel(text)} />;
+  }
   return <code className={className} {...props}>{children}</code>;
 }
 
@@ -43,22 +46,69 @@ function PreBlock({ children }) {
 }
 
 const PATH_RE = /^(?:[~./]|[A-Za-z]:\\)?[\w.@+\-/\\ ()\u4e00-\u9fff]*\.[A-Za-z0-9]{1,10}$/;
-function looksLikePath(s) {
-  if (!s || s.length > 120) return false;
-  if (!PATH_RE.test(s)) return false;
-  return s.includes("/") || s.startsWith(".") || /\.(md|txt|py|js|ts|tsx|jsx|java|json|ya?ml|toml|pdf|docx?|pptx?|png|jpe?g|gif|svg|html?|css|sh|sql|log|csv)$/i.test(s);
+const SOURCE_LOCATION_RE = /:(\d+)(?::\d+)?$/;
+
+function pathWithoutLocation(path) {
+  return String(path || "").replace(SOURCE_LOCATION_RE, "");
 }
 
-function FileChip({ name }) {
+function looksLikePath(s) {
+  if (!s || s.length > 2048) return false;
+  const path = pathWithoutLocation(s);
+  if (!PATH_RE.test(path)) return false;
+  return path.includes("/") || path.startsWith(".") || /\.(md|txt|py|js|ts|tsx|jsx|java|json|ya?ml|toml|pdf|docx?|pptx?|png|jpe?g|gif|svg|html?|css|sh|sql|log|csv)$/i.test(path);
+}
+
+function fileReferenceLabel(path) {
+  const normalized = pathWithoutLocation(path).replaceAll("\\", "/").replace(/\/+$/, "");
+  return normalized.slice(normalized.lastIndexOf("/") + 1) || normalized;
+}
+
+function inlineIconName(path) {
+  const cleanPath = pathWithoutLocation(path);
+  if (/\.(md|mdx|txt|rtf|docx?|pdf)$/i.test(cleanPath)) return "document";
+  return cleanPath;
+}
+
+function textFromChildren(children) {
+  return React.Children.toArray(children)
+    .map((child) => typeof child === "string" || typeof child === "number"
+      ? String(child)
+      : textFromChildren(child?.props?.children))
+    .join("");
+}
+
+function FileReference({ path, label }) {
+  const displayLabel = textFromChildren(label) || fileReferenceLabel(path);
+  const activate = () => openPath(resolveMaybePath(pathWithoutLocation(path)));
   return (
-    <button
-      className="mx-0.5 inline-flex translate-y-[-1px] items-center gap-1 rounded-md border border-(--border-light) bg-(--surface-hover) px-1.5 py-px align-baseline font-mono text-xs text-(--fg-secondary) hover:bg-(--surface-active) hover:text-(--fg)"
-      title={`Open ${name}`}
-      onClick={() => openPath(resolveMaybePath(name))}
+    <span
+      data-file-reference="true"
+      data-prompt-link-href={path}
+      data-prompt-link-label={displayLabel}
+      role="button"
+      tabIndex={0}
+      className="group/inline-mention cursor-pointer"
+      title={`Open ${pathWithoutLocation(path)}`}
+      onClick={activate}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        activate();
+      }}
     >
-      <IconFile size={11} className="shrink-0 text-(--fg-tertiary)" />
-      {name}
-    </button>
+      <span className="inline-mention-file whitespace-nowrap px-0.5 font-medium">
+        <span className="relative mr-[3px] inline-block h-[1lh] w-4 align-bottom">
+          <FileIcon
+            name={inlineIconName(path)}
+            size={16}
+            className="absolute top-1/2 -translate-y-1/2"
+            style={{ color: "currentColor" }}
+          />
+        </span>
+        <span className="min-w-0 break-words whitespace-normal">{displayLabel}</span>
+      </span>
+    </span>
   );
 }
 
@@ -81,7 +131,7 @@ export default function Markdown({ children }) {
           pre: PreBlock,
           a: ({ href, children }) => {
             if (href && looksLikePath(href) && !/^https?:\/\//.test(href)) {
-              return <FileChip name={href} />;
+              return <FileReference path={href} label={children} />;
             }
             // External links carry a small globe glyph (reference rendering).
             return (

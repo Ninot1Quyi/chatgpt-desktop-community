@@ -4,6 +4,7 @@
 // Appearance settings section.
 
 const KEY = "appearance";
+let desktopTheme = {};
 
 export const ACCENTS = [
   { id: "default", color: null, label: "Default" },
@@ -72,16 +73,23 @@ export function writeAppearance(patch) {
   return next;
 }
 
+export function setDesktopAppearance(theme) {
+  desktopTheme = theme && typeof theme === "object" ? theme : {};
+  applyAppearance();
+}
+
 export function applyAppearance(prefs) {
   const p = prefs || readAppearance();
   const root = document.documentElement;
   const st = root.style;
+  const themeFonts = desktopTheme.fonts || {};
 
   // Accent (+ soft tint used for highlights).
   const accent = ACCENTS.find((a) => a.id === p.accent) || ACCENTS[0];
-  if (accent.color) {
-    st.setProperty("--accent", accent.color);
-    st.setProperty("--accent-soft", `color-mix(in srgb, ${accent.color} 16%, transparent)`);
+  const accentColor = accent.color || desktopTheme.accent;
+  if (accentColor) {
+    st.setProperty("--accent", accentColor);
+    st.setProperty("--accent-soft", `color-mix(in srgb, ${accentColor} 16%, transparent)`);
   } else {
     st.removeProperty("--accent");
     st.removeProperty("--accent-soft");
@@ -89,19 +97,22 @@ export function applyAppearance(prefs) {
 
   // Background / foreground overrides.
   const bg = BACKGROUNDS.find((b) => b.id === p.background) || BACKGROUNDS[0];
-  if (bg.surface) {
-    st.setProperty("--surface", bg.surface);
-    st.setProperty("--surface-under", bg.under || bg.surface);
+  const surface = bg.surface || desktopTheme.surface;
+  if (surface) {
+    st.setProperty("--surface", surface);
+    if (bg.surface) st.setProperty("--surface-under", bg.under || bg.surface);
+    else st.removeProperty("--surface-under");
   } else {
     st.removeProperty("--surface");
     st.removeProperty("--surface-under");
   }
   const fg = FOREGROUNDS.find((f) => f.id === p.foreground) || FOREGROUNDS[0];
-  if (fg.color) {
-    st.setProperty("--fg", fg.color);
-    st.setProperty("--fg-secondary", `color-mix(in srgb, ${fg.color} 65%, transparent)`);
-    st.setProperty("--fg-tertiary", `color-mix(in srgb, ${fg.color} 50%, transparent)`);
-    st.setProperty("--fg-faint", `color-mix(in srgb, ${fg.color} 30%, transparent)`);
+  const foreground = fg.color || desktopTheme.ink;
+  if (foreground) {
+    st.setProperty("--fg", foreground);
+    st.setProperty("--fg-secondary", `color-mix(in srgb, ${foreground} 65%, transparent)`);
+    st.setProperty("--fg-tertiary", `color-mix(in srgb, ${foreground} 50%, transparent)`);
+    st.setProperty("--fg-faint", `color-mix(in srgb, ${foreground} 30%, transparent)`);
   } else {
     st.removeProperty("--fg");
     st.removeProperty("--fg-secondary");
@@ -112,10 +123,26 @@ export function applyAppearance(prefs) {
   // Fonts (theme.css consumes --font-sans / --font-mono).
   const uiFont = UI_FONTS.find((f) => f.id === p.uiFont) || UI_FONTS[0];
   const codeFont = CODE_FONTS.find((f) => f.id === p.codeFont) || CODE_FONTS[0];
-  if (uiFont.stack) st.setProperty("--font-sans", uiFont.stack);
+  if (uiFont.stack || themeFonts.ui) st.setProperty("--font-sans", uiFont.stack || themeFonts.ui);
   else st.removeProperty("--font-sans");
-  if (codeFont.stack) st.setProperty("--font-mono", codeFont.stack);
+  if (codeFont.stack || themeFonts.mono) st.setProperty("--font-mono", codeFont.stack || themeFonts.mono);
   else st.removeProperty("--font-mono");
+
+  const semantic = desktopTheme.semanticColors || {};
+  if (semantic.diffAdded) {
+    st.setProperty("--success", semantic.diffAdded);
+    st.setProperty("--diff-add-fg", semantic.diffAdded);
+  } else {
+    st.removeProperty("--success");
+    st.removeProperty("--diff-add-fg");
+  }
+  if (semantic.diffRemoved) {
+    st.setProperty("--danger", semantic.diffRemoved);
+  } else {
+    st.removeProperty("--danger");
+  }
+  if (semantic.skill) st.setProperty("--purple", semantic.skill);
+  else st.removeProperty("--purple");
 
   // Translucent sidebar (CSS rule in theme.css keys off this class).
   root.classList.toggle("translucent-sidebar", !!p.translucentSidebar);

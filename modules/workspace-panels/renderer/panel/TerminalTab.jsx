@@ -12,6 +12,12 @@ import {
   oneShotCommand,
   shellLabel,
 } from "@modules/terminal";
+import {
+  appendBoundedTerminalBuffer,
+  terminalExecParams,
+  terminalResizeParams,
+  terminalWriteParams,
+} from "./bus.js";
 
 function b64encode(str) {
   const bytes = new TextEncoder().encode(str);
@@ -63,7 +69,7 @@ export default function TerminalTab() {
 
   const append = useCallback((t) => {
     if (!t) return;
-    setBuf((b) => (b.length + t.length > 200000 ? (b + t).slice(-200000) : b + t));
+    setBuf((b) => appendBoundedTerminalBuffer(b, t));
   }, []);
 
   useEffect(() => {
@@ -122,7 +128,7 @@ export default function TerminalTab() {
     });
 
     const dataSub = term.onData((data) => {
-      api.rpc("command/exec/write", { processId, deltaBase64: b64encode(data) }).catch(() => {});
+      api.rpc("command/exec/write", terminalWriteParams(processId, b64encode(data))).catch(() => {});
     });
 
     // keep the PTY sized like the visible grid
@@ -130,21 +136,16 @@ export default function TerminalTab() {
       if (disposed) return;
       const s = gridSize(el, fontSize, lineHeight);
       try { term.resize(s.cols, s.rows); } catch {}
-      api.rpc("command/exec/resize", { processId, size: { cols: s.cols, rows: s.rows } }).catch(() => {});
+      api.rpc("command/exec/resize", terminalResizeParams(processId, { cols: s.cols, rows: s.rows })).catch(() => {});
     });
     ro.observe(el);
 
-    api.rpc("command/exec", {
+    api.rpc("command/exec", terminalExecParams({
       command: interactiveCommand,
       cwd: root || undefined,
-      env: { TERM: "xterm-256color" },
-      tty: true,
       processId,
-      streamStdin: true,
-      streamStdoutStderr: true,
-      disableTimeout: true,
       size: { cols, rows },
-    })
+    }))
       .then((res) => {
         if (disposed) return;
         setExited(res?.exitCode ?? 0);

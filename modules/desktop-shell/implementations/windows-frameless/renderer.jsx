@@ -16,6 +16,8 @@ import WinMenuBar from "./WinMenuBar.jsx";
 import WinWindowControls from "./WinWindowControls.jsx";
 import { IconButton } from "@app/components/ui.jsx";
 import {
+  IconHeaderBack,
+  IconHeaderForward,
   IconHeaderSidebar,
   LucideIcon,
 } from "@app/components/icons.jsx";
@@ -32,12 +34,13 @@ import "./styles.css";
 
 export default function DesktopShell({ overlays }) {
   const ui = useStore((state) => state.ui);
+  const rightVisible = ui.navView === "chats" && ui.rightOpen;
   return (
     <div className="app-shell-root win-shell desktop-shell-windows relative h-full w-full overflow-hidden">
       <div className="flex h-full w-full">
         <SidebarColumn />
         <div className="mt-[46px] ml-2 flex min-w-0 flex-1 overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)">
-          <div className={cx("flex min-w-[360px] flex-1 flex-col", ui.rightOpen && ui.rightExpanded && "hidden")}>
+          <div className={cx("flex min-w-[360px] flex-1 flex-col", rightVisible && ui.rightExpanded && "hidden")}>
             <div className="flex h-[46px] shrink-0 items-center gap-1 pl-3 pr-2">
               {ui.navView === "chats" ? (
                 <>
@@ -64,7 +67,7 @@ export default function DesktopShell({ overlays }) {
               </div>
             )}
           </div>
-          {ui.rightOpen && (
+          {rightVisible && (
             <>
               {!ui.rightExpanded && <RightPanelDragHandle />}
               <div
@@ -100,6 +103,33 @@ export default function DesktopShell({ overlays }) {
   );
 }
 
+function NavigationButtons() {
+  const navBack = useStore((state) => state.navBack);
+  const navForward = useStore((state) => state.navFwd);
+  const goBack = useStore((state) => state.goBack);
+  const goForward = useStore((state) => state.goForward);
+  return (
+    <>
+      <IconButton
+        icon={<IconHeaderBack />}
+        size={16}
+        title={`Back (${bindingFor("back")})`}
+        className="!rounded-[12.5px] !text-(--fg-tertiary)"
+        disabled={!navBack.length}
+        onClick={goBack}
+      />
+      <IconButton
+        icon={<IconHeaderForward />}
+        size={16}
+        title={`Forward (${bindingFor("forward")})`}
+        className="!rounded-[12.5px] !text-(--fg-tertiary)"
+        disabled={!navForward.length}
+        onClick={goForward}
+      />
+    </>
+  );
+}
+
 function WindowsHeader() {
   const ui = useStore((state) => state.ui);
   const setUi = useStore((state) => state.setUi);
@@ -111,6 +141,7 @@ function WindowsHeader() {
         title={`Toggle sidebar (${bindingFor("toggleSidebar")})`}
         onClick={() => setUi({ sidebarOpen: !ui.sidebarOpen })}
       />
+      <NavigationButtons />
       <WinMenuBar />
       {!ui.sidebarOpen && (
         <IconButton
@@ -139,6 +170,7 @@ function WindowsPeekHeader() {
         title={`Show sidebar (${bindingFor("toggleSidebar")})`}
         onClick={() => setUi({ sidebarOpen: true, sidebarPeek: false })}
       />
+      <NavigationButtons />
     </div>
   );
 }
