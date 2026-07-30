@@ -61,6 +61,8 @@ npm run dev -- --target=win32-x64
 The same target argument is required by `npm run build`, `npm start`, and
 `npm run package`. `npm test` validates module contracts, platform boundaries,
 legacy preference migration, and shared behavior.
+Packaging resolves OpenAI's latest stable Codex CLI release before building,
+verifies the official SHA-256 digest, and bundles that exact runtime.
 
 ### Architecture
 
