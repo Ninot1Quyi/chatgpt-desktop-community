@@ -121,11 +121,13 @@ export function KimiAccountPanel({
   onRefresh,
 }) {
   const profile = account?.profile;
-  const rows = [account?.usage?.summary, ...(account?.usage?.limits || [])].filter(Boolean);
-  const parallel = account?.usage?.parallel;
-  const totalQuota = quotaDetails(account?.usage?.totalQuota);
-  const wallet = account?.usage?.boosterWallet;
-  const metadata = account?.usage?.metadata;
+  const usage = account?.usage;
+  const usageError = account?.errors?.usage || error;
+  const rows = [usage?.summary, ...(usage?.limits || [])].filter(Boolean);
+  const parallel = usage?.parallel;
+  const totalQuota = quotaDetails(usage?.totalQuota);
+  const wallet = usage?.boosterWallet;
+  const metadata = usage?.metadata;
   const balanceRemaining = wallet?.balance?.remainingCents;
   const balanceTotal = wallet?.balance?.totalCents;
   const plan = prettyValue(profile?.membershipLevel);
@@ -152,10 +154,10 @@ export function KimiAccountPanel({
         {plan && <span className="ml-auto shrink-0 text-[14px] font-medium">{plan}</span>}
       </div>
 
-      {loading && !account && (
+      {loading && !usage && (
         <div className="flex justify-center py-3 text-(--fg-tertiary)"><Spinner /></div>
       )}
-      {!loading && !account && <UsageUnavailable error={error} onRefresh={onRefresh} />}
+      {!loading && !usage && <UsageUnavailable error={usageError} onRefresh={onRefresh} />}
 
       {rows.length > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5">

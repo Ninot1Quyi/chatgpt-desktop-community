@@ -3,11 +3,9 @@ const path = require("node:path");
 const { execFile, spawn } = require("node:child_process");
 const crypto = require("node:crypto");
 const { getKimiConfigDir, readIndex } = require("./kimi-history.cjs");
-const {
-  fetchKimiAccount,
-  generatedAvatar,
-  parseKimiAccountPayload,
-} = require("./kimi-account.cjs");
+const { fetchKimiAccount } = require("./kimi-account.cjs");
+const { parseKimiOAuthProfile } = require("./kimi-profile.cjs");
+const { parseKimiUsagePayload } = require("./kimi-usage.cjs");
 
 const CLAUDE_MODELS = [
   { model: "sonnet", displayName: "Claude Sonnet", description: "Balanced Claude Code model" },
@@ -353,10 +351,10 @@ module.exports = {
   getKimiAccount,
   getKimiAuth,
   getRuntimeCatalog,
-  generatedAvatar,
   kimiPromptArgs,
   loadKimiModels,
-  parseKimiAccountPayload,
+  parseKimiOAuthProfile,
+  parseKimiUsagePayload,
   runExternalAgent,
   startExternalLogin,
   validateRun,
