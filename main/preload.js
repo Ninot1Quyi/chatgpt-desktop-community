@@ -78,6 +78,19 @@ contextBridge.exposeInMainWorld("codexBridge", {
     if (r && r.ok === false) throw new Error(r.error);
     return r?.result;
   },
+  agentRuntimePluginTargets: async (plugin) => {
+    const r = await ipcRenderer.invoke("agent-runtime:plugin-targets", { plugin });
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
+  agentRuntimePluginInstall: async (runtime, plugin) => {
+    const r = await ipcRenderer.invoke(
+      "agent-runtime:plugin-install",
+      { plugin, runtime },
+    );
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
   rolloutActivity: (file) => ipcRenderer.invoke("rollout:activity", { file }),
   captureWebview: (webContentsId) => ipcRenderer.invoke("webview:capture", { webContentsId }),
   saveTempFile: (dataUrl, prefix, ext) => ipcRenderer.invoke("save-temp-file", { dataUrl, prefix, ext }),

@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-import { pluginRequestParams } from "./plugin-rpc.mjs";
+import {
+  pluginInstallDescriptor,
+  pluginRequestParams,
+} from "./plugin-rpc.mjs";
 
 test("Codex remote plugin requests use pluginName and remote marketplace", () => {
   assert.deepEqual(pluginRequestParams({
@@ -64,20 +67,51 @@ test("plugin requests reject metadata without a protocol name", () => {
   );
 });
 
-test("every plugin install entry point uses the Codex protocol params", () => {
+test("provider install descriptors expose only required package metadata", () => {
+  assert.deepEqual(pluginInstallDescriptor({
+    id: "demo@personal",
+    name: "demo",
+    installed: true,
+    _marketplace: "personal",
+    source: {
+      type: "git",
+      url: "https://github.com/example/demo",
+      refName: "main",
+      ignored: "value",
+    },
+  }), {
+    id: "demo@personal",
+    name: "demo",
+    installed: true,
+    source: {
+      type: "git",
+      url: "https://github.com/example/demo",
+      refName: "main",
+    },
+    installPath: null,
+    root: null,
+    path: null,
+  });
+});
+
+test("Codex installs only happen inside the plugin detail view", () => {
   const source = fs.readFileSync(
     new URL("./NavViews.jsx", import.meta.url),
     "utf8",
   );
+  const detailStart = source.indexOf("export function PluginDetailView");
   const installCalls = source.match(/api\.rpc\("plugin\/install"/g) || [];
-  const contractCalls = source.match(
-    /api\.rpc\("plugin\/install", pluginRequestParams\(plugin\)\)/g,
-  ) || [];
+  const firstInstall = source.indexOf('api.rpc("plugin/install"');
 
-  assert.equal(installCalls.length, 3);
-  assert.equal(contractCalls.length, installCalls.length);
+  assert.equal(installCalls.length, 2);
+  assert.ok(detailStart >= 0);
+  assert.ok(firstInstall > detailStart);
   assert.doesNotMatch(
     source,
     /api\.rpc\("plugin\/install",\s*\{\s*pluginId/,
+  );
+  assert.doesNotMatch(
+    source.slice(0, detailStart),
+    />\s*Install\s*</,
   );
 });

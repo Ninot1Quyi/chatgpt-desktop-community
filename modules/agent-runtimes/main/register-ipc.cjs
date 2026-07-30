@@ -11,6 +11,10 @@ const {
   runExternalAgent,
   startExternalLogin,
 } = require("./index.cjs");
+const {
+  getPluginInstallTargets,
+  installPluginForRuntime,
+} = require("./plugin-targets.cjs");
 
 function resultOrError(operation) {
   return Promise.resolve()
@@ -69,6 +73,23 @@ function registerAgentRuntimeHandlers({
       homePath: app.getPath("home"),
       host,
     })));
+  ipcMain.handle("agent-runtime:plugin-targets", (_event, { plugin } = {}) =>
+    resultOrError(() => getPluginInstallTargets({
+      homePath: app.getPath("home"),
+      host,
+      plugin,
+    })));
+  ipcMain.handle(
+    "agent-runtime:plugin-install",
+    (_event, { plugin, runtime } = {}) =>
+      resultOrError(() => installPluginForRuntime({
+        homePath: app.getPath("home"),
+        host,
+        plugin,
+        runtime: String(runtime || ""),
+        userDataPath: app.getPath("userData"),
+      })),
+  );
 
   const externalRuns = new Map();
   ipcMain.handle("agent-runtime:send", (_event, request = {}) =>

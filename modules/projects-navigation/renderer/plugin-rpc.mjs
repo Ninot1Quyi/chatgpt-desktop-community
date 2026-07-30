@@ -30,3 +30,32 @@ export function pluginRequestParams(plugin) {
 
   return { pluginName: localPluginName };
 }
+
+export function pluginInstallDescriptor(plugin) {
+  const source = plugin?.source && typeof plugin.source === "object"
+    ? Object.fromEntries(
+      [
+        "type",
+        "path",
+        "url",
+        "ref",
+        "refName",
+        "sha",
+        "package",
+        "version",
+        "registry",
+      ]
+        .filter((key) => plugin.source[key] != null)
+        .map((key) => [key, plugin.source[key]]),
+    )
+    : null;
+  return {
+    id: nonEmptyString(plugin?.id),
+    name: nonEmptyString(plugin?.name),
+    installed: plugin?.installed === true,
+    source,
+    installPath: nonEmptyString(plugin?.installPath),
+    root: nonEmptyString(plugin?.root),
+    path: nonEmptyString(plugin?.path),
+  };
+}

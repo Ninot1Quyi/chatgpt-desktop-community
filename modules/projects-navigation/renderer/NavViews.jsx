@@ -9,8 +9,12 @@ import { Spinner, Menu } from "@app/components/ui.jsx";
 import { IconPlus, IconSearch, IconMore, IconChevronDown, IconSkillCube, IconSkillCheck, IconDialogX, IconDots21, IconTryChat, IconPluginFallback } from "@app/components/icons.jsx";
 import { LucideIcon } from "@app/components/lucide/index.jsx";
 import { Markdown } from "@modules/conversations";
+import { runtimeMeta } from "@modules/agent-runtimes";
 import { openFileInPanel } from "@modules/workspace-panels/state";
-import { pluginRequestParams } from "./plugin-rpc.mjs";
+import {
+  pluginInstallDescriptor,
+  pluginRequestParams,
+} from "./plugin-rpc.mjs";
 
 const toast = (message) => useStore.getState().toast(message);
 
@@ -925,14 +929,8 @@ function PluginsView() {
   );
 }
 
-// Plugin card (icon + name + desc + overflow/Install action).
-function PluginCard({ plugin, onOverflow, onChanged, onOpenDetail }) {
-  const reload = () =>
-    api.rpc("plugin/list", {}).then((r) => {
-      const flat = [];
-      for (const mp of r?.marketplaces || []) for (const pl of mp.plugins || []) flat.push({ ...pl, _marketplace: mp.name, _marketplacePath: mp.path });
-      onChanged(flat);
-    });
+// Plugin card (icon + name + desc + details/overflow action).
+function PluginCard({ plugin, onOverflow, onOpenDetail }) {
   return (
     <div
       className="flex cursor-pointer items-center gap-2.5 rounded-2xl border border-(--border-light) bg-(--surface-under) p-3 hover:bg-(--fg)/5"
@@ -954,18 +952,10 @@ function PluginCard({ plugin, onOverflow, onChanged, onOpenDetail }) {
           <IconMore size={14} />
         </button>
       ) : (
-        <button
-          className="h-6 shrink-0 rounded-full border border-(--border) px-2.5 text-[11px] hover:bg-(--surface-hover)"
-          onClick={(e) => {
-            e.stopPropagation();
-            Promise.resolve()
-              .then(() => api.rpc("plugin/install", pluginRequestParams(plugin)))
-              .then(reload)
-              .catch((err) => toast(`Install failed: ${err.message}`));
-          }}
-        >
-          Install
-        </button>
+        <IconChevronDown
+          size={14}
+          className="-rotate-90 shrink-0 text-(--fg-faint)"
+        />
       )}
     </div>
   );
@@ -1237,13 +1227,7 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
 }
 
 // Full-width row used on the Personal tab ("Mario personal" + marketplace tag).
-function PersonalPluginRow({ plugin, onOverflow, onChanged, onOpenDetail }) {
-  const reload = () =>
-    api.rpc("plugin/list", {}).then((r) => {
-      const flat = [];
-      for (const mp of r?.marketplaces || []) for (const pl of mp.plugins || []) flat.push({ ...pl, _marketplace: mp.name, _marketplacePath: mp.path });
-      onChanged(flat);
-    });
+function PersonalPluginRow({ plugin, onOverflow, onOpenDetail }) {
   return (
     <div className="flex cursor-pointer items-center gap-3 rounded-xl p-2 hover:bg-(--fg)/5" onClick={() => onOpenDetail?.(plugin)}>
       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--surface)">
@@ -1264,18 +1248,10 @@ function PersonalPluginRow({ plugin, onOverflow, onChanged, onOpenDetail }) {
           <IconMore size={14} />
         </button>
       ) : (
-        <button
-          className="h-6 shrink-0 rounded-full border border-(--border) px-2.5 text-[11px] hover:bg-(--surface-hover)"
-          onClick={(e) => {
-            e.stopPropagation();
-            Promise.resolve()
-              .then(() => api.rpc("plugin/install", pluginRequestParams(plugin)))
-              .then(reload)
-              .catch((err) => toast(`Install failed: ${err.message}`));
-          }}
-        >
-          Install
-        </button>
+        <IconChevronDown
+          size={14}
+          className="-rotate-90 shrink-0 text-(--fg-faint)"
+        />
       )}
     </div>
   );
@@ -1797,66 +1773,237 @@ function SkillDetailDialog({ skill, onClose, onChanged }) {
 // =======================================================================
 export function PluginDetailView({ plugin, onBack, onChanged }) {
   const toast = (m, k) => useStore.getState().toast(m, k);
+  const [currentPlugin, setCurrentPlugin] = useState(plugin);
   const [detail, setDetail] = useState(null); // plugin/read result
+  const [targets, setTargets] = useState([]);
+  const [targetsLoading, setTargetsLoading] = useState(true);
+  const [busyTargets, setBusyTargets] = useState(() => new Set());
+  const [installAllBusy, setInstallAllBusy] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef(null);
-  const [busy, setBusy] = useState(false);
-  const slug = String(plugin.id || "").split("@")[0];
+  const [codexBusy, setCodexBusy] = useState(false);
+  const activePlugin = currentPlugin || plugin;
+  const slug = String(activePlugin.id || "").split("@")[0];
 
   useEffect(() => {
     let live = true;
     setDetail(null);
     Promise.resolve()
-      .then(() => api.rpc("plugin/read", pluginRequestParams(plugin)))
+      .then(() => api.rpc("plugin/read", pluginRequestParams(activePlugin)))
       .then((r) => live && setDetail(r?.plugin || r || null))
       .catch(() => live && setDetail({}));
     return () => { live = false; };
-  }, [plugin.id]);
+  }, [activePlugin.id]);
 
-  const reload = () =>
+  useEffect(() => {
+    let live = true;
+    setTargetsLoading(true);
+    api.agentRuntimePluginTargets(pluginInstallDescriptor(activePlugin))
+      .then((result) => {
+        if (live) setTargets(result?.targets || []);
+      })
+      .catch((error) => {
+        if (!live) return;
+        setTargets([
+          {
+            id: "codex",
+            label: "Codex",
+            available: true,
+            installed: activePlugin.installed === true,
+            description: activePlugin.installed
+              ? "Installed for Codex"
+              : "Available from this Codex marketplace",
+          },
+          {
+            id: "claude",
+            label: "Claude Code",
+            available: false,
+            installed: false,
+            reason: error.message,
+          },
+          {
+            id: "kimi",
+            label: "Kimi Code",
+            available: false,
+            installed: false,
+            reason: error.message,
+          },
+        ]);
+      })
+      .finally(() => live && setTargetsLoading(false));
+    return () => { live = false; };
+  }, [
+    activePlugin.id,
+    activePlugin.installed,
+    activePlugin.source?.path,
+    activePlugin.installPath,
+    activePlugin.root,
+  ]);
+
+  const reload = (candidate = activePlugin) =>
     api.rpc("plugin/list", {}).then((r) => {
       const flat = [];
       for (const mp of r?.marketplaces || []) for (const pl of mp.plugins || []) flat.push({ ...pl, _marketplace: mp.name, _marketplacePath: mp.path });
       onChanged?.(flat);
+      const next = flat.find((item) => item.id === candidate.id) || candidate;
+      setCurrentPlugin(next);
+      return next;
     });
 
-  const iface = plugin.interface || {};
+  const refreshTargets = async (candidate = activePlugin) => {
+    setTargetsLoading(true);
+    try {
+      const result = await api.agentRuntimePluginTargets(
+        pluginInstallDescriptor(candidate),
+      );
+      const next = result?.targets || [];
+      setTargets(next);
+      return next;
+    } finally {
+      setTargetsLoading(false);
+    }
+  };
+
+  const setTargetBusy = (targetId, value) => {
+    setBusyTargets((current) => {
+      const next = new Set(current);
+      if (value) next.add(targetId);
+      else next.delete(targetId);
+      return next;
+    });
+  };
+
+  const iface = activePlugin.interface || {};
   const summary = detail?.summary;
   const skills = detail?.skills || [];
-  const version = summary?.localVersion || plugin.localVersion || plugin.version;
+  const version = summary?.localVersion || activePlugin.localVersion || activePlugin.version;
   const developer = iface.developerName;
   const prompts = iface.defaultPrompt || [];
 
-  const install = async () => {
-    setBusy(true);
+  const installFor = async (targetId) => {
+    const target = targets.find((item) => item.id === targetId);
+    setTargetBusy(targetId, true);
+    let candidate = activePlugin;
     try {
-      await api.rpc("plugin/install", pluginRequestParams(plugin));
-      await reload();
-      onBack();
-    } catch (e) {
-      toast(`Install failed: ${e.message}`, "error");
+      if (targetId === "codex") {
+        await api.rpc("plugin/install", pluginRequestParams(activePlugin));
+        candidate = await reload(candidate);
+      } else {
+        await api.agentRuntimePluginInstall(
+          targetId,
+          pluginInstallDescriptor(candidate),
+        );
+      }
+    } catch (error) {
+      toast(
+        `${target?.label || runtimeMeta(targetId)?.label || targetId} install failed: ${error.message}`,
+        "error",
+      );
+      setTargetBusy(targetId, false);
+      return;
+    }
+    try {
+      await refreshTargets(candidate);
+      toast(`Installed for ${target?.label || runtimeMeta(targetId)?.label || targetId}`);
+    } catch (error) {
+      toast(
+        `Installed for ${target?.label || runtimeMeta(targetId)?.label || targetId}, but status refresh failed: ${error.message}`,
+        "error",
+      );
     } finally {
-      setBusy(false);
+      setTargetBusy(targetId, false);
     }
   };
-  const uninstall = async () => {
-    setBusy(true);
+
+  const installAll = async () => {
+    setInstallAllBusy(true);
     try {
-      await api.rpc("plugin/uninstall", { pluginId: plugin.id });
+      let candidate = activePlugin;
+      let currentTargets = targets;
+      const successes = [];
+      const failures = [];
+      const codex = currentTargets.find((target) => target.id === "codex");
+      let codexInstalled = false;
+      if (codex?.available && !codex.installed) {
+        try {
+          await api.rpc("plugin/install", pluginRequestParams(activePlugin));
+          candidate = await reload(candidate);
+          successes.push(codex.label);
+          codexInstalled = true;
+        } catch (error) {
+          failures.push({ label: codex.label, message: error.message });
+        }
+      }
+      if (codexInstalled) {
+        try {
+          currentTargets = await refreshTargets(candidate);
+        } catch (error) {
+          failures.push({ label: "Status refresh", message: error.message });
+        }
+      }
+      const external = currentTargets.filter((target) =>
+        target.id !== "codex" && target.available && !target.installed
+      );
+      const results = await Promise.allSettled(
+        external.map((target) =>
+          api.agentRuntimePluginInstall(
+            target.id,
+            pluginInstallDescriptor(candidate),
+          )
+        ),
+      );
+      results.forEach((result, index) => {
+        const target = external[index];
+        if (result.status === "fulfilled") successes.push(target.label);
+        else failures.push({
+          label: target.label,
+          message: result.reason?.message || String(result.reason),
+        });
+      });
+      try {
+        await refreshTargets(candidate);
+      } catch (error) {
+        failures.push({ label: "Status refresh", message: error.message });
+      }
+      if (failures.length) {
+        const installed = successes.length
+          ? `Installed for ${successes.join(", ")}. `
+          : "";
+        toast(
+          `${installed}${failures.map((failure) =>
+            `${failure.label}: ${failure.message}`
+          ).join(" · ")}`,
+          "error",
+        );
+      } else if (successes.length) {
+        toast(`Installed for ${successes.join(", ")}`);
+      }
+    } finally {
+      setInstallAllBusy(false);
+    }
+  };
+
+  const uninstall = async () => {
+    setCodexBusy(true);
+    try {
+      await api.rpc("plugin/uninstall", { pluginId: activePlugin.id });
       await reload();
       onBack();
     } catch (e) {
       toast(`Uninstall failed: ${e.message}`, "error");
     } finally {
-      setBusy(false);
+      setCodexBusy(false);
     }
   };
   const tryNow = () => {
     const prompt = Array.isArray(prompts) ? prompts[0] : prompts;
     useStore.getState().newChatWithPrefill(prompt ? prompt + " " : "", [
-      { kind: "skill", name: slug, displayName: pluginName(plugin), path: "", icon: iface.composerIcon || iface.logo || null },
+      { kind: "skill", name: slug, displayName: pluginName(activePlugin), path: "", icon: iface.composerIcon || iface.logo || null },
     ]);
   };
+  const pendingTargets = targets.filter((target) =>
+    target.available && !target.installed
+  );
 
   const link = (url, label) =>
     url ? (
@@ -1881,11 +2028,11 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
 
           {/* header */}
           <div className="flex items-start gap-4">
-            <PluginIcon plugin={plugin} size={56} />
+            <PluginIcon plugin={activePlugin} size={56} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h1 className="truncate text-[22px] font-semibold">{pluginName(plugin)}</h1>
-                {plugin._marketplace === "personal" && <span className="shrink-0 text-sm text-(--fg-tertiary)">personal</span>}
+                <h1 className="truncate text-[22px] font-semibold">{pluginName(activePlugin)}</h1>
+                {activePlugin._marketplace === "personal" && <span className="shrink-0 text-sm text-(--fg-tertiary)">personal</span>}
               </div>
               <div className="mt-0.5 text-sm text-(--fg-secondary)">{iface.shortDescription || ""}</div>
               <div className="mt-1 text-xs text-(--fg-tertiary)">
@@ -1893,7 +2040,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {plugin.installed ? (
+              {activePlugin.installed && (
                 <>
                   <button
                     onClick={tryNow}
@@ -1904,10 +2051,10 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                   </button>
                   <button
                     onClick={uninstall}
-                    disabled={busy}
+                    disabled={codexBusy}
                     className="flex h-7 items-center rounded-lg border border-(--border) px-2.5 text-sm text-(--danger) hover:bg-(--danger)/10"
                   >
-                    Uninstall
+                    Uninstall from Codex
                   </button>
                   <button
                     ref={moreRef}
@@ -1918,15 +2065,83 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                     <IconDots21 size={16} />
                   </button>
                 </>
-              ) : (
-                <button
-                  onClick={install}
-                  disabled={busy}
-                  className="flex h-7 items-center rounded-lg bg-(--fg) px-3 text-sm text-(--dropdown-bg) hover:bg-(--fg)/80 disabled:opacity-40"
-                >
-                  {busy ? "Installing…" : "Install"}
-                </button>
               )}
+            </div>
+          </div>
+
+          <SectionHeader title="Install for" className="pt-6" />
+          <div className="mt-2 overflow-hidden rounded-2xl border border-(--border-light) bg-(--surface-under)">
+            <div className="divide-y divide-(--border-light)">
+              {targets.map((target) => {
+                const targetBusy = busyTargets.has(target.id);
+                const meta = runtimeMeta(target.id);
+                return (
+                  <div key={target.id} className="flex min-h-14 items-center gap-3 px-4 py-3">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-(--surface)">
+                      {meta?.icon(20, "shrink-0")}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-medium">{target.label}</div>
+                      <div
+                        className="truncate text-[12px] text-(--fg-tertiary)"
+                        title={target.reason || target.description || ""}
+                      >
+                        {target.reason || target.description || "Checking compatibility…"}
+                      </div>
+                    </div>
+                    {targetsLoading && !target.description && !target.reason ? (
+                      <span className="px-2 text-(--fg-tertiary)"><Spinner /></span>
+                    ) : target.installed ? (
+                      <span className="shrink-0 rounded-full bg-(--success)/15 px-2.5 py-1 text-[11px] font-medium text-(--success)">
+                        Installed
+                      </span>
+                    ) : target.available ? (
+                      <button
+                        onClick={() => installFor(target.id)}
+                        disabled={targetBusy || installAllBusy}
+                        className="h-7 shrink-0 rounded-lg border border-(--border) bg-(--surface) px-3 text-[12px] hover:bg-(--surface-hover) disabled:opacity-40"
+                      >
+                        {targetBusy ? "Installing…" : "Install"}
+                      </button>
+                    ) : (
+                      <span className="shrink-0 px-1 text-[11px] text-(--fg-faint)">
+                        Unavailable
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+              {targetsLoading && targets.length === 0 && (
+                <div className="flex min-h-20 items-center justify-center text-(--fg-tertiary)">
+                  <Spinner />
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-4 border-t border-(--border-light) bg-(--surface) px-4 py-3">
+              <div>
+                <div className="text-[13px] font-medium">All compatible providers</div>
+                <div className="text-[12px] text-(--fg-tertiary)">
+                  Install this plugin everywhere a compatible package is available.
+                </div>
+              </div>
+              <button
+                onClick={installAll}
+                disabled={
+                  installAllBusy ||
+                  targetsLoading ||
+                  pendingTargets.length === 0 ||
+                  busyTargets.size > 0
+                }
+                className="h-8 shrink-0 rounded-lg bg-(--fg) px-3.5 text-[12px] font-medium text-(--dropdown-bg) hover:bg-(--fg)/80 disabled:opacity-40"
+              >
+                {installAllBusy
+                  ? "Installing…"
+                  : targetsLoading
+                    ? "Checking…"
+                  : pendingTargets.length
+                    ? "Install all"
+                    : "All available installed"}
+              </button>
             </div>
           </div>
 
@@ -1938,15 +2153,15 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                   key={p}
                   onClick={() =>
                     useStore.getState().newChatWithPrefill(p + " ", [
-                      { kind: "skill", name: slug, displayName: pluginName(plugin), path: "", icon: iface.composerIcon || iface.logo || null },
+                      { kind: "skill", name: slug, displayName: pluginName(activePlugin), path: "", icon: iface.composerIcon || iface.logo || null },
                     ])
                   }
                   className="flex items-center gap-2.5 rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-left text-[13px] hover:bg-(--fg)/5"
                 >
                   <span className="flex size-6 shrink-0 items-center justify-center">
-                    <PluginIcon plugin={plugin} size={18} />
+                    <PluginIcon plugin={activePlugin} size={18} />
                   </span>
-                  <span className="shrink-0 font-medium">{pluginName(plugin)}</span>
+                  <span className="shrink-0 font-medium">{pluginName(activePlugin)}</span>
                   <span className="min-w-0 flex-1 truncate">{p}</span>
                 </button>
               ))}
@@ -2049,7 +2264,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
             onSelect: () => useStore.getState().setUi({ settingsOpen: true, settingsSection: "plugins" }),
           },
           { sep: true },
-          { id: "uninstall", label: "Uninstall", danger: true, onSelect: uninstall },
+          { id: "uninstall", label: "Uninstall from Codex", danger: true, onSelect: uninstall },
         ]}
       />
     </div>
