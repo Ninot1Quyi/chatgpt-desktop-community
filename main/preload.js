@@ -131,6 +131,11 @@ contextBridge.exposeInMainWorld("codexBridge", {
   viewReload: () => ipcRenderer.invoke("view:reload"),
   viewToggleDevtools: () => ipcRenderer.invoke("view:toggle-devtools"),
   windowClose: () => ipcRenderer.invoke("window:close"),
+  windowDragBegin: (screenX, screenY) =>
+    ipcRenderer.send("window:drag-begin", { screenX, screenY }),
+  windowDragMove: (screenX, screenY) =>
+    ipcRenderer.send("window:drag-move", { screenX, screenY }),
+  windowDragEnd: () => ipcRenderer.send("window:drag-end"),
 
   // Custom Windows caption buttons
   windowMinimize: () => ipcRenderer.invoke("window:minimize"),

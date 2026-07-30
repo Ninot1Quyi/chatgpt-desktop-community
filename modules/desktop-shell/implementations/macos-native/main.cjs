@@ -2,6 +2,9 @@ const path = require("node:path");
 const {
   registerSharedDesktopShellHandlers,
 } = require("../../shared/main-handlers.cjs");
+const {
+  registerMacWindowDragHandlers,
+} = require("./window-drag.cjs");
 
 const PRODUCT_NAME = "ChatGPT Desktop Community";
 
@@ -64,6 +67,7 @@ function registerGlobalShortcuts(globalShortcut, actions) {
 
 function registerDesktopShellHandlers({ BrowserWindow, ipcMain }) {
   registerSharedDesktopShellHandlers({ BrowserWindow, ipcMain });
+  registerMacWindowDragHandlers({ BrowserWindow, ipcMain });
 }
 
 function installApplicationLifecycle({ app, iconPath, isDev, createMainWindow }) {

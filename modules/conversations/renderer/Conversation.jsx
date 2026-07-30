@@ -752,8 +752,8 @@ function MessageList({ conv }) {
   };
 
   return (
-    <div className="relative min-h-0 flex-1">
-      <div ref={ref} onScroll={onScroll} className="h-full overflow-x-hidden overflow-y-auto">
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={ref} onScroll={onScroll} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div ref={contentRef} className="flex min-h-full shrink-0 flex-col justify-start">
           <div className="mx-auto flex w-full max-w-(--thread-content-max-width) flex-col gap-(--conversation-item-gap) px-4 pt-4 pb-11">
             {conv?.thread?.forkedFromId && <ForkedFromCard forkedFromId={conv.thread.forkedFromId} />}
@@ -770,14 +770,14 @@ function MessageList({ conv }) {
             {activeTurnId && !hasActiveWork && <WorkingRow conv={conv} />}
             {showExternalActivity && <WorklogActionRow item={externalActivity} live />}
           </div>
-          {!conv?.readOnly && (
-            <BottomArea
-              conv={conv}
-              onScrollToBottom={!stickBottom ? scrollToBottom : null}
-            />
-          )}
         </div>
       </div>
+      {!conv?.readOnly && (
+        <BottomArea
+          conv={conv}
+          onScrollToBottom={!stickBottom ? scrollToBottom : null}
+        />
+      )}
       {useStore((s) => s.ui.findOpen) && <FindBar conv={conv} />}
       <MessageRail turns={turns} scrollRef={ref} />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-(--surface) to-transparent" />
@@ -1344,7 +1344,7 @@ function BottomArea({ conv, onScrollToBottom }) {
   const goalDialogOpen = useStore((s) => s.ui.goalDialogOpen);
   const approvals = approvalsAll.filter((a) => !a.threadId || a.threadId === activeThreadId);
   return (
-    <div className="relative sticky bottom-0 z-10 mt-auto w-full shrink-0 bg-(--surface)">
+    <div className="relative z-10 w-full shrink-0 bg-(--surface)">
       {onScrollToBottom && (
         <button
           type="button"

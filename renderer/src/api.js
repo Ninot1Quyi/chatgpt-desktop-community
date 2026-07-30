@@ -67,6 +67,11 @@ export const viewZoom = (direction) => b.viewZoom(direction);
 export const viewReload = () => b.viewReload();
 export const viewToggleDevtools = () => b.viewToggleDevtools();
 export const windowClose = () => b.windowClose();
+export const windowDragBegin = (screenX, screenY) =>
+  b.windowDragBegin(screenX, screenY);
+export const windowDragMove = (screenX, screenY) =>
+  b.windowDragMove(screenX, screenY);
+export const windowDragEnd = () => b.windowDragEnd();
 
 // Custom Windows caption buttons
 export const windowMinimize = () => b.windowMinimize();

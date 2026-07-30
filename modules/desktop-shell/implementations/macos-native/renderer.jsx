@@ -1,6 +1,7 @@
 import React from "react";
 import { useStore } from "@app/store.js";
 import { cx } from "@app/lib/cx.js";
+import * as api from "@app/api.js";
 import {
   Conversation,
   ConversationHeaderContent,
@@ -118,8 +119,12 @@ function NavigationButtons() {
 function MacHeader() {
   const ui = useStore((state) => state.ui);
   const setUi = useStore((state) => state.setUi);
+  const dragHandlers = useMacWindowDrag();
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pr-3 pl-[88px]">
+    <div
+      className="mac-window-drag-surface app-no-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pr-3 pl-[88px]"
+      {...dragHandlers}
+    >
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
@@ -177,8 +182,12 @@ function MacHeader() {
 
 function MacPeekHeader() {
   const setUi = useStore((state) => state.setUi);
+  const dragHandlers = useMacWindowDrag();
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-[84px]">
+    <div
+      className="mac-window-drag-surface app-no-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-[84px]"
+      {...dragHandlers}
+    >
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
@@ -188,4 +197,38 @@ function MacPeekHeader() {
       <NavigationButtons />
     </div>
   );
+}
+
+function useMacWindowDrag() {
+  const pointerId = React.useRef(null);
+
+  const finishDrag = React.useCallback((event) => {
+    if (pointerId.current !== event.pointerId) return;
+    pointerId.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    api.windowDragEnd();
+  }, []);
+
+  return {
+    onPointerDown: (event) => {
+      if (
+        event.button !== 0
+        || event.target.closest?.(
+          "button, a, input, textarea, select, [role='button'], [contenteditable='true'], [draggable='true']",
+        )
+      ) {
+        return;
+      }
+      pointerId.current = event.pointerId;
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+      api.windowDragBegin(event.screenX, event.screenY);
+    },
+    onPointerMove: (event) => {
+      if (pointerId.current !== event.pointerId || !(event.buttons & 1)) return;
+      api.windowDragMove(event.screenX, event.screenY);
+    },
+    onPointerUp: finishDrag,
+    onPointerCancel: finishDrag,
+  };
 }

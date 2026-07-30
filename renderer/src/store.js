@@ -1226,32 +1226,36 @@ export const useStore = create((set, get) => ({
       return false;
     }
     const catalog = get().runtimeCatalog[runtime];
-    if (catalog && catalog.available === false) {
+    if (!force && catalog && catalog.available === false) {
       if (!quiet) get().toast(catalog.error || `${runtimeLabel(runtime)} is unavailable`, "error");
       return false;
     }
-    if (!runtimeConnected(get(), runtime)) {
+    if (!force && !runtimeConnected(get(), runtime)) {
       if (!quiet) get().toast(`Sign in to ${runtimeLabel(runtime)} first (Settings → Account)`, "info");
       return false;
     }
     const models = get().modelsByRuntime[runtime] || [];
-    if (!models.length) {
+    if (!force && !models.length) {
       if (!quiet) get().toast(`${runtimeLabel(runtime)} has no available models`, "error");
       return false;
     }
     const selections = { ...get().modelSelections };
-    const selected = models.some((m) => m.model === selections[runtime])
-      ? selections[runtime]
-      : (models.find((m) => m.isDefault) || models[0]).model;
+    const selected = models.length
+      ? models.some((m) => m.model === selections[runtime])
+        ? selections[runtime]
+        : (models.find((m) => m.isDefault) || models[0]).model
+      : selections[runtime] || null;
     selections[runtime] = selected;
     const selectedModel = models.find((m) => m.model === selected);
     const currentEffort = get().effort;
     const supportsEffort = selectedModel?.supportedReasoningEfforts?.some((entry) => entry.reasoningEffort === currentEffort);
-    const effort = supportsEffort ? currentEffort : selectedModel?.defaultReasoningEffort || null;
+    const effort = selectedModel
+      ? supportsEffort ? currentEffort : selectedModel.defaultReasoningEffort || null
+      : null;
     set({ runtime, models, model: selected, modelSelections: selections, effort });
     persist("composer.runtime", runtime);
     persist("composer.models", selections);
-    persist("composer.model", selected);
+    if (selected) persist("composer.model", selected);
     persist("composer.effort", effort);
     if (saveThreadPrefs) get()._saveThreadPrefs();
     return true;
