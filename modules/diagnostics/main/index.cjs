@@ -139,7 +139,9 @@ function createDiagnostics({
     attachWindow,
     captureConsole,
     log,
-    logFile: fileLogger.logFile,
+    get logFile() {
+      return fileLogger.logFile;
+    },
     logsDirectory: fileLogger.logsDirectory,
     sessionId: fileLogger.sessionId,
   };

@@ -5,6 +5,7 @@ import { useStore } from "@app/store.js";
 import * as api from "@app/api.js";
 import { cx } from "@app/lib/cx.js";
 import { basename } from "@app/lib/time.js";
+import { useT } from "@app/i18n.jsx";
 import { Spinner, Menu } from "@app/components/ui.jsx";
 import { IconPlus, IconSearch, IconMore, IconChevronDown, IconSkillCube, IconSkillCheck, IconDialogX, IconDots21, IconTryChat, IconPluginFallback } from "@app/components/icons.jsx";
 import { LucideIcon } from "@app/components/lucide/index.jsx";
@@ -48,6 +49,7 @@ function SimpleView({ title, desc }) {
 }
 
 function SitesView() {
+  const t = useT();
   const [plugin, setPlugin] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -96,10 +98,10 @@ function SitesView() {
           <div>
             <div className="flex items-center gap-2 text-[22px] font-semibold">
               <LucideIcon name="PanelTop" size={22} className="text-(--fg-secondary)" />
-              Sites
+              {t("Sites")}
             </div>
             <div className="mt-1 text-[13px] text-(--fg-tertiary)">
-              Turn your ideas into live websites.
+              {t("Turn your ideas into live websites.")}
             </div>
           </div>
           <button
@@ -107,7 +109,7 @@ function SitesView() {
             onClick={createSite}
           >
             <IconPlus size={14} />
-            Create new site
+            {t("Create new site")}
           </button>
         </div>
 
@@ -115,7 +117,7 @@ function SitesView() {
           <IconSearch size={14} className="shrink-0 text-(--fg-faint)" />
           <input
             className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-(--fg-faint)"
-            placeholder="Search sites"
+            placeholder={t("Search sites")}
             disabled
           />
         </div>
@@ -124,9 +126,9 @@ function SitesView() {
           <div className="flex size-12 items-center justify-center rounded-2xl border border-(--border-light) bg-(--surface-under)">
             <LucideIcon name="PanelTop" size={22} className="text-(--fg-faint)" />
           </div>
-          <div className="mt-3 text-[14px] font-medium">No sites yet</div>
+          <div className="mt-3 text-[14px] font-medium">{t("No sites yet")}</div>
           <div className="mt-1 max-w-sm text-[13px] leading-5 text-(--fg-tertiary)">
-            Start a new Sites chat to design, save, and publish a web page from this app.
+            {t("Start a new Sites chat to design, save, and publish a web page from this app.")}
           </div>
           <button
             className="mt-4 flex h-8 items-center gap-1.5 rounded-full border border-(--border) px-3 text-[13px] hover:bg-(--surface-hover)"
@@ -134,7 +136,7 @@ function SitesView() {
             disabled={loading}
           >
             {loading ? <Spinner size={12} /> : <LucideIcon name="ExternalLink" size={13} />}
-            Open Sites
+            {t("Open Sites")}
           </button>
         </div>
       </div>
@@ -195,6 +197,7 @@ function parsePrSearch(r) {
 }
 
 function PullRequestsView() {
+  const t = useT();
   const threads = useStore((s) => s.threads);
   const [prs, setPrs] = useState(null);
   const [errors, setErrors] = useState(0);
@@ -327,7 +330,7 @@ function PullRequestsView() {
                   tab === id ? "font-medium text-(--fg)" : "text-(--fg-tertiary) hover:text-(--fg)"
                 )}
               >
-                {label}
+                {t(label)}
               </button>
             ))}
           </div>
@@ -337,14 +340,14 @@ function PullRequestsView() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search pull requests"
+                placeholder={t("Search pull requests")}
                 spellCheck={false}
                 className="h-8 w-full rounded-full border border-(--border-light) bg-(--surface) pl-8 pr-3 text-xs outline-none placeholder:text-(--fg-faint) focus:border-(--border-heavy)"
               />
             </div>
             <button
               ref={filterRef}
-              title="Filter by state"
+              title={t("Filter by state")}
               className={cx(
                 "flex h-7 w-7 shrink-0 items-center justify-center rounded-full hover:bg-(--surface-hover)",
                 stateFilter !== "all" ? "text-(--accent)" : "text-(--fg-tertiary) hover:text-(--fg)"
@@ -362,11 +365,13 @@ function PullRequestsView() {
           ) : sections.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
               <div className="text-[13px] text-(--fg-tertiary)">
-                {prs.length === 0 ? "No pull requests found" : "No pull requests match your filters"}
+                {prs.length === 0 ? t("No pull requests found") : t("No pull requests match your filters")}
               </div>
               {prs.length === 0 && (
                 <div className="text-xs text-(--fg-faint)">
-                  {errors > 0 ? `${errors} of ${repos.length} folders are not GitHub repos` : "PRs in your project repos will appear here"}
+                  {errors > 0
+                    ? t("{errors} of {count} folders are not GitHub repos", { errors, count: repos.length })
+                    : t("PRs in your project repos will appear here")}
                 </div>
               )}
             </div>
@@ -375,7 +380,7 @@ function PullRequestsView() {
               <div key={kind}>
                 {kind !== "results" && (
                   <div className="px-2 pt-3 pb-1 text-[11px] font-medium text-(--fg-tertiary)">
-                    {kind === "review_requested" ? "Review requested" : kind === "reviewed" ? "Previously reviewed" : "Authored"}
+                    {t(kind === "review_requested" ? "Review requested" : kind === "reviewed" ? "Previously reviewed" : "Authored")}
                   </div>
                 )}
                 {list.map((pr) => (
@@ -435,7 +440,7 @@ function PullRequestsView() {
           <PrDetail pr={selected} />
         ) : (
           <div className="flex h-full items-center justify-center text-[13px] text-(--fg-tertiary)">
-            Select pull request to view
+            {t("Select pull request to view")}
           </div>
         )}
       </div>
@@ -575,6 +580,7 @@ const SCHEDULED_SUGGESTIONS = [
 ];
 
 function ScheduledView() {
+  const t = useT();
   const codexHome = useStore((s) => s.codexHome);
   const [items, setItems] = useState(null);
   const [error, setError] = useState(null);
@@ -629,9 +635,9 @@ function ScheduledView() {
     <PageShell title="Scheduled">
       {/* Header */}
       <div className="px-6 pt-5">
-        <div className="text-[28px] font-normal">Scheduled tasks</div>
+        <div className="text-[28px] font-normal">{t("Scheduled tasks")}</div>
         <div className="mt-1 text-[16px] leading-6 text-(--fg-secondary)">
-          Ask ChatGPT to schedule tasks, set reminders, or monitor for updates
+          {t("Ask ChatGPT to schedule tasks, set reminders, or monitor for updates")}
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <div className="relative flex-1">
@@ -639,7 +645,7 @@ function ScheduledView() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search scheduled tasks"
+              placeholder={t("Search scheduled tasks")}
               spellCheck={false}
               className="h-8 w-full rounded-full border border-(--border-light) bg-(--input-bg) pl-8 pr-3 text-sm outline-none placeholder:text-(--fg-faint)"
             />
@@ -655,7 +661,7 @@ function ScheduledView() {
                   tab === id ? "font-medium text-(--fg)" : "text-(--fg-tertiary) hover:text-(--fg)"
                 )}
               >
-                {label}
+                {t(label)}
               </button>
             ))}
           </div>
@@ -670,7 +676,7 @@ function ScheduledView() {
         {error && <div className="px-6 py-10 text-center text-[13px] text-(--fg-tertiary)">{error}</div>}
         {items && filtered.length === 0 && (
           <div className="px-6 py-10 text-center text-[13px] text-(--fg-tertiary)">
-            {items.length === 0 ? "No scheduled tasks yet" : "No tasks match your filters"}
+            {items.length === 0 ? t("No scheduled tasks yet") : t("No tasks match your filters")}
           </div>
         )}
         {filtered.map((a) => (
@@ -680,12 +686,12 @@ function ScheduledView() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate text-[13px] font-medium">{a.name}</div>
-              <div className="mt-0.5 truncate text-xs text-(--fg-tertiary)">{a.schedule || "No schedule"}</div>
+              <div className="mt-0.5 truncate text-xs text-(--fg-tertiary)">{a.schedule || t("No schedule")}</div>
             </div>
             {/* The reference page shows a status chip only in the Paused filter. */}
             {tab === "paused" && (
               <span className="shrink-0 rounded-full bg-(--surface-active) px-2 py-0.5 text-[11px] font-medium text-(--fg-tertiary)">
-                Paused
+                {t("Paused")}
               </span>
             )}
           </div>
@@ -693,7 +699,7 @@ function ScheduledView() {
       </div>
 
       {/* Suggestions */}
-      <div className="px-6 pt-4 text-[11px] font-medium text-(--fg-tertiary)">Suggestions</div>
+      <div className="px-6 pt-4 text-[11px] font-medium text-(--fg-tertiary)">{t("Suggestions")}</div>
       <div className="mt-2 flex flex-col gap-2 px-6 pb-8">
         {SCHEDULED_SUGGESTIONS.map((s) => (
           <button
@@ -706,10 +712,10 @@ function ScheduledView() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-[13px] font-medium">{s.name}</span>
-                <span className="text-xs text-(--fg-tertiary)">{s.schedule}</span>
+                <span className="text-[13px] font-medium">{t(s.name)}</span>
+                <span className="text-xs text-(--fg-tertiary)">{t(s.schedule)}</span>
               </span>
-              <span className="mt-0.5 block text-xs leading-relaxed text-(--fg-tertiary)">{s.desc}</span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-(--fg-tertiary)">{t(s.desc)}</span>
             </span>
           </button>
         ))}
@@ -793,6 +799,7 @@ function humanizeRRule(rrule) {
 }
 
 function PluginsView() {
+  const t = useT();
   const [plugins, setPlugins] = useState(null);
   const [error, setError] = useState(null);
   const tab = useStore((s) => s.ui.pluginsTab || "plugins"); // plugins | skills
@@ -875,16 +882,16 @@ function PluginsView() {
       <div className="mx-auto w-full max-w-[48rem] px-5 pt-6">
       {/* Header */}
       <div>
-        <h1 className="text-[28px] font-normal text-(--fg)">{tab === "plugins" ? "Plugins" : "Skills"}</h1>
+        <h1 className="text-[28px] font-normal text-(--fg)">{t(tab === "plugins" ? "Plugins" : "Skills")}</h1>
         <div className="mt-1 text-[16px] leading-6 text-(--fg-secondary)">
-          {tab === "plugins" ? "Work with ChatGPT across your favorite tools" : "Extend ChatGPT with task-specific skills"}
+          {t(tab === "plugins" ? "Work with ChatGPT across your favorite tools" : "Extend ChatGPT with task-specific skills")}
         </div>
         <div className="mt-3 flex h-8 items-center gap-2 rounded-full border border-(--border-light) bg-(--input-bg) px-2.5">
           <IconSearch size={14} className="shrink-0 text-(--fg-faint)" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={tab === "plugins" ? "Search plugins" : "Search skills"}
+            placeholder={t(tab === "plugins" ? "Search plugins" : "Search skills")}
             spellCheck={false}
             className="min-w-0 flex-1 bg-transparent text-sm leading-[18px] outline-none placeholder:text-(--fg-faint)"
           />
@@ -931,6 +938,9 @@ function PluginsView() {
 
 // Plugin card (icon + name + desc + details/overflow action).
 function PluginCard({ plugin, onOverflow, onOpenDetail }) {
+  const t = useT();
+  const name = pluginName(plugin);
+  const description = plugin.interface?.shortDescription || "—";
   return (
     <div
       className="flex cursor-pointer items-center gap-2.5 rounded-2xl border border-(--border-light) bg-(--surface-under) p-3 hover:bg-(--fg)/5"
@@ -938,15 +948,15 @@ function PluginCard({ plugin, onOverflow, onOpenDetail }) {
     >
       <PluginIcon plugin={plugin} size={28} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-medium">{pluginName(plugin)}</span>
-        <span className="block truncate text-xs text-(--fg-tertiary)" title={plugin.interface?.shortDescription || ""}>
-          {plugin.interface?.shortDescription || "—"}
+        <span className="block truncate text-[13px] font-medium">{t(name)}</span>
+        <span className="block truncate text-xs text-(--fg-tertiary)" title={t(description)}>
+          {t(description)}
         </span>
       </span>
       {plugin.installed ? (
         <button
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
-          title="More actions"
+          title={t("More actions")}
           onClick={(e) => { e.stopPropagation(); onOverflow(e.currentTarget.getBoundingClientRect()); }}
         >
           <IconMore size={14} />
@@ -1037,23 +1047,27 @@ const pluginSlug = (p) => String(p.id || "").split("@")[0];
 
 // Plugins tab body: installed tiles, scope pills, Featured, categories.
 function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOverflow, onOpenDetail }) {
+  const t = useT();
   const q = query.trim().toLowerCase();
   const [seeAllFeatured, setSeeAllFeatured] = useState(false);
+  const matchQ = (p) => {
+    if (!q) return true;
+    const name = pluginName(p);
+    const description = p.interface?.shortDescription || "";
+    return [name, description, t(name), t(description)]
+      .some((value) => value.toLowerCase().includes(q));
+  };
   const installed = useMemo(
-    () => (plugins || []).filter((p) => p.installed && (!q || pluginName(p).toLowerCase().includes(q))),
-    [plugins, q]
+    () => (plugins || []).filter((p) => p.installed && matchQ(p)),
+    [plugins, q, t]
   );
-  const matchQ = (p) =>
-    !q ||
-    pluginName(p).toLowerCase().includes(q) ||
-    (p.interface?.shortDescription || "").toLowerCase().includes(q);
   // Featured = the pinned set (public tab) or the personal marketplace.
   const featured = useMemo(() => {
     if (scope !== "public") return [];
     const bySlug = new Map();
     for (const p of plugins || []) if (!bySlug.has(pluginSlug(p))) bySlug.set(pluginSlug(p), p);
     return FEATURED_SLUGS.map((s) => bySlug.get(s)).filter((p) => p && matchQ(p));
-  }, [plugins, q, scope]);
+  }, [plugins, q, scope, t]);
   // Personal tab: "Created by you" (personal marketplace) + one section per
   // third-party marketplace (ponytail…), full-width rows like the reference.
   const personalSections = useMemo(() => {
@@ -1072,7 +1086,7 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
       out.push([mp.charAt(0).toUpperCase() + mp.slice(1), list]);
     }
     return out;
-  }, [plugins, q, scope]);
+  }, [plugins, q, scope, t]);
   // Category sections: every catalog plugin grouped by interface.category in
   // the reference's fixed order. Productivity additionally carries the local
   // (installed, non-featured) plugins right after the first page.
@@ -1113,9 +1127,9 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
     <>
           {/* Installed */}
           <div className="flex items-center justify-between pt-4">
-            <span className="text-[11px] font-medium text-(--fg-tertiary)">Installed</span>
+            <span className="text-[11px] font-medium text-(--fg-tertiary)">{t("Installed")}</span>
             <button
-              title="Manage plugins"
+              title={t("Manage plugins")}
               className="flex h-5 w-5 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
               onClick={() => useStore.getState().setUi({ settingsOpen: true, settingsSection: "plugins" })}
             >
@@ -1123,11 +1137,13 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
             </button>
           </div>
           {installed.length === 0 ? (
-            <div className="mt-2 text-xs text-(--fg-faint)">{query ? "No installed plugins match your search" : "No plugins installed yet"}</div>
+            <div className="mt-2 text-xs text-(--fg-faint)">
+              {t(query ? "No installed plugins match your search" : "No plugins installed yet")}
+            </div>
           ) : (
             <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
               {installed.map((p) => (
-                <span key={p.id} title={pluginName(p)} className="shrink-0 cursor-default">
+                <span key={p.id} title={t(pluginName(p))} className="shrink-0 cursor-default">
                   <PluginIcon plugin={p} size={32} />
                 </span>
               ))}
@@ -1146,12 +1162,12 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
                     scope === id ? "bg-(--surface-active) text-(--fg)" : "text-(--fg-tertiary) hover:text-(--fg)"
                   )}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
             <button
-              title="Filter"
+              title={t("Filter")}
               className="flex h-5 w-5 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
             >
               <LucideIcon name="ListFilter" size={13} />
@@ -1162,7 +1178,9 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
           {scope === "personal" ? (
             <>
               {personalSections.length === 0 && (
-                <div className="mt-2 pb-2 text-xs text-(--fg-faint)">{query ? "No plugins match your search" : "Nothing to show here yet"}</div>
+                <div className="mt-2 pb-2 text-xs text-(--fg-faint)">
+                  {t(query ? "No plugins match your search" : "Nothing to show here yet")}
+                </div>
               )}
               {personalSections.map(([title, list]) => (
                 <div key={title}>
@@ -1180,7 +1198,7 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
           <SectionHeader title="Featured" className="pt-5" />
           {featured.length === 0 ? (
             <div className="mt-2 pb-2 text-xs text-(--fg-faint)">
-              {query ? "No plugins match your search" : "Nothing to show here yet"}
+              {t(query ? "No plugins match your search" : "Nothing to show here yet")}
             </div>
           ) : (
             <>
@@ -1201,7 +1219,10 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
                     </span>
                   ))}
                 </span>
-                See {pluginName(featured[FEATURED_VISIBLE])}, {pluginName(featured[FEATURED_VISIBLE + 1])}, and {featured.length - FEATURED_VISIBLE - 2} more
+                {seeMoreLabel(
+                  t,
+                  featured.slice(FEATURED_VISIBLE).map((plugin) => t(pluginName(plugin))),
+                )}
               </button>
             )}
             {seeAllFeatured && !q && featured.length > FEATURED_VISIBLE && (
@@ -1209,7 +1230,7 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
                 className="mt-2 flex items-center rounded-lg px-1 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--fg)/5"
                 onClick={() => setSeeAllFeatured(false)}
               >
-                Show less
+                {t("Show less")}
               </button>
             )}
             </>
@@ -1228,6 +1249,11 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
 
 // Full-width row used on the Personal tab ("Mario personal" + marketplace tag).
 function PersonalPluginRow({ plugin, onOverflow, onOpenDetail }) {
+  const t = useT();
+  const description = plugin.interface?.shortDescription || "—";
+  const marketplace = plugin._marketplace === "personal"
+    ? t("Personal")
+    : plugin._marketplace;
   return (
     <div className="flex cursor-pointer items-center gap-3 rounded-xl p-2 hover:bg-(--fg)/5" onClick={() => onOpenDetail?.(plugin)}>
       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--surface)">
@@ -1235,14 +1261,14 @@ function PersonalPluginRow({ plugin, onOverflow, onOpenDetail }) {
       </span>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">
-          {pluginName(plugin)} <span className="font-normal text-(--fg-tertiary)">{plugin._marketplace}</span>
+          {t(pluginName(plugin))} <span className="font-normal text-(--fg-tertiary)">{marketplace}</span>
         </div>
-        <div className="truncate text-sm text-(--fg-secondary)">{plugin.interface?.shortDescription || "—"}</div>
+        <div className="truncate text-sm text-(--fg-secondary)">{t(description)}</div>
       </div>
       {plugin.installed ? (
         <button
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
-          title="More actions"
+          title={t("More actions")}
           onClick={(e) => { e.stopPropagation(); onOverflow(e.currentTarget.getBoundingClientRect()); }}
         >
           <IconMore size={14} />
@@ -1258,9 +1284,10 @@ function PersonalPluginRow({ plugin, onOverflow, onOpenDetail }) {
 }
 
 function SectionHeader({ title, className }) {
+  const t = useT();
   return (
     <div className={cx("flex items-center justify-between gap-3 border-b border-(--border-light) pr-0.5 pb-2 pl-2", className)}>
-      <h2 className="flex min-h-7 items-center gap-1.5 text-[16px] font-medium leading-6">{title}</h2>
+      <h2 className="flex min-h-7 items-center gap-1.5 text-[16px] font-medium leading-6">{t(title)}</h2>
     </div>
   );
 }
@@ -1373,21 +1400,39 @@ function SkillCard({ skill, onOpen }) {
 
 // "See A, B, and N more" / "Show less" row button. `names` is the full
 // display-name list of the section; the first two hidden names are shown.
+function seeMoreLabel(t, names) {
+  if (names.length === 1) {
+    return t("See {first}", { first: names[0] });
+  }
+  if (names.length === 2) {
+    return t("See {first} and {second}", {
+      first: names[0],
+      second: names[1],
+    });
+  }
+  return t("See {first}, {second}, and {count} more", {
+    first: names[0],
+    second: names[1],
+    count: Math.max(0, names.length - 2),
+  });
+}
+
 function SeeMoreRow({ skills, expanded, onToggle, names }) {
+  const t = useT();
   if (expanded) {
     return (
       <button
         onClick={onToggle}
         className="flex min-h-7 w-full cursor-pointer items-center rounded-md px-2 py-1 text-left text-sm leading-relaxed text-(--fg-tertiary) hover:text-(--fg)"
       >
-        Show less
+        {t("Show less")}
       </button>
     );
   }
   if (skills.length <= 6) return null;
-  const all = names || skills.map(skillName);
+  const all = (names || skills.map(skillName)).map((name) => t(name));
   const rest = all.slice(6);
-  const label = `See ${rest.slice(0, 2).join(", ")}, and ${rest.length - 2 > 0 ? rest.length - 2 : 0} more`;
+  const label = seeMoreLabel(t, rest);
   return (
     <button
       onClick={onToggle}
@@ -1772,6 +1817,7 @@ function SkillDetailDialog({ skill, onClose, onChanged }) {
 // developer, version, links). Mirrors the reference detail page.
 // =======================================================================
 export function PluginDetailView({ plugin, onBack, onChanged }) {
+  const t = useT();
   const toast = (m, k) => useStore.getState().toast(m, k);
   const [currentPlugin, setCurrentPlugin] = useState(plugin);
   const [detail, setDetail] = useState(null); // plugin/read result
@@ -1879,6 +1925,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
   const version = summary?.localVersion || activePlugin.localVersion || activePlugin.version;
   const developer = iface.developerName;
   const prompts = iface.defaultPrompt || [];
+  const localizedPluginName = t(pluginName(activePlugin));
 
   const installFor = async (targetId) => {
     const target = targets.find((item) => item.id === targetId);
@@ -1904,7 +1951,9 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
     }
     try {
       await refreshTargets(candidate);
-      toast(`Installed for ${target?.label || runtimeMeta(targetId)?.label || targetId}`);
+      toast(t("Installed for {provider}", {
+        provider: target?.label || runtimeMeta(targetId)?.label || targetId,
+      }));
     } catch (error) {
       toast(
         `Installed for ${target?.label || runtimeMeta(targetId)?.label || targetId}, but status refresh failed: ${error.message}`,
@@ -1998,7 +2047,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
   const tryNow = () => {
     const prompt = Array.isArray(prompts) ? prompts[0] : prompts;
     useStore.getState().newChatWithPrefill(prompt ? prompt + " " : "", [
-      { kind: "skill", name: slug, displayName: pluginName(activePlugin), path: "", icon: iface.composerIcon || iface.logo || null },
+      { kind: "skill", name: slug, displayName: localizedPluginName, path: "", icon: iface.composerIcon || iface.logo || null },
     ]);
   };
   const pendingTargets = targets.filter((target) =>
@@ -2008,7 +2057,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
   const link = (url, label) =>
     url ? (
       <button className="text-(--accent) hover:underline" onClick={() => api.openExternal(url)}>
-        {label}
+        {t(label)}
       </button>
     ) : (
       <span className="text-(--fg-tertiary)">—</span>
@@ -2023,7 +2072,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
             className="mb-4 flex h-7 items-center gap-1 rounded-lg px-2 text-sm text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)"
           >
             <IconChevronDown size={14} className="rotate-90" />
-            Back
+            {t("Back")}
           </button>
 
           {/* header */}
@@ -2031,10 +2080,10 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
             <PluginIcon plugin={activePlugin} size={56} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h1 className="truncate text-[22px] font-semibold">{pluginName(activePlugin)}</h1>
-                {activePlugin._marketplace === "personal" && <span className="shrink-0 text-sm text-(--fg-tertiary)">personal</span>}
+                <h1 className="truncate text-[22px] font-semibold">{localizedPluginName}</h1>
+                {activePlugin._marketplace === "personal" && <span className="shrink-0 text-sm text-(--fg-tertiary)">{t("Personal")}</span>}
               </div>
-              <div className="mt-0.5 text-sm text-(--fg-secondary)">{iface.shortDescription || ""}</div>
+              <div className="mt-0.5 text-sm text-(--fg-secondary)">{t(iface.shortDescription || "")}</div>
               <div className="mt-1 text-xs text-(--fg-tertiary)">
                 {[developer, version].filter(Boolean).join(" · ")}
               </div>
@@ -2047,18 +2096,18 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                     className="flex h-7 items-center gap-1 rounded-lg bg-(--fg) px-2.5 text-sm text-(--dropdown-bg) hover:bg-(--fg)/80"
                   >
                     <IconTryChat size={14} />
-                    Try now
+                    {t("Try now")}
                   </button>
                   <button
                     onClick={uninstall}
                     disabled={codexBusy}
                     className="flex h-7 items-center rounded-lg border border-(--border) px-2.5 text-sm text-(--danger) hover:bg-(--danger)/10"
                   >
-                    Uninstall from Codex
+                    {t("Uninstall from Codex")}
                   </button>
                   <button
                     ref={moreRef}
-                    aria-label="More actions"
+                    aria-label={t("More actions")}
                     onClick={() => setMoreOpen(true)}
                     className="flex h-7 w-7 items-center justify-center rounded-lg border border-(--border) text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
                   >
@@ -2084,16 +2133,16 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                       <div className="text-[13px] font-medium">{target.label}</div>
                       <div
                         className="truncate text-[12px] text-(--fg-tertiary)"
-                        title={target.reason || target.description || ""}
+                        title={t(target.reason || target.description || "")}
                       >
-                        {target.reason || target.description || "Checking compatibility…"}
+                        {t(target.reason || target.description || "Checking compatibility…")}
                       </div>
                     </div>
                     {targetsLoading && !target.description && !target.reason ? (
                       <span className="px-2 text-(--fg-tertiary)"><Spinner /></span>
                     ) : target.installed ? (
                       <span className="shrink-0 rounded-full bg-(--success)/15 px-2.5 py-1 text-[11px] font-medium text-(--success)">
-                        Installed
+                        {t("Installed")}
                       </span>
                     ) : target.available ? (
                       <button
@@ -2101,11 +2150,11 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                         disabled={targetBusy || installAllBusy}
                         className="h-7 shrink-0 rounded-lg border border-(--border) bg-(--surface) px-3 text-[12px] hover:bg-(--surface-hover) disabled:opacity-40"
                       >
-                        {targetBusy ? "Installing…" : "Install"}
+                        {t(targetBusy ? "Installing…" : "Install")}
                       </button>
                     ) : (
                       <span className="shrink-0 px-1 text-[11px] text-(--fg-faint)">
-                        Unavailable
+                        {t("Unavailable")}
                       </span>
                     )}
                   </div>
@@ -2119,9 +2168,9 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
             </div>
             <div className="flex items-center justify-between gap-4 border-t border-(--border-light) bg-(--surface) px-4 py-3">
               <div>
-                <div className="text-[13px] font-medium">All compatible providers</div>
+                <div className="text-[13px] font-medium">{t("All compatible providers")}</div>
                 <div className="text-[12px] text-(--fg-tertiary)">
-                  Install this plugin everywhere a compatible package is available.
+                  {t("Install this plugin everywhere a compatible package is available.")}
                 </div>
               </div>
               <button
@@ -2135,12 +2184,12 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                 className="h-8 shrink-0 rounded-lg bg-(--fg) px-3.5 text-[12px] font-medium text-(--dropdown-bg) hover:bg-(--fg)/80 disabled:opacity-40"
               >
                 {installAllBusy
-                  ? "Installing…"
+                  ? t("Installing…")
                   : targetsLoading
-                    ? "Checking…"
+                    ? t("Checking…")
                   : pendingTargets.length
-                    ? "Install all"
-                    : "All available installed"}
+                    ? t("Install all")
+                    : t("All available installed")}
               </button>
             </div>
           </div>
@@ -2153,7 +2202,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                   key={p}
                   onClick={() =>
                     useStore.getState().newChatWithPrefill(p + " ", [
-                      { kind: "skill", name: slug, displayName: pluginName(activePlugin), path: "", icon: iface.composerIcon || iface.logo || null },
+                      { kind: "skill", name: slug, displayName: localizedPluginName, path: "", icon: iface.composerIcon || iface.logo || null },
                     ])
                   }
                   className="flex items-center gap-2.5 rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-left text-[13px] hover:bg-(--fg)/5"
@@ -2161,15 +2210,15 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                   <span className="flex size-6 shrink-0 items-center justify-center">
                     <PluginIcon plugin={activePlugin} size={18} />
                   </span>
-                  <span className="shrink-0 font-medium">{pluginName(activePlugin)}</span>
-                  <span className="min-w-0 flex-1 truncate">{p}</span>
+                  <span className="shrink-0 font-medium">{localizedPluginName}</span>
+                  <span className="min-w-0 flex-1 truncate">{t(p)}</span>
                 </button>
               ))}
             </div>
           )}
 
           {iface.longDescription && (
-            <p className="mt-5 text-sm leading-relaxed text-(--fg-secondary)">{iface.longDescription}</p>
+            <p className="mt-5 text-sm leading-relaxed text-(--fg-secondary)">{t(iface.longDescription)}</p>
           )}
 
           {/* Includes */}
@@ -2179,15 +2228,15 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
             <>
               {(detail.apps || []).length > 0 && (
                 <>
-                  <SectionHeader title={`Apps · ${detail.apps.length}`} className="pt-8" />
+                  <SectionHeader title={t("Apps · {count}", { count: detail.apps.length })} className="pt-8" />
                   <div className="mt-2 divide-y divide-(--border-light) rounded-2xl border border-(--border-light)">
                     {detail.apps.map((a) => (
                       <div key={a.id || a.name} className="flex items-center gap-3 px-4 py-3">
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13px] font-medium">{appDisplayName(a)}</div>
-                          {a.description && <div className="line-clamp-2 text-[12px] text-(--fg-tertiary)">{a.description}</div>}
+                          <div className="truncate text-[13px] font-medium">{t(appDisplayName(a))}</div>
+                          {a.description && <div className="line-clamp-2 text-[12px] text-(--fg-tertiary)">{t(a.description)}</div>}
                         </div>
-                        <span className="shrink-0 rounded-full bg-(--success)/15 px-2 py-0.5 text-[11px] font-medium text-(--success)">Connected</span>
+                        <span className="shrink-0 rounded-full bg-(--success)/15 px-2 py-0.5 text-[11px] font-medium text-(--success)">{t("Connected")}</span>
                       </div>
                     ))}
                   </div>
@@ -2195,7 +2244,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
               )}
               {skills.length > 0 && (
                 <>
-                  <SectionHeader title={`Skills · ${skills.length}`} className="pt-8" />
+                  <SectionHeader title={t("Skills · {count}", { count: skills.length })} className="pt-8" />
                   <div className="mt-2 divide-y divide-(--border-light) rounded-2xl border border-(--border-light)">
                     {skills.map((s) => (
                       <div key={s.name} className="flex items-center gap-3 px-4 py-3">
@@ -2207,9 +2256,9 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                           )}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13px] font-medium">{s.interface?.displayName || s.name}</div>
+                          <div className="truncate text-[13px] font-medium">{t(s.interface?.displayName || s.name)}</div>
                           <div className="truncate text-[12px] text-(--fg-tertiary)">
-                            {s.interface?.shortDescription || s.shortDescription || s.description || ""}
+                            {t(s.interface?.shortDescription || s.shortDescription || s.description || "")}
                           </div>
                         </div>
                       </div>
@@ -2224,9 +2273,9 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
           <SectionHeader title="Information" className="pt-8" />
           <div className="mt-2 divide-y divide-(--border-light) rounded-2xl border border-(--border-light)">
             {[
-              ["Capabilities", (iface.capabilities || []).join(", ") || null],
+              ["Capabilities", (iface.capabilities || []).map((capability) => t(capability)).join(", ") || null],
               ["Developer", developer || null],
-              ["Category", iface.category || null],
+              ["Category", iface.category ? t(iface.category) : null],
               ["Version", version || null],
               ["Website", iface.websiteUrl ? link(iface.websiteUrl, iface.websiteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")) : null],
               ["Privacy policy", iface.privacyPolicyUrl ? link(iface.privacyPolicyUrl, "Privacy policy") : null],
@@ -2235,7 +2284,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
               .filter(([, v]) => v)
               .map(([k, v]) => (
                 <div key={k} className="flex items-center justify-between gap-4 px-4 py-2.5">
-                  <span className="text-[13px] text-(--fg-secondary)">{k}</span>
+                  <span className="text-[13px] text-(--fg-secondary)">{t(k)}</span>
                   <span className="truncate text-[13px]">{v}</span>
                 </div>
               ))}

@@ -6,6 +6,10 @@ const { getKimiConfigDir, readIndex } = require("./kimi-history.cjs");
 const { fetchKimiAccount } = require("./kimi-account.cjs");
 const { parseKimiOAuthProfile } = require("./kimi-profile.cjs");
 const { parseKimiUsagePayload } = require("./kimi-usage.cjs");
+const {
+  createKimiWebProfileService,
+  normalizeKimiWebProfile,
+} = require("./kimi-web-profile.cjs");
 
 const CLAUDE_MODELS = [
   { model: "sonnet", displayName: "Claude Sonnet", description: "Balanced Claude Code model" },
@@ -296,6 +300,7 @@ async function getKimiAccount({
   env = process.env,
   forceRefresh = false,
   host,
+  profileProvider = null,
 } = {}) {
   const binary = requireHost(host).resolveKimiBinary(homePath, env);
   if (!binary) throw new Error("Kimi Code CLI was not found");
@@ -310,6 +315,7 @@ async function getKimiAccount({
     configDir: getKimiConfigDir(homePath, env),
     env,
     forceRefresh,
+    profileProvider,
   });
 }
 
@@ -347,12 +353,14 @@ module.exports = {
   ...require("./claude-history.cjs"),
   ...require("./kimi-history.cjs"),
   CLAUDE_MODELS,
+  createKimiWebProfileService,
   getExternalAuthStatus,
   getKimiAccount,
   getKimiAuth,
   getRuntimeCatalog,
   kimiPromptArgs,
   loadKimiModels,
+  normalizeKimiWebProfile,
   parseKimiOAuthProfile,
   parseKimiUsagePayload,
   runExternalAgent,

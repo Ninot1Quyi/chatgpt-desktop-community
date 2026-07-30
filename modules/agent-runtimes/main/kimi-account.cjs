@@ -9,33 +9,71 @@ async function fetchKimiAccount({
   fetchImpl = globalThis.fetch,
   forceRefresh = false,
   now = Date.now,
+  profileProvider = null,
 } = {}) {
-  const authSession = await createKimiAuthSession({
-    clientVersion,
-    configDir,
-    env,
-    fetchImpl,
-    forceRefresh,
-    now,
-  });
-
-  let usage = null;
-  let usageError = null;
-  try {
-    usage = await fetchKimiUsage({
-      authSession,
-      env,
-      fetchImpl,
+  const usagePromise = Promise.resolve()
+    .then(async () => {
+      const authSession = await createKimiAuthSession({
+        clientVersion,
+        configDir,
+        env,
+        fetchImpl,
+        forceRefresh,
+        now,
+      });
+      const fallbackProfile = parseKimiOAuthProfile(authSession.getAccessToken());
+      try {
+        const usage = await fetchKimiUsage({
+          authSession,
+          env,
+          fetchImpl,
+        });
+        return {
+          fallbackProfile,
+          usage,
+          error: null,
+        };
+      } catch (error) {
+        return {
+          fallbackProfile,
+          usage: null,
+          error: String(error?.message || error),
+        };
+      }
+    })
+    .catch((error) => ({
+      fallbackProfile: null,
+      usage: null,
+      error: String(error?.message || error),
+    }));
+  const profilePromise = profileProvider?.getProfile
+    ? Promise.resolve()
+      .then(() => profileProvider.getProfile())
+      .catch((error) => ({
+        status: "unavailable",
+        profile: null,
+        error: String(error?.message || error),
+      }))
+    : Promise.resolve({
+      status: "not_connected",
+      profile: null,
+      error: null,
     });
-  } catch (error) {
-    usageError = String(error?.message || error);
-  }
+  const [usageResult, profileResult] = await Promise.all([
+    usagePromise,
+    profilePromise,
+  ]);
+  const serviceProfile = profileResult?.status === "connected"
+    ? profileResult.profile
+    : null;
 
   return {
-    profile: parseKimiOAuthProfile(authSession.getAccessToken()),
-    usage,
+    profile: serviceProfile || usageResult.fallbackProfile,
+    profileStatus: profileResult?.status || "unavailable",
+    usage: usageResult.usage,
     errors: {
-      usage: usageError,
+      profile: profileResult?.error || null,
+      usage: usageResult.error,
     },
     fetchedAt: now(),
   };

@@ -33,6 +33,8 @@ export const agentRuntimeSend = (request) => b.agentRuntimeSend(request);
 export const agentRuntimeCancel = (runId) => b.agentRuntimeCancel(runId);
 export const agentRuntimeAuthStatus = () => b.agentRuntimeAuthStatus();
 export const agentRuntimeAccount = (runtime, refresh = false) => b.agentRuntimeAccount(runtime, refresh);
+export const agentRuntimeProfileLogin = (runtime) => b.agentRuntimeProfileLogin(runtime);
+export const agentRuntimeProfileLogout = (runtime) => b.agentRuntimeProfileLogout(runtime);
 export const agentRuntimeLogin = (runtime) => b.agentRuntimeLogin(runtime);
 export const agentRuntimePluginTargets = (plugin) => b.agentRuntimePluginTargets(plugin);
 export const agentRuntimePluginInstall = (runtime, plugin) => b.agentRuntimePluginInstall(runtime, plugin);

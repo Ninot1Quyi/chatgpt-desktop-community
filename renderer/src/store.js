@@ -2,6 +2,7 @@ import { create } from "zustand";
 import * as api from "./api.js";
 import { panelHook } from "./lib/panelHook.js";
 import { applyAppearance } from "./lib/appearance.js";
+import { DEFAULT_LANGUAGE } from "./lib/i18n.mjs";
 import {
   RUNTIME_IDS,
   externalProjectId,
@@ -106,6 +107,7 @@ export const useStore = create((set, get) => ({
     terminalLocation: stored("ui.terminalLocation", "bottom"),
     suggestedPrompts: stored("ui.suggestedPrompts", true),
     theme: stored("ui.theme", "system"),
+    language: stored("ui.language", DEFAULT_LANGUAGE),
     commandMenuOpen: false,
     settingsOpen: false,
     settingsSection: null, // deep-link target section consumed on open
@@ -149,7 +151,7 @@ export const useStore = create((set, get) => ({
           try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
         }
         const uiPatch = {};
-        for (const k of ["sidebarOpen", "sidebarWidth", "rightOpen", "rightTab", "rightWidth", "rightExpanded", "terminalLocation", "suggestedPrompts", "theme"]) {
+        for (const k of ["sidebarOpen", "sidebarWidth", "rightOpen", "rightTab", "rightWidth", "rightExpanded", "terminalLocation", "suggestedPrompts", "theme", "language"]) {
           if (`ui.${k}` in prefs) uiPatch[k] = prefs[`ui.${k}`];
         }
         set((s) => ({
@@ -362,6 +364,138 @@ export const useStore = create((set, get) => ({
         runtime,
       }, "error");
       get().toast(error.message, "error");
+    }
+  },
+
+  async connectExternalProfile(runtime) {
+    api.reportDiagnostic("runtime_profile_login_started", { runtime });
+    set((state) => ({
+      externalProfileLoading: {
+        ...state.externalProfileLoading,
+        [runtime]: true,
+      },
+    }));
+    try {
+      const result = await api.agentRuntimeProfileLogin(runtime);
+      if (result?.status === "connected" && result.profile) {
+        set((state) => {
+          const current = state.externalAccounts?.[runtime] || {};
+          return {
+            externalAccounts: {
+              ...state.externalAccounts,
+              [runtime]: {
+                ...current,
+                profile: result.profile,
+                profileStatus: "connected",
+                errors: {
+                  ...current.errors,
+                  profile: null,
+                },
+              },
+            },
+          };
+        });
+        api.reportDiagnostic("runtime_profile_login_completed", { runtime });
+        get().toast(`${runtimeLabel(runtime)} profile connected`, "info");
+      } else if (result?.status !== "cancelled") {
+        const message = result?.error || `${runtimeLabel(runtime)} profile sign-in was not completed`;
+        set((state) => {
+          const current = state.externalAccounts?.[runtime] || {};
+          return {
+            externalAccounts: {
+              ...state.externalAccounts,
+              [runtime]: {
+                ...current,
+                profileStatus: result?.status || "unavailable",
+                errors: {
+                  ...current.errors,
+                  profile: message,
+                },
+              },
+            },
+          };
+        });
+        get().toast(message, "error");
+      }
+      return result;
+    } catch (error) {
+      api.reportDiagnostic("runtime_profile_login_failed", {
+        message: error.message,
+        runtime,
+      }, "error");
+      set((state) => {
+        const current = state.externalAccounts?.[runtime] || {};
+        return {
+          externalAccounts: {
+            ...state.externalAccounts,
+            [runtime]: {
+              ...current,
+              profileStatus: "unavailable",
+              errors: {
+                ...current.errors,
+                profile: String(error?.message || error),
+              },
+            },
+          },
+        };
+      });
+      get().toast(error.message, "error");
+      return null;
+    } finally {
+      set((state) => ({
+        externalProfileLoading: {
+          ...state.externalProfileLoading,
+          [runtime]: false,
+        },
+      }));
+    }
+  },
+
+  async disconnectExternalProfile(runtime) {
+    api.reportDiagnostic("runtime_profile_logout_started", { runtime });
+    set((state) => ({
+      externalProfileLoading: {
+        ...state.externalProfileLoading,
+        [runtime]: true,
+      },
+    }));
+    try {
+      await api.agentRuntimeProfileLogout(runtime);
+      set((state) => {
+        const current = state.externalAccounts?.[runtime] || {};
+        return {
+          externalAccounts: {
+            ...state.externalAccounts,
+            [runtime]: {
+              ...current,
+              profile: null,
+              profileStatus: "not_connected",
+              errors: {
+                ...current.errors,
+                profile: null,
+              },
+            },
+          },
+        };
+      });
+      await get().refreshExternalAccount(runtime);
+      api.reportDiagnostic("runtime_profile_logout_completed", { runtime });
+      get().toast(`${runtimeLabel(runtime)} profile disconnected`, "info");
+      return true;
+    } catch (error) {
+      api.reportDiagnostic("runtime_profile_logout_failed", {
+        message: error.message,
+        runtime,
+      }, "error");
+      get().toast(error.message, "error");
+      return false;
+    } finally {
+      set((state) => ({
+        externalProfileLoading: {
+          ...state.externalProfileLoading,
+          [runtime]: false,
+        },
+      }));
     }
   },
 
@@ -1586,7 +1720,7 @@ export const useStore = create((set, get) => ({
     }
     set((s) => {
       const ui = { ...s.ui, ...patch };
-      for (const k of ["sidebarOpen", "sidebarWidth", "rightOpen", "rightTab", "rightWidth", "rightExpanded", "terminalLocation", "suggestedPrompts", "theme"]) {
+      for (const k of ["sidebarOpen", "sidebarWidth", "rightOpen", "rightTab", "rightWidth", "rightExpanded", "terminalLocation", "suggestedPrompts", "theme", "language"]) {
         if (k in patch) persist(`ui.${k}`, ui[k]);
       }
       return { ui };

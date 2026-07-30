@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore, runtimeConnected, planLabel } from "@app/store.js";
 import { cx } from "@app/lib/cx.js";
+import { useT } from "@app/i18n.jsx";
 import { isPathInside } from "@app/lib/time.js";
 import { externalProjectId, normalizeProjectPath } from "@modules/agent-runtimes";
 import {
@@ -43,6 +44,7 @@ const HELP_URL = "https://developers.openai.com/codex/";
 
 // ---------------------------------------------------------------------------
 export default function Sidebar() {
+  const t = useT();
   const threads = useStore((s) => s.threads);
   const threadsLoading = useStore((s) => s.threadsLoading);
   // External history sources (registry-driven; hook order stable because the
@@ -176,7 +178,7 @@ export default function Sidebar() {
             <input
               autoFocus
               className="w-full bg-transparent text-[13px] outline-none placeholder:text-(--fg-faint)"
-              placeholder="Search chats and history"
+              placeholder={t("Search chats and history")}
               value={searchTerm}
               onChange={(e) => useStore.getState().setSearchTerm(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Escape") closeSearch(); }}
@@ -200,7 +202,7 @@ export default function Sidebar() {
             }}
           />
           <button
-            title="Quick chat"
+            title={t("Quick chat")}
             className="absolute top-1/2 right-1.5 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-(--fg-tertiary) opacity-0 transition-opacity group-hover/nav:opacity-100 hover:bg-(--surface-active) hover:text-(--fg)"
             onClick={(e) => { e.stopPropagation(); toggleQuickChat(); }}
           >
@@ -320,7 +322,7 @@ export default function Sidebar() {
 
         {empty && !threadsLoading && (
           <div className="px-3 pt-8 text-center text-[13px] text-(--fg-tertiary)">
-            {archivedView ? "No archived chats" : "No chats"}
+            {archivedView ? t("No archived chats") : t("No chats")}
           </div>
         )}
         {threadsLoading && (
@@ -339,6 +341,7 @@ export default function Sidebar() {
 
 // ---------------------------------------------------------------------------
 function NavRow({ icon, label, active, compact = false, onClick }) {
+  const t = useT();
   return (
     <button
       className={cx(
@@ -349,13 +352,14 @@ function NavRow({ icon, label, active, compact = false, onClick }) {
       onClick={onClick}
     >
       <span className="flex h-4 w-4 shrink-0 items-center justify-center">{icon}</span>
-      <span className="text-fade-truncate min-w-0 flex-1">{label}</span>
+      <span className="text-fade-truncate min-w-0 flex-1">{t(label)}</span>
     </button>
   );
 }
 
 function SectionLabel({ children }) {
-  return <div className="px-4 pt-4 pb-1 text-[14px] font-medium text-(--fg-tertiary)">{children}</div>;
+  const t = useT();
+  return <div className="px-4 pt-4 pb-1 text-[14px] font-medium text-(--fg-tertiary)">{t(children)}</div>;
 }
 
 // ---------------------------------------------------------------------------
@@ -377,6 +381,7 @@ function ProjectSection({
   onMoveProject,
   onAssignThread,
 }) {
+  const t = useT();
   const activeThreadId = useStore((s) => s.activeThreadId);
   const draftAt = useStore((s) => s.draftAt);
   const navView = useStore((s) => s.ui.navView);
@@ -491,7 +496,7 @@ function ProjectSection({
         {project.kind !== "remote" && project.kind !== "virtual" && !!project.path && (
           <button
             className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover/proj:flex"
-            title={`Start new chat in ${project.name}`}
+            title={t("Start new chat in {project}", { project: project.name })}
             onClick={newChatHere}
           >
             <IconPlus size={14} />
@@ -500,7 +505,7 @@ function ProjectSection({
         <button
           ref={menuBtnRef}
           className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover/proj:flex"
-          title="Project actions"
+          title={t("Project actions")}
           onClick={(e) => { e.stopPropagation(); setMenuOpen(true); }}
         >
           <IconMore size={14} />
@@ -512,7 +517,7 @@ function ProjectSection({
           align="end"
           items={[
             ...(project.kind !== "remote" && project.kind !== "virtual" && project.path
-              ? [{ id: "new", label: `New chat in ${project.name}`, icon: <IconPlus size={14} />, onSelect: () => newChatHere() }]
+              ? [{ id: "new", label: t("New chat in {project}", { project: project.name }), icon: <IconPlus size={14} />, onSelect: () => newChatHere() }]
               : []),
             {
               id: "pin",
@@ -532,7 +537,7 @@ function ProjectSection({
           >
             <div className="min-w-0 truncate text-[14px] font-medium">{project.name}</div>
             <div className="mt-0.5 text-xs text-(--fg-tertiary)">
-              {project.threads.length} {project.threads.length === 1 ? "thread" : "threads"}
+              {t(project.threads.length === 1 ? "{count} thread" : "{count} threads", { count: project.threads.length })}
             </div>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-(--fg-secondary)">
               <IconFolder size={12} className="shrink-0 text-(--fg-tertiary)" />
@@ -546,7 +551,7 @@ function ProjectSection({
         <>
           {rows.length === 0 ? (
             <div className="mx-2 flex h-[30px] items-center pl-8 pr-2 text-[13px] text-(--fg-faint)">
-              No chats
+              {t("No chats")}
             </div>
           ) : (
             <>
@@ -573,7 +578,7 @@ function ProjectSection({
                   className="mx-2 flex h-[30px] w-[calc(100%-16px)] items-center pl-8 pr-2 text-left text-[13px] text-(--fg-tertiary) hover:text-(--fg)"
                   onClick={() => setShowAll(true)}
                 >
-                  Show more
+                  {t("Show more")}
                 </button>
               )}
             </>
@@ -586,15 +591,17 @@ function ProjectSection({
 
 // The in-project "New chat" draft row (active when the draft view is open).
 function DraftRow() {
+  const t = useT();
   return (
     <div className="mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] bg-(--sidebar-row-active) pl-8 pr-1 text-(--fg)">
-      <span className="min-w-0 flex-1 truncate text-[14px]">New chat</span>
+      <span className="min-w-0 flex-1 truncate text-[14px]">{t("New chat")}</span>
     </div>
   );
 }
 
 // Projectless threads ("Chats" section), capped like projects.
 function ChatList({ threads, archived, onRename }) {
+  const t = useT();
   const activeThreadId = useStore((s) => s.activeThreadId);
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? threads : threads.slice(0, THREAD_CAP);
@@ -616,7 +623,7 @@ function ChatList({ threads, archived, onRename }) {
           className="mx-2 flex h-[30px] w-[calc(100%-16px)] items-center pl-8 pr-2 text-left text-[13px] text-(--fg-tertiary) hover:text-(--fg)"
           onClick={() => setShowAll(true)}
         >
-          Show more
+          {t("Show more")}
         </button>
       )}
     </>
@@ -624,6 +631,7 @@ function ChatList({ threads, archived, onRename }) {
 }
 
 function RuntimeHeader({ runtime, label, loading, configDir, open, onToggle, onRefresh }) {
+  const t = useT();
   return (
     <div className={cx("px-2", open ? "pt-4 pb-1" : "pt-1 pb-1")}>
       <div
@@ -649,7 +657,9 @@ function RuntimeHeader({ runtime, label, loading, configDir, open, onToggle, onR
               "flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-(--fg-tertiary) transition-opacity hover:bg-(--surface-active) hover:text-(--fg)",
               loading ? "cursor-default" : "opacity-0 group-hover/runtime:opacity-100 focus-visible:opacity-100",
             )}
-            title={configDir ? `Refresh history from ${configDir}` : `Refresh ${label}`}
+            title={configDir
+              ? t("Refresh history from {path}", { path: configDir })
+              : t("Refresh {provider}", { provider: label })}
             disabled={loading}
             onClick={(event) => {
               event.stopPropagation();
@@ -669,9 +679,12 @@ function RuntimeHeader({ runtime, label, loading, configDir, open, onToggle, onR
 }
 
 function RuntimeEmpty({ searching, label }) {
+  const t = useT();
   return (
     <div className="px-4 py-2 text-[12px] text-(--fg-faint)">
-      {searching ? `No matching ${label} sessions` : `No local ${label} sessions`}
+      {searching
+        ? t("No matching {provider} sessions", { provider: label })
+        : t("No local {provider} sessions", { provider: label })}
     </div>
   );
 }
@@ -689,6 +702,7 @@ function RuntimeProjectSection({
   isOpen,
   toggleOpen,
 }) {
+  const t = useT();
   const refresh = () => {
     const loader = runtimeMeta(runtime)?.loaderName;
     if (loader) useStore.getState()[loader]();
@@ -729,7 +743,7 @@ function RuntimeProjectSection({
           title={error}
           onClick={refresh}
         >
-          Could not read {label} history · Retry
+          {t("Could not read {provider} history · Retry", { provider: label })}
         </button>
       )}
     </>
@@ -737,13 +751,14 @@ function RuntimeProjectSection({
 }
 
 function ExternalThreadRow({ thread, runtime }) {
+  const t = useT();
   const active = useStore((s) => s.activeThreadId === thread.id);
   const pinned = useStore((s) => s.pinnedThreadIds.includes(thread.id));
   const [menuOpen, setMenuOpen] = useState(false);
   const rowRef = useRef(null);
   const claude = runtime === "claude";
   const label = claude ? "Claude" : "Kimi";
-  const title = thread.name || firstLine(thread.preview) || `${label} Code session`;
+  const title = thread.name || firstLine(thread.preview) || t("{provider} Code session", { provider: label });
   const age = shortAge(thread.updatedAt || thread.createdAt);
   const copy = (value, label) => {
     if (!value) return;
@@ -769,7 +784,7 @@ function ExternalThreadRow({ thread, runtime }) {
       {age && <span className="shrink-0 text-[10px] text-(--fg-faint) group-hover/external:hidden">{age}</span>}
       <button
         className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover/external:flex"
-        title={`${label} session actions`}
+        title={t("{provider} session actions", { provider: label })}
         onClick={(event) => {
           event.stopPropagation();
           setMenuOpen(true);
@@ -824,6 +839,7 @@ function WordmarkMenu() {
 }
 
 function ThreadRow({ thread, active, archived, onRename, draggable = false }) {  const needsInput = useStore((s) => s.approvals.some((a) => a.threadId === thread.id));
+  const t = useT();
   const pinned = useStore((s) => s.pinnedThreadIds.includes(thread.id));
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoverCard, setHoverCard] = useState(false);
@@ -831,7 +847,7 @@ function ThreadRow({ thread, active, archived, onRename, draggable = false }) { 
   const btnRef = useRef(null);
 
   const running = thread.status?.type === "active";
-  const title = thread.name || firstLine(thread.preview) || "New chat";
+  const title = thread.name || firstLine(thread.preview) || t("New chat");
 
   const open = () => useStore.getState().openThread(thread.id);
   const menuItems = [
@@ -884,14 +900,14 @@ function ThreadRow({ thread, active, archived, onRename, draggable = false }) { 
       <span className="hidden shrink-0 items-center gap-0.5 group-hover/thr:flex">
         <button
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg)"
-          title={pinned ? "Unpin chat" : "Pin chat"}
+          title={t(pinned ? "Unpin chat" : "Pin chat")}
           onClick={(e) => { e.stopPropagation(); useStore.getState().togglePinnedThread(thread.id); }}
         >
           {pinned ? <IconPinFilled size={13} /> : <IconPin size={13} />}
         </button>
         <button
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg)"
-          title={archived ? "Unarchive chat" : "Archive chat"}
+          title={t(archived ? "Unarchive chat" : "Archive chat")}
           onClick={(e) => { e.stopPropagation(); archived ? useStore.getState().unarchiveThread(thread.id) : useStore.getState().archiveThread(thread.id); }}
         >
           <IconArchive size={13} />
@@ -977,6 +993,7 @@ function shortAge(ts) {
 // ---------------------------------------------------------------------------
 let usageCache = null;
 function UsageNudge() {
+  const t = useT();
   const codexConnected = useStore((s) => runtimeConnected(s, "codex"));
   const [usage, setUsage] = useState(usageCache);
   const [dismissed, setDismissed] = useState(false);
@@ -1014,18 +1031,18 @@ function UsageNudge() {
   return (
     <div className="mx-2 mb-2 rounded-xl border border-(--border-light) bg-(--surface) p-3">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[13px] font-medium">{remaining}% usage remaining</span>
+        <span className="text-[13px] font-medium">{t("{percent}% usage remaining", { percent: remaining })}</span>
         <button
           className="flex h-4 w-4 shrink-0 items-center justify-center text-(--fg-tertiary) hover:text-(--fg)"
-          title="Dismiss"
+          title={t("Dismiss")}
           onClick={() => setDismissed(true)}
         >
           <IconX size={12} />
         </button>
       </div>
       <div className="mt-1 text-xs leading-relaxed text-(--fg-tertiary)">
-        {weekly ? "Resets every week" : "Resets periodically"}
-        {resetStr && ` · Next reset is on ${resetStr}`}
+        {weekly ? t("Resets every week") : t("Resets periodically")}
+        {resetStr && t(" · Next reset is on {date}", { date: resetStr })}
       </div>
       <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-(--surface-active)">
         <div className="h-full rounded-full bg-(--fg)" style={{ width: `${Math.max(2, remaining)}%` }} />
@@ -1034,7 +1051,7 @@ function UsageNudge() {
         className="mt-3 h-8 w-full rounded-full bg-(--fg) text-[13px] font-medium text-(--surface) hover:opacity-90"
         onClick={() => openExternal("https://chatgpt.com/pricing")}
       >
-        Add credits
+        {t("Add credits")}
       </button>
     </div>
   );
@@ -1042,11 +1059,12 @@ function UsageNudge() {
 
 // ---------------------------------------------------------------------------
 function Footer() {
+  const t = useT();
   const account = useStore((s) => s.account);
   const profile = useStore((s) => s.profile);
   const archivedView = useStore((s) => s.archivedView);
   const email = account?.email || "";
-  const displayName = profile?.name || (email ? email.split("@")[0] : "Not signed in");
+  const displayName = profile?.name || (email ? email.split("@")[0] : t("Not signed in"));
   const [menuOpen, setMenuOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
   const profileRef = useRef(null);
@@ -1146,6 +1164,7 @@ function ProviderDialog({ open, onClose }) {
 
 // Centered login prompt for a vendor that is not connected.
 function ProviderLogin({ runtime, meta }) {
+  const t = useT();
   const loginStatus = useStore((s) => s.loginStatus);
   const codex = runtime === "codex";
   const waiting = codex && (loginStatus === "starting" || loginStatus === "waiting" || loginStatus === "completing");
@@ -1154,7 +1173,9 @@ function ProviderLogin({ runtime, meta }) {
       <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-(--border-light) bg-(--surface-under)">
         {meta?.icon(24)}
       </span>
-      <div className="text-[12px] text-(--fg-tertiary)">Not signed in to {meta?.label}</div>
+      <div className="text-[12px] text-(--fg-tertiary)">
+        {t("Not signed in to {provider}", { provider: meta?.label })}
+      </div>
       <button
         className="rounded-full bg-(--fg) px-4 py-1.5 text-[13px] font-medium text-(--surface) disabled:opacity-60"
         disabled={waiting}
@@ -1163,19 +1184,21 @@ function ProviderLogin({ runtime, meta }) {
           else useStore.getState().startExternalLogin(runtime);
         }}
       >
-        {waiting ? "Signing in…" : "Log in"}
+        {waiting ? t("Signing in…") : t("Log in")}
       </button>
     </div>
   );
 }
 
 function ProviderAccount({ runtime, meta }) {
+  const t = useT();
   const account = useStore((s) => s.account);
   const profile = useStore((s) => s.profile);
   const externalAuth = useStore((s) => s.externalAuth);
   const externalAccount = useStore((s) => s.externalAccounts?.[runtime]);
   const externalAccountLoading = useStore((s) => s.externalAccountLoading?.[runtime]);
   const externalAccountError = useStore((s) => s.externalAccountErrors?.[runtime]);
+  const externalProfileLoading = useStore((s) => s.externalProfileLoading?.[runtime]);
   const codex = runtime === "codex";
   const kimi = runtime === "kimi";
 
@@ -1189,21 +1212,24 @@ function ProviderAccount({ runtime, meta }) {
     return (
       <KimiAccountPanel
         account={externalAccount}
-        credentialLabel={externalAuth?.kimi?.detail === "oauth_credentials" ? "OAuth credentials" : "Saved credentials"}
+        credentialLabel={t(externalAuth?.kimi?.detail === "oauth_credentials" ? "OAuth credentials" : "Saved credentials")}
         error={externalAccountError}
         fallbackIcon={meta?.icon(22)}
         loading={externalAccountLoading}
+        onProfileConnect={() => useStore.getState().connectExternalProfile("kimi")}
+        onProfileDisconnect={() => useStore.getState().disconnectExternalProfile("kimi")}
         onRefresh={(refresh) => useStore.getState().refreshExternalAccount("kimi", { refresh })}
+        profileLoading={externalProfileLoading}
       />
     );
   }
 
-  const name = codex ? profile?.name || account?.email || "Codex account" : meta?.label;
+  const name = codex ? profile?.name || account?.email || t("Codex account") : meta?.label;
   const accountLine = codex
-    ? account?.email || "Signed in"
+    ? account?.email || t("Signed in")
     : externalAuth?.claude?.detail === "oauth_token"
-      ? "OAuth token"
-      : externalAuth?.claude?.detail || "Signed in";
+      ? t("OAuth token")
+      : externalAuth?.claude?.detail || t("Signed in");
   const plan = codex ? planLabel(account?.planType) : null;
 
   return (
@@ -1231,12 +1257,16 @@ function ProviderAccount({ runtime, meta }) {
 
 // Small "x% left" bar, same visual language as Settings → Usage.
 function UsageBar({ label, pctLeft, reset }) {
+  const t = useT();
   const pct = Math.max(0, Math.min(100, Math.round(pctLeft)));
   return (
     <div>
       <div className="flex items-baseline justify-between text-[12px]">
         <span>{label}</span>
-        <span className="text-(--fg-tertiary)">{reset && <>Resets {reset} · </>}{pct}% left</span>
+        <span className="text-(--fg-tertiary)">
+          {reset && <>{t("Resets {date} · ", { date: reset })}</>}
+          {t("{percent}% left", { percent: pct })}
+        </span>
       </div>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-(--surface-active)">
         <div
@@ -1249,15 +1279,17 @@ function UsageBar({ label, pctLeft, reset }) {
 }
 
 function UsageUnavailable({ label }) {
+  const t = useT();
   return (
     <div className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-[12px] text-(--fg-tertiary)">
-      Usage data is not available for {label}.
+      {t("Usage data is not available for {provider}.", { provider: label })}
     </div>
   );
 }
 
 // Codex rate limits via the app-server (same RPC as Settings → Usage).
 function CodexUsage() {
+  const t = useT();
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
   const [resetMsg, setResetMsg] = useState(null);
@@ -1314,17 +1346,19 @@ function CodexUsage() {
       {resetSummary && (
         <div className="flex flex-col gap-2 border-t border-(--border-light) pt-2">
           <div className="flex items-center justify-between text-[11px] text-(--fg-tertiary)">
-            <span>Usage limit resets</span>
-            <span>{resetCount} available</span>
+            <span>{t("Usage limit resets")}</span>
+            <span>{t("{count} available", { count: resetCount })}</span>
           </div>
           {resets.map((credit) => (
             <div key={credit.id} className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[12px] text-(--fg-secondary)">
-                  {credit.title || "Full reset"}
+                  {credit.title || t("Full reset")}
                 </div>
                 <div className="truncate text-[11px] text-(--fg-tertiary)">
-                  {credit.expiresAt ? `Expires ${codexResetDate(credit.expiresAt, true)}` : credit.status || "No expiry reported"}
+                  {credit.expiresAt
+                    ? t("Expires {date}", { date: codexResetDate(credit.expiresAt, true) })
+                    : credit.status || t("No expiry reported")}
                 </div>
               </div>
               {credit.status === "available" && (
@@ -1332,7 +1366,7 @@ function CodexUsage() {
                   className="shrink-0 rounded-full border border-(--border) px-2.5 py-1 text-[11px] hover:bg-(--surface-hover)"
                   onClick={() => useReset(credit.id)}
                 >
-                  Use reset
+                  {t("Use reset")}
                 </button>
               )}
             </div>
@@ -1351,6 +1385,7 @@ function CodexUsage() {
 
 // ---------------------------------------------------------------------------
 function RenameDialog({ renaming, onClose }) {
+  const t = useT();
   const [value, setValue] = useState("");
   React.useEffect(() => { if (renaming) setValue(renaming.name); }, [renaming]);
   if (!renaming) return null;
@@ -1361,18 +1396,18 @@ function RenameDialog({ renaming, onClose }) {
   };
   return (
     <Dialog open title="Rename chat" onClose={onClose}>
-      <div className="mb-1 text-xs text-(--fg-tertiary)">Keep it short and recognizable.</div>
+      <div className="mb-1 text-xs text-(--fg-tertiary)">{t("Keep it short and recognizable.")}</div>
       <input
         autoFocus
         className="mt-2 w-full rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[13px] outline-none focus:border-(--accent)"
-        placeholder="Add a title…"
+        placeholder={t("Add a title…")}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
       />
       <div className="mt-4 flex justify-end gap-2">
-        <button className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={onClose}>Cancel</button>
-        <button className="rounded-lg bg-(--accent) px-3 py-1.5 text-[13px] font-medium text-(--accent-fg) hover:opacity-90" onClick={submit}>Save</button>
+        <button className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={onClose}>{t("Cancel")}</button>
+        <button className="rounded-lg bg-(--accent) px-3 py-1.5 text-[13px] font-medium text-(--accent-fg) hover:opacity-90" onClick={submit}>{t("Save")}</button>
       </div>
     </Dialog>
   );

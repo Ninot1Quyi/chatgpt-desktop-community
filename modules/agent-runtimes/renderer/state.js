@@ -16,5 +16,6 @@ export function createAgentRuntimeState() {
     externalAccounts: {},
     externalAccountLoading: {},
     externalAccountErrors: {},
+    externalProfileLoading: {},
   };
 }

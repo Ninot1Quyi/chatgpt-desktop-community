@@ -14,6 +14,7 @@ import {
 import { Toasts, Spinner } from "./components/ui.jsx";
 import { IconChat, IconSearch, LucideIcon } from "./components/icons.jsx";
 import { reportDiagnostic } from "@modules/diagnostics";
+import { useT } from "./i18n.jsx";
 
 const Settings = React.lazy(() => import("@modules/settings"));
 
@@ -178,6 +179,7 @@ export default function App() {
 }
 
 function BootScreen({ status }) {
+  const t = useT();
   const binary = useStore((state) => state.binary);
   const binaryCandidates = useStore((state) => state.binaryCandidates);
   const backendError = useStore((state) => state.backendError);
@@ -186,16 +188,16 @@ function BootScreen({ status }) {
       {status === "crashed" ? (
         <>
           <div className="text-[15px] font-medium text-(--danger)">
-            ChatGPT Desktop Community backend failed to start
+            {t("ChatGPT Desktop Community backend failed to start")}
           </div>
           <div className="max-w-[420px] text-center text-[13px] text-(--fg-tertiary)">
-            Tried to launch: <span className="font-mono">{binary || "codex"}</span>
+            {t("Tried to launch:")} <span className="font-mono">{binary || "codex"}</span>
             <br />
-            {backendError || "The bundled Codex runtime could not be started."}
+            {backendError || t("The bundled Codex runtime could not be started.")}
           </div>
           {binaryCandidates.length > 0 && (
             <details className="max-w-[560px] text-[12px] text-(--fg-tertiary)">
-              <summary className="cursor-pointer text-center">Show searched locations</summary>
+              <summary className="cursor-pointer text-center">{t("Show searched locations")}</summary>
               <div className="mt-2 break-all rounded-lg bg-(--surface-secondary) px-3 py-2 font-mono">
                 {binaryCandidates.join("\n")}
               </div>
@@ -205,7 +207,7 @@ function BootScreen({ status }) {
             className="mt-2 rounded-lg bg-(--accent) px-4 py-2 text-[13px] font-medium text-(--accent-fg)"
             onClick={() => api.restartAppServer()}
           >
-            Retry
+            {t("Retry")}
           </button>
         </>
       ) : (
@@ -213,10 +215,10 @@ function BootScreen({ status }) {
           <Spinner size={22} className="text-(--fg-tertiary)" />
           <div className="text-[13px] text-(--fg-tertiary)">
             {status === "starting"
-              ? "Starting ChatGPT Desktop Community…"
+              ? t("Starting ChatGPT Desktop Community…")
               : status === "checking-account"
-                ? "Checking account…"
-                : "Connecting…"}
+                ? t("Checking account…")
+                : t("Connecting…")}
           </div>
         </>
       )}
@@ -225,6 +227,7 @@ function BootScreen({ status }) {
 }
 
 function AuthScreen() {
+  const t = useT();
   const loginError = useStore((state) => state.loginError);
 
   useEffect(() => {
@@ -241,7 +244,7 @@ function AuthScreen() {
         </div>
         <h1 className="text-[22px] font-semibold">ChatGPT Desktop Community</h1>
         <p className="mt-2 max-w-[340px] text-[13px] leading-5 text-(--fg-tertiary)">
-          Sign in with any provider below to use its account and models.
+          {t("Sign in with any provider below to use its account and models.")}
         </p>
         <div className="mt-6 flex w-full flex-col gap-2">
           {RUNTIMES.map((runtime) => (
@@ -254,7 +257,7 @@ function AuthScreen() {
           </div>
         )}
         <p className="mt-6 text-[11px] leading-4 text-(--fg-faint)">
-          Credentials are handled and stored locally by each provider&apos;s runtime.
+          {t("Credentials are handled and stored locally by each provider's runtime.")}
         </p>
       </div>
     </div>
@@ -262,6 +265,7 @@ function AuthScreen() {
 }
 
 function AuthVendorRow({ meta }) {
+  const t = useT();
   const connected = useStore((state) => runtimeConnected(state, meta.id));
   const loginStatus = useStore((state) => state.loginStatus);
   const startLogin = useStore((state) => state.startChatgptLogin);
@@ -274,12 +278,12 @@ function AuthVendorRow({ meta }) {
     "completing",
   ].includes(loginStatus);
   const label = loginStatus === "starting"
-    ? "Starting…"
+    ? t("Starting…")
     : loginStatus === "waiting"
-      ? "In browser…"
+      ? t("In browser…")
       : loginStatus === "completing"
-        ? "Finishing…"
-        : "Connect";
+        ? t("Finishing…")
+        : t("Connect");
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-(--border-light) bg-(--surface-under) px-4 py-3 text-left">
@@ -290,10 +294,10 @@ function AuthVendorRow({ meta }) {
         <div className="text-[13px] font-medium">{meta.label}</div>
         <div className="text-[11px] text-(--fg-tertiary)">
           {connected
-            ? "Connected"
+            ? t("Connected")
             : codex
-              ? "Sign in with your ChatGPT account"
-              : `Sign in via the ${meta.label} CLI (opens a window)`}
+              ? t("Sign in with your ChatGPT account")
+              : t("Sign in via the {provider} CLI (opens a window)", { provider: meta.label })}
         </div>
       </div>
       {connected ? (
@@ -304,7 +308,7 @@ function AuthVendorRow({ meta }) {
           disabled={waiting}
           onClick={() => (codex ? startLogin() : startExternalLogin(meta.id))}
         >
-          {codex ? label : "Connect"}
+          {codex ? label : t("Connect")}
         </button>
       )}
       {!connected && codex && loginStatus === "waiting" && (
@@ -312,7 +316,7 @@ function AuthVendorRow({ meta }) {
           className="shrink-0 text-xs text-(--fg-tertiary) hover:text-(--fg)"
           onClick={cancelLogin}
         >
-          Cancel
+          {t("Cancel")}
         </button>
       )}
     </div>
@@ -320,6 +324,7 @@ function AuthVendorRow({ meta }) {
 }
 
 function CommandMenu() {
+  const t = useT();
   const open = useStore((state) => state.ui.commandMenuOpen);
   const setUi = useStore((state) => state.setUi);
   const threads = useStore((state) => state.threads);
@@ -364,7 +369,7 @@ function CommandMenu() {
           <input
             autoFocus
             className="w-full bg-transparent text-[14px] outline-none placeholder:text-(--fg-faint)"
-            placeholder="Search chats…"
+            placeholder={t("Search chats…")}
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -400,7 +405,7 @@ function CommandMenu() {
             <span className="flex h-6 w-6 items-center justify-center rounded-md bg-(--accent-soft) text-(--accent)">
               ＋
             </span>
-            New chat
+            {t("New chat")}
           </button>
           {filtered.map((thread, index) => {
             const meta = runtimeMeta(thread.source);
@@ -420,7 +425,7 @@ function CommandMenu() {
                   ? meta.icon(14, "shrink-0")
                   : <IconChat size={14} className="shrink-0 text-(--fg-tertiary)" />}
                 <span className="truncate">
-                  {thread.name || (thread.preview || "").split("\n")[0] || "New chat"}
+                  {thread.name || (thread.preview || "").split("\n")[0] || t("New chat")}
                 </span>
                 {meta && (
                   <span className="ml-auto shrink-0 text-[10px] text-(--fg-faint)">
@@ -432,7 +437,7 @@ function CommandMenu() {
           })}
           {filtered.length === 0 && (
             <div className="px-4 py-6 text-center text-[13px] text-(--fg-tertiary)">
-              No matches
+              {t("No matches")}
             </div>
           )}
         </div>

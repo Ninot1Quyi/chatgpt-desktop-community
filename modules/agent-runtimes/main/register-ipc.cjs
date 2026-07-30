@@ -1,4 +1,5 @@
 const {
+  createKimiWebProfileService,
   getClaudeConfigDir,
   getExternalAuthStatus,
   getKimiAccount,
@@ -28,9 +29,21 @@ function resultOrError(operation) {
 
 function registerAgentRuntimeHandlers({
   app,
+  BrowserWindow,
   host,
   ipcMain,
+  session,
 }) {
+  const kimiWebProfile = createKimiWebProfileService({
+    BrowserWindow,
+    session,
+    log: (level, event) => {
+      const method = level === "error" ? "error" : level === "warn" ? "warn" : "log";
+      console[method](`[kimi-profile] ${event}`);
+    },
+  });
+  app.once("before-quit", () => kimiWebProfile.dispose());
+
   ipcMain.handle("claude-history:list", () => resultOrError(async () => {
     const configDir = getClaudeConfigDir(app.getPath("home"));
     return listClaudeSessions({ configDir });
@@ -66,7 +79,23 @@ function registerAgentRuntimeHandlers({
         homePath: app.getPath("home"),
         forceRefresh: refresh === true,
         host,
+        profileProvider: kimiWebProfile,
       });
+    }));
+  ipcMain.handle("agent-runtime:profile-login", (event, { runtime } = {}) =>
+    resultOrError(() => {
+      if (runtime !== "kimi") {
+        throw new Error(`Profile sign-in is not available for "${runtime || "unknown"}"`);
+      }
+      const parent = BrowserWindow.fromWebContents(event.sender);
+      return kimiWebProfile.login({ parent });
+    }));
+  ipcMain.handle("agent-runtime:profile-logout", (_event, { runtime } = {}) =>
+    resultOrError(() => {
+      if (runtime !== "kimi") {
+        throw new Error(`Profile sign-out is not available for "${runtime || "unknown"}"`);
+      }
+      return kimiWebProfile.logout();
     }));
   ipcMain.handle("agent-runtime:login", (_event, { runtime } = {}) =>
     resultOrError(() => startExternalLogin(String(runtime || ""), {

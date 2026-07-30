@@ -4,6 +4,7 @@ import React, { useRef, useState } from "react";
 import { cx } from "@app/lib/cx.js";
 import { Menu } from "@app/components/ui.jsx";
 import { IconChevronDown } from "@app/components/icons.jsx";
+import { useT } from "@app/i18n.jsx";
 
 export const lsGet = (k, fallback) => {
   try {
@@ -20,9 +21,10 @@ export const lsSet = (k, v) => {
 };
 
 export function Card({ title, children }) {
+  const t = useT();
   return (
     <section className="mb-6">
-      {title && <h2 className="mb-2 px-1 text-[13px] font-medium text-(--fg-secondary)">{title}</h2>}
+      {title && <h2 className="mb-2 px-1 text-[13px] font-medium text-(--fg-secondary)">{t(title)}</h2>}
       <div className="divide-y divide-(--border-light) rounded-2xl border border-(--border-light) bg-(--surface-under)">
         {children}
       </div>
@@ -31,11 +33,12 @@ export function Card({ title, children }) {
 }
 
 export function Row({ title, desc, children }) {
+  const t = useT();
   return (
     <div className="flex items-center justify-between gap-6 px-4 py-3.5">
       <div className="min-w-0">
-        <div className="text-[13px]">{title}</div>
-        {desc && <div className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-(--fg-tertiary)">{desc}</div>}
+        <div className="text-[13px]">{t(title)}</div>
+        {desc && <div className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-(--fg-tertiary)">{t(desc)}</div>}
       </div>
       {children && <div className="shrink-0">{children}</div>}
     </div>
@@ -65,6 +68,7 @@ export function Toggle({ on, onChange }) {
 }
 
 export function Dropdown({ value, options, onChange, disabled }) {
+  const t = useT();
   const btnRef = useRef(null);
   const [open, setOpen] = useState(false);
   const current = options.find((o) => o.id === value);
@@ -78,7 +82,7 @@ export function Dropdown({ value, options, onChange, disabled }) {
         )}
         onClick={() => !disabled && setOpen(!open)}
       >
-        {current?.label}
+        {t(current?.label)}
         <IconChevronDown size={12} className="text-(--fg-tertiary)" />
       </button>
       <Menu
@@ -88,7 +92,7 @@ export function Dropdown({ value, options, onChange, disabled }) {
         align="end"
         items={options.map((o) => ({
           id: o.id,
-          label: o.label,
+          label: t(o.label),
           checked: o.id === value,
           onSelect: () => onChange(o.id),
         }))}
@@ -99,6 +103,7 @@ export function Dropdown({ value, options, onChange, disabled }) {
 
 // Segmented two-or-more option control (e.g. Bottom | Right).
 export function Segmented({ value, options, onChange }) {
+  const t = useT();
   return (
     <div className="flex gap-0.5 rounded-lg border border-(--border-light) bg-(--surface) p-0.5">
       {options.map(([id, label]) => (
@@ -110,7 +115,7 @@ export function Segmented({ value, options, onChange }) {
           )}
           onClick={() => onChange(id)}
         >
-          {label}
+          {t(label)}
         </button>
       ))}
     </div>
@@ -119,6 +124,7 @@ export function Segmented({ value, options, onChange }) {
 
 // Small secondary button used across settings rows.
 export function Btn({ children, onClick, danger, disabled }) {
+  const t = useT();
   return (
     <button
       className={cx(
@@ -131,7 +137,7 @@ export function Btn({ children, onClick, danger, disabled }) {
       disabled={disabled}
       onClick={disabled ? undefined : onClick}
     >
-      {children}
+      {t(children)}
     </button>
   );
 }
