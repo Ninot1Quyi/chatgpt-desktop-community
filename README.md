@@ -88,8 +88,9 @@ bundle inputs and cannot enter a target's package.
 ## Current limitations
 
 - Release CI produces a Windows x64 NSIS installer and a macOS universal
-  DMG/ZIP. Local macOS packages are unsigned unless signing credentials are
-  supplied.
+  DMG/ZIP. macOS packaging requires Developer ID credentials, notarizes the
+  app, and rejects artifacts that fail signature, hardened-runtime, Gatekeeper,
+  or stapled-ticket verification.
 - The Browser panel provides practical embedded navigation, but it does not reproduce every browser-control feature of the official client.
 - Compatibility can lag behind newly released app-server methods or notification shapes.
 - This remains an independent community implementation, so visual and behavioral differences are expected for now; the goal is complete visual and behavioral parity.

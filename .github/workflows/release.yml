@@ -54,12 +54,24 @@ jobs:
         with:
           name: codex-release-manifest
           path: release
+      - name: Prepare macOS signing credentials
+        if: matrix.target == 'darwin-universal'
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: node scripts/prepare-macos-signing.mjs
       - run: npm run package -- --target=${{ matrix.target }}
         env:
           CODEX_RELEASE_MANIFEST_PATH: release/codex-release-manifest.json
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
       - run: node _analysis/bundle-selection-check.mjs --target=${{ matrix.target }}
+
+      - name: Verify macOS signature and notarization
+        if: matrix.target == 'darwin-universal'
+        run: node scripts/verify-macos-release.mjs --target=darwin-universal
 
       - uses: actions/upload-artifact@v4
         with:
@@ -71,6 +83,11 @@ jobs:
             release/${{ matrix.target }}/*.blockmap
             release/${{ matrix.target }}/*.yml
           if-no-files-found: error
+
+      - name: Remove macOS signing material
+        if: always() && matrix.target == 'darwin-universal'
+        run: >-
+          node -e "require('node:fs').rmSync(require('node:path').join(process.env.RUNNER_TEMP, 'macos-signing'), { recursive: true, force: true })"
 
   publish:
     needs: package
