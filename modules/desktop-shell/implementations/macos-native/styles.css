@@ -3,6 +3,6 @@
 }
 
 .desktop-shell-macos .right-panel-root {
-  background: var(--surface-under);
+  background: var(--surface);
   padding-top: 46px;
 }

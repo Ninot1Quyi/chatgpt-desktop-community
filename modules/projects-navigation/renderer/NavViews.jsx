@@ -17,6 +17,7 @@ export default function NavViews() {
   const navView = useStore((s) => s.ui.navView);
   switch (navView) {
     case "scheduled": return <ScheduledView />;
+    case "sites": return <SitesView />;
     case "plugins": return <PluginsView />;
     case "pull-requests": return <PullRequestsView />;
     default: return null;
@@ -36,6 +37,101 @@ function SimpleView({ title, desc }) {
     <PageShell title={title}>
       <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
         <div className="text-[14px] text-(--fg-tertiary)">{desc}</div>
+      </div>
+    </PageShell>
+  );
+}
+
+function SitesView() {
+  const [plugin, setPlugin] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let live = true;
+    api.rpc("plugin/list", {})
+      .then((result) => {
+        if (!live) return;
+        const plugins = (result?.marketplaces || []).flatMap((marketplace) =>
+          (marketplace.plugins || []).map((candidate) => ({ ...candidate, _marketplace: marketplace.name }))
+        );
+        setPlugin(plugins.find((candidate) =>
+          /(^|[-_\s])sites?($|[-_\s])/i.test(candidate.id || candidate.name || "")
+          || /sites?/i.test(candidate.interface?.displayName || candidate.interface?.name || "")
+        ) || null);
+      })
+      .catch(() => live && setPlugin(null))
+      .finally(() => live && setLoading(false));
+    return () => { live = false; };
+  }, []);
+
+  const createSite = () => {
+    useStore.getState().newChatWithPrefill(
+      "Create a website that ",
+      [{ kind: "site", name: "Sites", displayName: "Sites" }]
+    );
+  };
+
+  const openSites = () => {
+    if (plugin?.interface?.defaultPrompt) {
+      const prompt = Array.isArray(plugin.interface.defaultPrompt)
+        ? plugin.interface.defaultPrompt[0] || ""
+        : plugin.interface.defaultPrompt;
+      useStore.getState().newChatWithPrefill(prompt ? `${prompt} ` : "", [
+        { kind: "site", name: "Sites", displayName: pluginName(plugin) || "Sites" },
+      ]);
+      return;
+    }
+    createSite();
+  };
+
+  return (
+    <PageShell title="Sites">
+      <div className="mx-auto flex h-full max-w-[44rem] flex-col px-6 py-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-[22px] font-semibold">
+              <LucideIcon name="PanelTop" size={22} className="text-(--fg-secondary)" />
+              Sites
+            </div>
+            <div className="mt-1 text-[13px] text-(--fg-tertiary)">
+              Turn your ideas into live websites.
+            </div>
+          </div>
+          <button
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-(--fg) px-3 text-[13px] font-medium text-(--surface) hover:opacity-90"
+            onClick={createSite}
+          >
+            <IconPlus size={14} />
+            Create new site
+          </button>
+        </div>
+
+        <div className="mt-5 flex h-9 items-center gap-2 rounded-full border border-(--border-light) bg-(--surface) px-3">
+          <IconSearch size={14} className="shrink-0 text-(--fg-faint)" />
+          <input
+            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-(--fg-faint)"
+            placeholder="Search sites"
+            disabled
+          />
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl border border-(--border-light) bg-(--surface-under)">
+            <LucideIcon name="PanelTop" size={22} className="text-(--fg-faint)" />
+          </div>
+          <div className="mt-3 text-[14px] font-medium">No sites yet</div>
+          <div className="mt-1 max-w-sm text-[13px] leading-5 text-(--fg-tertiary)">
+            Start a new Sites chat to design, save, and publish a web page from this app.
+          </div>
+          <button
+            className="mt-4 flex h-8 items-center gap-1.5 rounded-full border border-(--border) px-3 text-[13px] hover:bg-(--surface-hover)"
+            onClick={openSites}
+            disabled={loading}
+          >
+            {loading ? <Spinner size={12} /> : <LucideIcon name="ExternalLink" size={13} />}
+            Open Sites
+          </button>
+        </div>
       </div>
     </PageShell>
   );
