@@ -110,7 +110,7 @@ export const useStore = create((set, get) => ({
     settingsOpen: false,
     settingsSection: null, // deep-link target section consumed on open
     pluginsTab: "plugins", // plugins | skills (header-band tabs)
-    navView: "chats", // chats | pull-requests | scheduled | plugins
+    navView: "chats", // chats | pull-requests | scheduled | sites | plugins
     pinnedProjects: stored("ui.pinnedProjects", []), // cwd strings
     keybindings: stored("ui.keybindings", {}), // command id -> accelerator string
   },

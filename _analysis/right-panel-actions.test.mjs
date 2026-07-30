@@ -5,7 +5,9 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (relativePath) => fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
+const read = (relativePath) => fs
+  .readFileSync(path.join(repoRoot, relativePath), "utf8")
+  .replace(/\r\n/g, "\n");
 const moduleUrl = (relativePath) => pathToFileURL(path.join(repoRoot, relativePath)).href;
 
 test("right panel empty state restores the reference action order", () => {

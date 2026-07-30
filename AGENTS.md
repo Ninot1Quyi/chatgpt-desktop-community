@@ -61,6 +61,19 @@ For a read-only app-server smoke test, prepare or install Codex and run:
 node _analysis/smoke.mjs --target=<target>
 ```
 
+## Version Governance
+
+Treat the product version as an explicit release decision. Every product
+version change represents the launch of a major feature and requires the
+user's explicit confirmation before changing `package.json`, lockfile version
+metadata, installer or update metadata, release tags, or any other
+product-version source.
+
+A request to fix, build, package, commit, push, or publish does not authorize a
+version change. Keep the current product version unless the user separately
+confirms that the version should be updated for that specific release. Approval
+for an earlier release does not authorize a later version change.
+
 Release tags must match `package.json` exactly. Release CI packages
 `win32-x64` as NSIS plus `latest.yml`, and `darwin-universal` as DMG/ZIP plus
 macOS update metadata.
