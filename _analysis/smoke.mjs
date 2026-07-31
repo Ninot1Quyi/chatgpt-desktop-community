@@ -24,10 +24,21 @@ const { binary: BIN } = locator.resolveCodexBinary({
   ),
   homePath: os.homedir(),
 });
-const proc = spawn(BIN, ["-c", "features.code_mode_host=true", "app-server", "--analytics-default-enabled"], {
-  stdio: ["pipe", "pipe", "pipe"],
-  env: { ...process.env, LOG_FORMAT: "json", RUST_LOG: "warn" },
-});
+const proc = spawn(
+  BIN,
+  [
+    "-c",
+    "features.code_mode_host=true",
+    "-c",
+    "features.respect_system_proxy=true",
+    "app-server",
+    "--analytics-default-enabled",
+  ],
+  {
+    stdio: ["pipe", "pipe", "pipe"],
+    env: { ...process.env, LOG_FORMAT: "json", RUST_LOG: "warn" },
+  },
+);
 
 let buf = "";
 const pending = new Map();

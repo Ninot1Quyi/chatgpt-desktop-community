@@ -2,32 +2,12 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-
-const RELEASE_TAG = "rust-v0.145.0";
-const CODEX_VERSION = "0.145.0";
-const RUNTIMES = {
-  "darwin-arm64": {
-    asset: "codex-package-aarch64-apple-darwin.tar.gz",
-    sha256: "ece937169d4c9e910d60826a6ea4ae7848a16c089403d122e70e7da4ac41ba34",
-    target: "aarch64-apple-darwin",
-    entrypoint: "bin/codex",
-  },
-  "darwin-x64": {
-    asset: "codex-package-x86_64-apple-darwin.tar.gz",
-    sha256: "9d402c9ca814655fddc07b548d7086491c0afcebe1f746cdeba1045fd6f62646",
-    target: "x86_64-apple-darwin",
-    entrypoint: "bin/codex",
-  },
-  "win32-x64": {
-    asset: "codex-package-x86_64-pc-windows-msvc.tar.gz",
-    sha256: "8d0d281346aedf63c4cc3922997df822fbb8881f7ffb2b57416f48e8c52a734e",
-    target: "x86_64-pc-windows-msvc",
-    entrypoint: "bin/codex.exe",
-  },
-};
+import {
+  readCodexReleaseManifest,
+  resolveLatestCodexRelease,
+} from "./codex-release.mjs";
 const PACKAGE_TARGETS = {
   "darwin-arm64": ["darwin-arm64"],
   "darwin-universal": ["darwin-arm64", "darwin-x64"],
@@ -41,7 +21,16 @@ if (!runtimeKeys) {
 }
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const cacheDir = path.join(repoRoot, "release", "codex-runtime-cache");
+const releaseManifestPath = process.env.CODEX_RELEASE_MANIFEST_PATH;
+const release = releaseManifestPath
+  ? await readCodexReleaseManifest(path.resolve(repoRoot, releaseManifestPath))
+  : await resolveLatestCodexRelease();
+const cacheDir = path.join(
+  repoRoot,
+  "release",
+  "codex-runtime-cache",
+  release.version,
+);
 const stageRoot = path.join(
   repoRoot,
   "release",
@@ -69,15 +58,31 @@ async function ensureArchive(runtime) {
   } catch {}
 
   const partialPath = `${archivePath}.download-${process.pid}`;
-  const url = `https://github.com/openai/codex/releases/download/${RELEASE_TAG}/${runtime.asset}`;
-  console.log(`Downloading ${url}`);
-  const response = await fetch(url);
-  if (!response.ok || !response.body) {
-    throw new Error(`Download failed (${response.status}): ${url}`);
-  }
-
+  console.log(`Downloading ${runtime.downloadUrl}`);
   try {
-    await pipeline(response.body, fs.createWriteStream(partialPath));
+    const curl = process.platform === "win32" ? "curl.exe" : "curl";
+    execFileSync(
+      curl,
+      [
+        "--silent",
+        "--show-error",
+        "--fail",
+        "--location",
+        "--retry",
+        "8",
+        "--retry-delay",
+        "2",
+        "--retry-all-errors",
+        "--connect-timeout",
+        "20",
+        "--max-time",
+        "900",
+        "--output",
+        partialPath,
+        runtime.downloadUrl,
+      ],
+      { stdio: "inherit", windowsHide: true },
+    );
     const digest = await sha256(partialPath);
     if (digest !== runtime.sha256) {
       throw new Error(`SHA-256 mismatch for ${runtime.asset}: ${digest}`);
@@ -93,7 +98,7 @@ async function ensureArchive(runtime) {
 }
 
 async function extractRuntime(key) {
-  const runtime = RUNTIMES[key];
+  const runtime = release.runtimes[key];
   const archivePath = await ensureArchive(runtime);
   const destination = path.join(resourceDir, key);
   await mkdir(destination, { recursive: true });
@@ -110,7 +115,7 @@ async function extractRuntime(key) {
     "utf8",
   ));
   if (
-    manifest.version !== CODEX_VERSION ||
+    manifest.version !== release.version ||
     manifest.target !== runtime.target ||
     manifest.entrypoint !== runtime.entrypoint
   ) {
@@ -136,10 +141,20 @@ async function extractRuntime(key) {
 
 await rm(stageRoot, { recursive: true, force: true });
 await mkdir(resourceDir, { recursive: true });
+console.log(
+  `Preparing latest stable Codex CLI ${release.version} (${release.releaseTag}) for ${packageTarget}`,
+);
 const runtimes = [];
 for (const key of runtimeKeys) runtimes.push(await extractRuntime(key));
 await writeFile(
   path.join(resourceDir, "runtime-manifest.json"),
-  `${JSON.stringify({ releaseTag: RELEASE_TAG, version: CODEX_VERSION, runtimes }, null, 2)}\n`,
+  `${JSON.stringify({
+    releaseTag: release.releaseTag,
+    version: release.version,
+    publishedAt: release.publishedAt,
+    resolvedAt: release.resolvedAt,
+    source: release.source,
+    runtimes,
+  }, null, 2)}\n`,
 );
-console.log(`Prepared Codex ${CODEX_VERSION} for ${packageTarget}: ${resourceDir}`);
+console.log(`Prepared Codex ${release.version} for ${packageTarget}: ${resourceDir}`);

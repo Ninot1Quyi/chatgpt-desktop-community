@@ -3,6 +3,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "../lib/cx.js";
 import { useStore } from "../store.js";
+import { useT } from "../i18n.jsx";
 import { IconX } from "./icons.jsx";
 
 export function ActivityDisclosure({ open, children }) {
@@ -69,6 +70,7 @@ export function ActivityDisclosure({ open, children }) {
 // items: [{id, label, hint?, icon?, danger?, checked?, onSelect} | {sep:true}]
 // ---------------------------------------------------------------------------
 export function Menu({ open, anchor, items, onClose, width = 220, align = "start" }) {
+  const t = useT();
   const ref = useRef(null);
   const [pos, setPos] = useState(null);
   const [sub, setSub] = useState(null); // { id, rect }
@@ -140,7 +142,7 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
         it.sep ? (
           <div key={i} className="my-1 h-px bg-(--border-light)" />
         ) : it.header ? (
-          <div key={i} className="px-3 pt-2 pb-1 text-xs font-medium text-(--fg-tertiary)">{it.header}</div>
+          <div key={i} className="px-3 pt-2 pb-1 text-xs font-medium text-(--fg-tertiary)">{t(it.header)}</div>
         ) : it.children ? (
           <button
             key={it.id ?? i}
@@ -155,9 +157,9 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
-          >
-            {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
-            <span className={cx("min-w-0 flex-1", !it.tall && "truncate")}>{it.label}</span>
+            >
+              {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
+            <span className={cx("min-w-0 flex-1", !it.tall && "truncate")}>{t(it.label)}</span>
           </button>
         ) : (
           <button
@@ -172,9 +174,9 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
-          >
-            {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
-            <span className={cx("min-w-0 flex-1", !it.tall && "truncate")}>{it.label}</span>
+            >
+              {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
+            <span className={cx("min-w-0 flex-1", !it.tall && "truncate")}>{t(it.label)}</span>
             {it.hint && <span className="shrink-0 text-xs text-(--fg-tertiary)">{it.hint}</span>}
             {it.checked && <span className="shrink-0 text-(--accent)">✓</span>}
           </button>
@@ -190,6 +192,7 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
 
 // Nested flyout for `children` items, opening to the side of its parent row.
 function SubMenu({ rect, items, onClose, onEnter, onLeave }) {
+  const t = useT();
   const width = 210;
   const left = rect.right + 2 + width > window.innerWidth - 8 ? rect.left - width - 2 : rect.right + 2;
   const top = Math.max(8, Math.min(rect.top - 4, window.innerHeight - items.length * 32 - 16));
@@ -223,7 +226,7 @@ function SubMenu({ rect, items, onClose, onEnter, onLeave }) {
             )}
           >
             {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
-            <span className="min-w-0 flex-1 truncate">{it.label}</span>
+            <span className="min-w-0 flex-1 truncate">{t(it.label)}</span>
             {it.hint && <span className="shrink-0 text-xs text-(--fg-tertiary)">{it.hint}</span>}
             {it.checked && <span className="shrink-0 text-(--accent)">✓</span>}
           </button>
@@ -237,6 +240,7 @@ function SubMenu({ rect, items, onClose, onEnter, onLeave }) {
 // Dialog
 // ---------------------------------------------------------------------------
 export function Dialog({ open, title, children, onClose, width = 420 }) {
+  const t = useT();
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
@@ -253,7 +257,7 @@ export function Dialog({ open, title, children, onClose, width = 420 }) {
         className="fade-in rounded-2xl border border-(--border) bg-(--surface-raised) p-5"
         style={{ width, boxShadow: "var(--shadow-menu)" }}
       >
-        {title && <div className="mb-3 text-[15px] font-semibold">{title}</div>}
+        {title && <div className="mb-3 text-[15px] font-semibold">{t(title)}</div>}
         {children}
       </div>
     </div>,
@@ -265,6 +269,7 @@ export function Dialog({ open, title, children, onClose, width = 420 }) {
 // Toasts
 // ---------------------------------------------------------------------------
 export function Toasts() {
+  const translateText = useT();
   const toasts = useStore((s) => s.toasts);
   const dismiss = useStore((s) => s.dismissToast);
   return createPortal(
@@ -280,13 +285,13 @@ export function Toasts() {
           )}
           style={{ boxShadow: "var(--shadow-menu)" }}
         >
-          <span className="max-w-[420px] truncate">{t.message}</span>
+          <span className="max-w-[420px] truncate">{translateText(t.message)}</span>
           {t.action && (
             <button
               className="shrink-0 font-medium text-(--accent) hover:underline"
               onClick={() => { t.action.onClick?.(); dismiss(t.id); }}
             >
-              {t.action.label}
+              {translateText(t.action.label)}
             </button>
           )}
           <button className="shrink-0 opacity-50 hover:opacity-100" onClick={() => dismiss(t.id)}>
@@ -303,10 +308,17 @@ export function Toasts() {
 // Small shared bits
 // ---------------------------------------------------------------------------
 export function IconButton({ icon, title, onClick, active, danger, className, size = 15, disabled, ...buttonProps }) {
+  const t = useT();
+  const localizedButtonProps = {
+    ...buttonProps,
+    ...(buttonProps["aria-label"]
+      ? { "aria-label": t(buttonProps["aria-label"]) }
+      : {}),
+  };
   return (
     <button
-      {...buttonProps}
-      title={title}
+      {...localizedButtonProps}
+      title={t(title)}
       onClick={onClick}
       disabled={disabled}
       className={cx(

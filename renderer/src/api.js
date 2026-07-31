@@ -36,7 +36,11 @@ export const agentRuntimePermissionResponse = (permissionId, optionId) =>
   b.agentRuntimePermissionResponse(permissionId, optionId);
 export const agentRuntimeAuthStatus = () => b.agentRuntimeAuthStatus();
 export const agentRuntimeAccount = (runtime, refresh = false) => b.agentRuntimeAccount(runtime, refresh);
+export const agentRuntimeProfileLogin = (runtime) => b.agentRuntimeProfileLogin(runtime);
+export const agentRuntimeProfileLogout = (runtime) => b.agentRuntimeProfileLogout(runtime);
 export const agentRuntimeLogin = (runtime) => b.agentRuntimeLogin(runtime);
+export const agentRuntimePluginTargets = (plugin) => b.agentRuntimePluginTargets(plugin);
+export const agentRuntimePluginInstall = (runtime, plugin) => b.agentRuntimePluginInstall(runtime, plugin);
 export const rolloutActivity = (file) => b.rolloutActivity(file);
 export const captureWebview = (id) => b.captureWebview(id);
 export const saveTempFile = (dataUrl, prefix, ext) => b.saveTempFile(dataUrl, prefix, ext);

@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@app/store.js";
 import { cx } from "@app/lib/cx.js";
+import { useT } from "@app/i18n.jsx";
 import * as api from "@app/api.js";
 import { basename, formatDuration } from "@app/lib/time.js";
 import { commandActivity } from "@app/lib/commandActivity.mjs";
@@ -28,6 +29,7 @@ const OutputsPanel = React.lazy(() =>
 
 // ---------------------------------------------------------------------------
 export default function Conversation() {
+  const t = useT();
   const activeThreadId = useStore((s) => s.activeThreadId);
   const conv = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId] : null));
   const gs = useStore((s) => s.gs);
@@ -54,16 +56,18 @@ export default function Conversation() {
             {readOnly ? (
               <>
                 <IconClaude size={48} className="text-[#d97757] opacity-70" />
-                <div className="mt-5 text-center text-[20px] leading-8 font-medium">No displayable messages</div>
+                <div className="mt-5 text-center text-[20px] leading-8 font-medium">{t("No displayable messages")}</div>
                 <div className="mt-1 text-center text-[13px] text-(--fg-tertiary)">
-                  This Claude Code transcript is available as read-only history.
+                  {t("This Claude Code transcript is available as read-only history.")}
                 </div>
               </>
             ) : (
               <>
                 <CodexMark size={56} className="text-(--fg) opacity-[0.24]" />
                 <div className="mt-5 text-center text-[28px] leading-9 font-medium">
-                  What should we build in {matchProjectName(gs, threadCwdOf(conv)) || basename(threadCwdOf(conv)) || "this folder"}?
+                  {t("What should we build in {project}?", {
+                    project: matchProjectName(gs, threadCwdOf(conv)) || basename(threadCwdOf(conv)) || t("this folder"),
+                  })}
                 </div>
               </>
             )}
@@ -91,6 +95,7 @@ export function ConversationHeaderContent() {
 }
 
 function ThreadHeaderContent() {
+  const t = useT();
   const conv = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId] : null));
   const thread = useStore((s) => {
     const id = s.activeThreadId;
@@ -111,7 +116,7 @@ function ThreadHeaderContent() {
                 ? <IconKimi size={16} className="text-[#7777e8]" />
                 : <IconFolderFilled size={16} className="text-(--fg-secondary)" />}
           </button>
-          <div className="max-w-[320px] truncate text-[14px] font-medium">{thread?.name || "New chat"}</div>
+          <div className="max-w-[320px] truncate text-[14px] font-medium">{thread?.name || t("New chat")}</div>
           {(thread?.source === "claude" || thread?.source === "kimi") && (
             <span className={cx(
               "shrink-0 rounded-full px-1.5 py-0.5 text-[10px]",
@@ -320,6 +325,7 @@ function RuntimeThreadMenu({ thread }) {
 }
 
 function ThreadMenu({ thread }) {
+  const t = useT();
   const activeThreadId = useStore((s) => s.activeThreadId);
   const pinned = useStore((s) => s.pinnedThreadIds.includes(s.activeThreadId));
   const renameThread = useStore((s) => s.renameThread);
@@ -366,7 +372,7 @@ function ThreadMenu({ thread }) {
     <>
       <button
         ref={btnRef}
-        aria-label="Chat actions"
+        aria-label={t("Chat actions")}
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         data-state={menuOpen ? "open" : "closed"}
@@ -467,7 +473,7 @@ function ThreadMenu({ thread }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[14px] outline-none focus:border-(--accent)"
-            placeholder="Chat name"
+            placeholder={t("Chat name")}
           />
           <div className="mt-4 flex justify-end gap-2">
             <button
@@ -475,27 +481,27 @@ function ThreadMenu({ thread }) {
               className="rounded-lg border border-(--border) px-3 py-1.5 text-[13px] hover:bg-(--surface-hover)"
               onClick={() => setRenameOpen(false)}
             >
-              Cancel
+              {t("Cancel")}
             </button>
             <button
               type="submit"
               disabled={!name.trim()}
               className="rounded-lg bg-(--fg) px-3 py-1.5 text-[13px] font-medium text-(--surface) hover:opacity-85 disabled:opacity-40"
             >
-              Save
+              {t("Save")}
             </button>
           </div>
         </form>
       </Dialog>
 
       <Dialog open={archiveOpen} title="Archive chat?" onClose={() => setArchiveOpen(false)}>
-        <div className="text-[13px] text-(--fg-secondary)">You can find it later in your archived chats.</div>
+        <div className="text-[13px] text-(--fg-secondary)">{t("You can find it later in your archived chats.")}</div>
         <div className="mt-4 flex justify-end gap-2">
           <button
             className="rounded-lg border border-(--border) px-3 py-1.5 text-[13px] hover:bg-(--surface-hover)"
             onClick={() => setArchiveOpen(false)}
           >
-            Cancel
+            {t("Cancel")}
           </button>
           <button
             className="rounded-lg bg-(--fg) px-3 py-1.5 text-[13px] font-medium text-(--surface) hover:opacity-85"
@@ -504,7 +510,7 @@ function ThreadMenu({ thread }) {
               if (activeThreadId) archiveThread(activeThreadId);
             }}
           >
-            Archive
+            {t("Archive")}
           </button>
         </div>
       </Dialog>
@@ -522,6 +528,7 @@ function ThreadMenu({ thread }) {
 // Fork the thread into a fresh git worktree (branch name prompt), like the
 // reference client's "Continue in new worktree".
 function WorktreeDialog({ open, thread, activeThreadId, onClose }) {
+  const t = useT();
   const toast = useStore((s) => s.toast);
   const openThread = useStore((s) => s.openThread);
   const codexHome = useStore((s) => s.codexHome);
@@ -563,7 +570,7 @@ function WorktreeDialog({ open, thread, activeThreadId, onClose }) {
   return (
     <Dialog open={open} title="Continue in new worktree" onClose={onClose}>
       <div className="text-xs text-(--fg-tertiary)">
-        Creates a git worktree and a fork of this chat inside it.
+        {t("Creates a git worktree and a fork of this chat inside it.")}
       </div>
       <input
         autoFocus
@@ -574,13 +581,13 @@ function WorktreeDialog({ open, thread, activeThreadId, onClose }) {
         onKeyDown={(e) => { if (e.key === "Enter" && !busy) run(); }}
       />
       <div className="mt-4 flex justify-end gap-2">
-        <button className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={onClose}>Cancel</button>
+        <button className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={onClose}>{t("Cancel")}</button>
         <button
           className="rounded-lg bg-(--fg) px-3 py-1.5 text-[13px] font-medium text-(--surface) hover:opacity-85 disabled:opacity-50"
           disabled={busy || !branch.trim()}
           onClick={run}
         >
-          {busy ? "Creating…" : "Create worktree"}
+          {t(busy ? "Creating…" : "Create worktree")}
         </button>
       </div>
     </Dialog>
@@ -595,6 +602,7 @@ function WorktreeDialog({ open, thread, activeThreadId, onClose }) {
 // Find-in-thread bar (⌘F): query + match navigation with item highlighting.
 // ---------------------------------------------------------------------------
 function FindBar({ conv }) {
+  const t = useT();
   const setUi = useStore((s) => s.setUi);
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
@@ -642,7 +650,7 @@ function FindBar({ conv }) {
       <input
         ref={inputRef}
         className="w-44 bg-transparent px-1 text-[13px] outline-none placeholder:text-(--fg-faint)"
-        placeholder="Find in chat"
+        placeholder={t("Find in chat")}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => {
@@ -653,9 +661,9 @@ function FindBar({ conv }) {
       <span className="shrink-0 text-xs text-(--fg-tertiary)">
         {q ? `${matches.length ? Math.min(idx + 1, matches.length) : 0} / ${matches.length}` : ""}
       </span>
-      <button className="flex h-5 w-5 items-center justify-center rounded text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={() => step(-1)} title="Previous">↑</button>
-      <button className="flex h-5 w-5 items-center justify-center rounded text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={() => step(1)} title="Next">↓</button>
-      <button className="flex h-5 w-5 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-hover)" onClick={close} title="Close"><IconX size={11} /></button>
+      <button className="flex h-5 w-5 items-center justify-center rounded text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={() => step(-1)} title={t("Previous")}>↑</button>
+      <button className="flex h-5 w-5 items-center justify-center rounded text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={() => step(1)} title={t("Next")}>↓</button>
+      <button className="flex h-5 w-5 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-hover)" onClick={close} title={t("Close")}><IconX size={11} /></button>
     </div>
   );
 }
@@ -1338,6 +1346,7 @@ function WorkingRow({ conv }) {
 // Bottom area: gradient fade, plan widget, approvals, composer, footer line.
 // ---------------------------------------------------------------------------
 function BottomArea({ conv, onScrollToBottom }) {
+  const t = useT();
   const approvalsAll = useStore((s) => s.approvals);
   const activeThreadId = useStore((s) => s.activeThreadId);
   const pendingNewThread = useStore((s) => s.pendingNewThread);
@@ -1349,7 +1358,7 @@ function BottomArea({ conv, onScrollToBottom }) {
         <button
           type="button"
           aria-label="Scroll to bottom"
-          title="Scroll to bottom"
+          title={t("Scroll to bottom")}
           className="absolute -top-10 left-1/2 z-20 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-(--border) bg-(--surface-raised) text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)"
           style={{ boxShadow: "var(--shadow-menu)" }}
           onClick={onScrollToBottom}
@@ -1364,7 +1373,7 @@ function BottomArea({ conv, onScrollToBottom }) {
         ))}
         {pendingNewThread && (
           <div className="flex items-center gap-2 text-[13px] text-(--fg-tertiary)">
-            <Spinner size={13} /> Starting chat…
+            <Spinner size={13} /> {t("Starting chat…")}
           </div>
         )}
         {conv?.goal?.objective && <GoalChip goal={conv.goal} />}
@@ -1379,6 +1388,7 @@ function BottomArea({ conv, onScrollToBottom }) {
 
 // Active goal chip above the composer: objective + status, clear on ✕.
 function GoalChip({ goal }) {
+  const t = useT();
   const activeThreadId = useStore((s) => s.activeThreadId);
   const setUi = useStore((s) => s.setUi);
   const objectiveRef = useRef(null);
@@ -1412,7 +1422,7 @@ function GoalChip({ goal }) {
     >
       <div className="flex h-[34px] items-center gap-2 px-3 py-[5px] text-[14px] leading-4 font-[445]">
         <IconCmdGoal size={14} className="shrink-0 text-(--fg-tertiary) opacity-70" />
-        <span className="shrink-0">Pursuing goal</span>
+        <span className="shrink-0">{t("Pursuing goal")}</span>
         <span ref={objectiveRef} className="-ml-1 min-w-0 flex-1 truncate text-(--fg-tertiary)">
           {expanded ? null : goal.objective}
         </span>
@@ -1448,6 +1458,7 @@ function GoalChip({ goal }) {
 
 // Goal dialog: set objective + optional token budget (thread/goal/set).
 function GoalDialog({ open, goal }) {
+  const t = useT();
   const activeThreadId = useStore((s) => s.activeThreadId);
   const setUi = useStore((s) => s.setUi);
   const toast = useStore((s) => s.toast);
@@ -1475,29 +1486,29 @@ function GoalDialog({ open, goal }) {
   };
   return (
     <Dialog open={open} title="Set a goal" onClose={close}>
-      <div className="mb-2 text-xs text-(--fg-tertiary)">The assistant keeps pursuing the goal across turns until it is done or you clear it.</div>
+      <div className="mb-2 text-xs text-(--fg-tertiary)">{t("The assistant keeps pursuing the goal across turns until it is done or you clear it.")}</div>
       <textarea
         autoFocus
         rows={3}
         className="w-full resize-none rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[13px] outline-none focus:border-(--accent)"
-        placeholder="Describe your goal, define measurable outcomes for best results"
+        placeholder={t("Describe your goal, define measurable outcomes for best results")}
         value={objective}
         onChange={(e) => setObjective(e.target.value)}
       />
       <input
         className="mt-2 w-full rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[13px] outline-none focus:border-(--accent)"
-        placeholder="Token budget (optional)"
+        placeholder={t("Token budget (optional)")}
         value={budget}
         onChange={(e) => setBudget(e.target.value)}
       />
       <div className="mt-4 flex justify-end gap-2">
-        <button className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={close}>Cancel</button>
+        <button className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={close}>{t("Cancel")}</button>
         <button
           className="rounded-lg bg-(--fg) px-3 py-1.5 text-[13px] font-medium text-(--surface) hover:opacity-85 disabled:opacity-50"
           disabled={!objective.trim()}
           onClick={submit}
         >
-          Set goal
+          {t("Set goal")}
         </button>
       </div>
     </Dialog>
@@ -1527,6 +1538,7 @@ function matchProjectName(gs, cwd) {
 }
 
 function Home() {
+  const t = useT();
   const cwd = useStore((s) => s.cwd);
   const gs = useStore((s) => s.gs);
   const project = matchProjectName(gs, cwd);
@@ -1542,11 +1554,25 @@ function Home() {
   }, [cwd]);
   // reference rules: a matched project always puts its name in the heading;
   // git projects say "build in", anything else "work on"
-  const title = !project
-    ? "What should we build?"
-    : hasGit
-      ? <>What should we build in <span className="inline-block max-w-full break-words whitespace-normal underline decoration-(--fg-tertiary) decoration-dotted decoration-[1px] underline-offset-4">{project}?</span></>
-      : <>What should we work on in <span className="inline-block max-w-full break-words whitespace-normal underline decoration-(--fg-tertiary) decoration-dotted decoration-[1px] underline-offset-4">{project}?</span></>;
+  const projectMarker = "\u0000project\u0000";
+  const localizedTitle = !project
+    ? t("What should we build?")
+    : t(
+      hasGit
+        ? "What should we build in {project}?"
+        : "What should we work on in {project}?",
+      { project: projectMarker },
+    );
+  const [titleBeforeProject, titleAfterProject = ""] = localizedTitle.split(projectMarker);
+  const title = !project ? localizedTitle : (
+    <>
+      {titleBeforeProject}
+      <span className="inline-block max-w-full break-words whitespace-normal underline decoration-(--fg-tertiary) decoration-dotted decoration-[1px] underline-offset-4">
+        {project}
+      </span>
+      {titleAfterProject}
+    </>
+  );
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col overflow-y-auto">
       <div className="flex min-h-0 w-full flex-1 flex-col pt-6">
@@ -1586,6 +1612,7 @@ function HomeSuggestions() {
 // Starter suggestions, like the reference home screen. Clicking one seeds
 // the composer with a matching prompt.
 function SuggestionCards() {
+  const t = useT();
   const sendMessage = useStore((s) => s.sendMessage);
   const cards = [
     { icon: <IconTelescope />, color: "#0169cc", text: "Explore and understand code", prompt: "Explore this repository and explain how it works: architecture, key modules, and entry points." },
@@ -1607,7 +1634,7 @@ function SuggestionCards() {
             </span>
           </span>
           <span className="mt-auto flex min-h-10 w-full flex-col justify-end">
-            <span className="text-[13px] leading-5 font-medium text-(--fg)">{c.text}</span>
+            <span className="text-[13px] leading-5 font-medium text-(--fg)">{t(c.text)}</span>
           </span>
         </button>
       ))}

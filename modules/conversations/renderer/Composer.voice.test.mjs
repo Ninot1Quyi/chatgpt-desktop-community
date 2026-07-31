@@ -3,7 +3,8 @@ import fs from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 
-const source = fs.readFileSync(new URL("./Composer.jsx", import.meta.url), "utf8");
+const source = fs.readFileSync(new URL("./Composer.jsx", import.meta.url), "utf8")
+  .replace(/\r\n/g, "\n");
 const defaults = source.match(/const DEFAULT_GPT_LIVE_VOICE = "marin";\nconst SUPPORTED_GPT_LIVE_VOICES = new Set\(\[[\s\S]*?\]\);\n/);
 const getter = source.match(/function getGptLiveVoice\(\) \{[\s\S]*?\n\}/);
 

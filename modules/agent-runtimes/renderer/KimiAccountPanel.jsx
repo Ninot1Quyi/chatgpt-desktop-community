@@ -116,24 +116,72 @@ function UsageUnavailable({ error, onRefresh }) {
   );
 }
 
+function ProfileConnection({
+  error,
+  loading,
+  onConnect,
+  onDisconnect,
+  status,
+}) {
+  const connected = status === "connected";
+  return (
+    <div className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-[12px]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-medium text-(--fg-secondary)">
+            {connected ? "Kimi profile connected" : "Kimi profile"}
+          </div>
+          <div className="mt-0.5 text-[11px] text-(--fg-tertiary)">
+            {connected
+              ? "Your display name and avatar come from an isolated Kimi Web session."
+              : "Connect an isolated Kimi Web session to show your display name and avatar."}
+          </div>
+        </div>
+        <button
+          type="button"
+          className="shrink-0 rounded-full border border-(--border) px-2.5 py-1 text-[11px] text-(--fg-secondary) hover:bg-(--surface-hover) disabled:opacity-50"
+          disabled={loading}
+          onClick={connected ? onDisconnect : onConnect}
+        >
+          {loading ? "Working…" : connected ? "Disconnect" : "Connect profile"}
+        </button>
+      </div>
+      {!connected && error && (
+        <div className="mt-2 break-words text-[11px] text-(--danger)">
+          Profile unavailable: {error}
+        </div>
+      )}
+      <div className="mt-2 text-[10px] text-(--fg-faint)">
+        Kimi Code credentials and quota access remain separate.
+      </div>
+    </div>
+  );
+}
+
 export function KimiAccountPanel({
   account,
   credentialLabel = "OAuth credentials",
   error,
-  fallbackAvatar,
   fallbackIcon,
   loading,
+  onProfileConnect,
+  onProfileDisconnect,
   onRefresh,
+  profileLoading,
 }) {
   const profile = account?.profile;
-  const rows = [account?.usage?.summary, ...(account?.usage?.limits || [])].filter(Boolean);
-  const parallel = account?.usage?.parallel;
-  const totalQuota = quotaDetails(account?.usage?.totalQuota);
-  const wallet = account?.usage?.boosterWallet;
+  const profileStatus = account?.profileStatus || "not_connected";
+  const profileError = account?.errors?.profile;
+  const usage = account?.usage;
+  const usageError = account?.errors?.usage || error;
+  const rows = [usage?.summary, ...(usage?.limits || [])].filter(Boolean);
+  const parallel = usage?.parallel;
+  const totalQuota = quotaDetails(usage?.totalQuota);
+  const wallet = usage?.boosterWallet;
   const balanceRemaining = wallet?.balance?.remainingCents;
   const balanceTotal = wallet?.balance?.totalCents;
   const plan = prettyValue(profile?.membershipLevel);
-  const avatar = fallbackAvatar || profile?.avatar;
+  const avatar = profile?.avatar;
   const accountLine = profile?.usernameSource === "service"
     ? [plan, prettyValue(profile?.region)].filter(Boolean).join(" · ") || "Kimi Code"
     : profile?.id
@@ -157,10 +205,20 @@ export function KimiAccountPanel({
         {plan && <span className="ml-auto shrink-0 text-[14px] font-medium">{plan}</span>}
       </div>
 
-      {loading && !account && (
+      {(!loading || account) && (
+        <ProfileConnection
+          error={profileError}
+          loading={profileLoading}
+          onConnect={onProfileConnect}
+          onDisconnect={onProfileDisconnect}
+          status={profileStatus}
+        />
+      )}
+
+      {loading && !usage && (
         <div className="flex justify-center py-3 text-(--fg-tertiary)"><Spinner /></div>
       )}
-      {!loading && !account && <UsageUnavailable error={error} onRefresh={onRefresh} />}
+      {!loading && !usage && <UsageUnavailable error={usageError} onRefresh={onRefresh} />}
 
       {(rows.length > 0 || parallel || totalQuota.length > 0 || wallet) && (
         <div className="flex flex-col gap-3 rounded-2xl border border-(--border-light) bg-(--surface-under) px-3.5 py-3 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset]">

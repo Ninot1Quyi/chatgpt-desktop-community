@@ -84,7 +84,8 @@ export class DiagnosticsBoundary extends React.Component {
           <h1 className="text-lg font-semibold">ChatGPT Desktop Community could not render</h1>
           <p className="mt-2 text-sm text-(--fg-tertiary)">
             The error was written to the diagnostic log. Open the logs folder and
-            send <span className="font-mono">main.log</span> when reporting this problem.
+            send the latest <span className="font-mono">main-YYYY-MM-DD.log</span> file
+            when reporting this problem.
           </p>
           <div className="mt-5 flex justify-center gap-2">
             <button
