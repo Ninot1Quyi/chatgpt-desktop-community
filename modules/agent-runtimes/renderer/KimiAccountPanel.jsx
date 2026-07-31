@@ -81,7 +81,7 @@ function UsageBar({ row }) {
         <span>{row.label}</span>
         <span className="text-(--fg-tertiary)">
           {reset && <>Resets {reset} · </>}
-          {formatQuotaNumber(row.remaining)} / {formatQuotaNumber(row.limit)} left
+          {pct}% left
         </span>
       </div>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-(--surface-active)">
@@ -92,6 +92,10 @@ function UsageBar({ row }) {
       </div>
     </div>
   );
+}
+
+function Divider() {
+  return <div className="h-px bg-(--border-light)" />;
 }
 
 function DetailRow({ label, value }) {
@@ -174,10 +178,10 @@ export function KimiAccountPanel({
   const parallel = usage?.parallel;
   const totalQuota = quotaDetails(usage?.totalQuota);
   const wallet = usage?.boosterWallet;
-  const metadata = usage?.metadata;
   const balanceRemaining = wallet?.balance?.remainingCents;
   const balanceTotal = wallet?.balance?.totalCents;
   const plan = prettyValue(profile?.membershipLevel);
+  const avatar = profile?.avatar;
   const accountLine = profile?.usernameSource === "service"
     ? [plan, prettyValue(profile?.region)].filter(Boolean).join(" · ") || "Kimi Code"
     : profile?.id
@@ -187,8 +191,8 @@ export function KimiAccountPanel({
   return (
     <div className="flex max-h-[calc(100vh-190px)] flex-col gap-3 overflow-y-auto pr-1">
       <div className="flex items-center gap-3">
-        {profile?.avatar ? (
-          <img src={profile.avatar} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
+        {avatar ? (
+          <img src={avatar} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
         ) : (
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--border-light) bg-(--surface-under)">
             {fallbackIcon}
@@ -216,66 +220,72 @@ export function KimiAccountPanel({
       )}
       {!loading && !usage && <UsageUnavailable error={usageError} onRefresh={onRefresh} />}
 
-      {rows.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5">
-          {rows.map((row, index) => <UsageBar key={`${row.label}-${index}`} row={row} />)}
-        </div>
-      )}
-
-      {(parallel || totalQuota.length > 0) && (
-        <div className="flex flex-col gap-1.5 rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5">
-          <div className="mb-0.5 text-[11px] font-medium text-(--fg-secondary)">Additional quotas</div>
-          {parallel && (
-            <DetailRow
-              label="Parallel requests"
-              value={[
-                parallel.used != null ? `${formatQuotaNumber(parallel.used)} used` : null,
-                parallel.remaining != null ? `${formatQuotaNumber(parallel.remaining)} left` : null,
-                parallel.limit != null ? `${formatQuotaNumber(parallel.limit)} limit` : null,
-              ].filter(Boolean).join(" · ") || "—"}
-            />
-          )}
-          {totalQuota.map(([label, value], index) => (
-            <DetailRow key={`${label}-${index}`} label={`Total quota · ${label}`} value={value} />
-          ))}
-        </div>
-      )}
-
-      {wallet && (
-        <div className="flex flex-col gap-1.5 rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5">
-          <div className="mb-0.5 flex items-center justify-between text-[11px] font-medium text-(--fg-secondary)">
-            <span>Extra Usage</span>
-            <span>{prettyValue(wallet.status) || "Available"}</span>
+      {(rows.length > 0 || parallel || totalQuota.length > 0 || wallet) && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-(--border-light) bg-(--surface-under) px-3.5 py-3 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset]">
+          <div className="flex items-center justify-between text-[12px] font-medium text-(--fg-secondary)">
+            <span>Usage</span>
+            {plan && <span className="text-(--fg-tertiary)">{plan}</span>}
           </div>
-          {(balanceRemaining != null || balanceTotal != null) && (
-            <DetailRow
-              label="Booster balance"
-              value={[
-                balanceRemaining != null ? `${formatMoney({ cents: balanceRemaining, currency: wallet.balance?.currency })} left` : null,
-                balanceTotal != null ? `${formatMoney({ cents: balanceTotal, currency: wallet.balance?.currency })} total` : null,
-              ].filter(Boolean).join(" · ")}
-            />
+          {rows.length > 0 && (
+            <div className="flex flex-col gap-3">
+              {rows.map((row, index) => <UsageBar key={`${row.label}-${index}`} row={row} />)}
+            </div>
           )}
-          <DetailRow label="Monthly used" value={formatMoney(wallet.monthlyUsed)} />
-          <DetailRow
-            label="Monthly charge limit"
-            value={wallet.monthlyChargeLimitEnabled ? formatMoney(wallet.monthlyChargeLimit) : "Disabled"}
-          />
-          <DetailRow label="Top-up limit" value={formatMoney(wallet.topupLimit)} />
-          <DetailRow label="Auto-refill charge" value={formatMoney(wallet.autoRefillCharge)} />
-          <DetailRow label="Auto-refill threshold" value={formatMoney(wallet.autoRefillThreshold)} />
-          <DetailRow label="Top-up allowed" value={wallet.allowTopup == null ? "—" : wallet.allowTopup ? "Yes" : "No"} />
+
+          {(parallel || totalQuota.length > 0) && (
+            <>
+              {rows.length > 0 && <Divider />}
+              <div className="flex flex-col gap-1.5">
+                <div className="text-[11px] font-medium text-(--fg-secondary)">Additional quotas</div>
+                {parallel && (
+                  <DetailRow
+                    label="Parallel requests"
+                    value={[
+                      parallel.used != null ? `${formatQuotaNumber(parallel.used)} used` : null,
+                      parallel.remaining != null ? `${formatQuotaNumber(parallel.remaining)} left` : null,
+                      parallel.limit != null ? `${formatQuotaNumber(parallel.limit)} limit` : null,
+                    ].filter(Boolean).join(" · ") || "—"}
+                  />
+                )}
+                {totalQuota.map(([label, value], index) => (
+                  <DetailRow key={`${label}-${index}`} label={`Total quota · ${label}`} value={value} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {wallet && (
+            <>
+              {(rows.length > 0 || parallel || totalQuota.length > 0) && <Divider />}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-[11px] font-medium text-(--fg-secondary)">
+                  <span>Extra Usage</span>
+                  <span className="text-(--fg-tertiary)">{prettyValue(wallet.status) || "Available"}</span>
+                </div>
+                {(balanceRemaining != null || balanceTotal != null) && (
+                  <DetailRow
+                    label="Booster balance"
+                    value={[
+                      balanceRemaining != null ? `${formatMoney({ cents: balanceRemaining, currency: wallet.balance?.currency })} left` : null,
+                      balanceTotal != null ? `${formatMoney({ cents: balanceTotal, currency: wallet.balance?.currency })} total` : null,
+                    ].filter(Boolean).join(" · ")}
+                  />
+                )}
+                <DetailRow label="Monthly used" value={formatMoney(wallet.monthlyUsed)} />
+                <DetailRow
+                  label="Monthly charge limit"
+                  value={wallet.monthlyChargeLimitEnabled ? formatMoney(wallet.monthlyChargeLimit) : "Disabled"}
+                />
+                <DetailRow label="Top-up limit" value={formatMoney(wallet.topupLimit)} />
+                <DetailRow label="Auto-refill charge" value={formatMoney(wallet.autoRefillCharge)} />
+                <DetailRow label="Auto-refill threshold" value={formatMoney(wallet.autoRefillThreshold)} />
+                <DetailRow label="Top-up allowed" value={wallet.allowTopup == null ? "—" : wallet.allowTopup ? "Yes" : "No"} />
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {(metadata?.subType || metadata?.domain || metadata?.authenticationScope) && (
-        <div className="flex flex-wrap gap-x-2 text-[10px] text-(--fg-faint)">
-          {[metadata.subType, metadata.domain, metadata.authenticationMethod, metadata.authenticationScope]
-            .map(prettyValue)
-            .filter(Boolean)
-            .map((value) => <span key={value}>{value}</span>)}
-        </div>
-      )}
       {account && (
         <button
           className="flex items-center justify-center gap-1.5 self-end rounded-full border border-(--border) px-2.5 py-1 text-[11px] text-(--fg-secondary) hover:bg-(--surface-hover) disabled:opacity-50"

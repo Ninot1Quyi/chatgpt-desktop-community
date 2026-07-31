@@ -7,6 +7,7 @@ import { IconButton, Menu } from "@app/components/ui.jsx";
 import {
   IconChevronDown,
   IconGear,
+  IconRefresh,
   IconPlus,
   IconX,
   LucideIcon,
@@ -177,6 +178,33 @@ export function NavHeaderActions({ view }) {
       icon: `${home}/.codex/skills/.system/${name}/assets/${name}-small.svg`,
     }]);
   };
+
+  const createSite = () => {
+    useStore.getState().newChatWithPrefill(
+      "Create a website that …",
+      [{ kind: "site", name: "Sites", displayName: "Sites" }],
+    );
+  };
+
+  if (view === "sites") {
+    return (
+      <div className="app-no-drag flex items-center gap-2">
+        <IconButton
+          icon={<IconRefresh />}
+          title="Refresh sites"
+          className="!rounded-[12.5px] !text-(--fg-tertiary)"
+          onClick={() => window.dispatchEvent(new CustomEvent("sites:reload"))}
+        />
+        <button
+          type="button"
+          className="flex h-7 items-center rounded-[12.5px] border border-(--border) bg-(--fg) px-2 text-[14px] leading-[18px] text-(--surface) hover:opacity-80"
+          onClick={createSite}
+        >
+          Create
+        </button>
+      </div>
+    );
+  }
 
   if (view === "plugins") {
     return (

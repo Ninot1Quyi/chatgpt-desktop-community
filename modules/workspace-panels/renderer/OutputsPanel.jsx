@@ -12,6 +12,7 @@ import {
 import { FileIcon } from "./panel/FileIcon.jsx";
 import { TAB_KINDS } from "./RightPanel.jsx";
 import { openFileInPanel, usePanelStore } from "./state.js";
+import { agentStatusLabel, summarizeAgentsFromConversation } from "./outputs-agents.mjs";
 
 const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"];
 
@@ -21,6 +22,7 @@ export default function OutputsPanel() {
   const git = useGitInfo(cwd, conv);
   const procs = useBackgroundTerminals(conv?.thread?.id);
   const { outputs, sources, agents } = useConversationItems(conv);
+  const [agentsOpen, setAgentsOpen] = useState(false);
 
   return (
     <div
@@ -89,8 +91,18 @@ export default function OutputsPanel() {
                   <span className="text-(--fg-tertiary)">{agents.done} done</span>
                 </span>
               }
-              trailing={<LucideIcon name="ChevronDown" size={12} className="text-(--fg-tertiary)" />}
+              trailing={
+                <LucideIcon
+                  name="ChevronDown"
+                  size={12}
+                  className={`text-(--fg-tertiary) transition-transform ${agentsOpen ? "rotate-180" : ""}`}
+                />
+              }
+              title={agentsOpen ? "Hide subagent details" : "Show subagent details"}
+              ariaExpanded={agentsOpen}
+              onClick={() => setAgentsOpen((open) => !open)}
             />
+            {agentsOpen && <SubagentsDetails agents={agents.list} />}
           </>
         )}
 
@@ -155,18 +167,45 @@ function SectionHeader({ title, plus, onPlus }) {
   );
 }
 
-function Row({ icon, label, trailing, title, onClick }) {
+function Row({ icon, label, trailing, title, onClick, ariaExpanded }) {
   const Tag = onClick ? "button" : "div";
   return (
     <Tag
       title={typeof label === "string" ? title || label : title}
       onClick={onClick}
+      aria-expanded={ariaExpanded}
       className={`flex h-[30px] w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-(--fg) ${onClick ? "hover:bg-(--surface-hover)" : ""}`}
     >
       <span className="flex h-4 w-4 shrink-0 items-center justify-center text-(--fg-tertiary)">{icon}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {trailing}
     </Tag>
+  );
+}
+
+function SubagentsDetails({ agents }) {
+  return (
+    <div className="mb-1 ml-6 flex flex-col border-l border-(--border-light) pl-2">
+      {agents.map((agent) => (
+        <div
+          key={agent.id}
+          className="flex min-h-[28px] items-center gap-2 rounded-md px-2 text-[12px] text-(--fg-secondary)"
+          title={[agent.agentThreadId, agent.message].filter(Boolean).join(" · ")}
+        >
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+              agentStatusLabel(agent.status) === "working"
+                ? "bg-(--accent)"
+                : agentStatusLabel(agent.status) === "failed"
+                  ? "bg-(--danger)"
+                  : "bg-(--fg-faint)"
+            }`}
+          />
+          <span className="min-w-0 flex-1 truncate">{agent.name}</span>
+          <span className="shrink-0 text-(--fg-tertiary)">{agentStatusLabel(agent.status)}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -352,8 +391,7 @@ function useConversationItems(conv) {
   return useMemo(() => {
     const outs = new Map();
     const srcs = new Map();
-    let working = 0, done = 0;
-    const activeTurnId = conv?.activeTurnId || null;
+    const agents = summarizeAgentsFromConversation(conv);
     const pushFile = (map, p, kind) => {
       if (!p || typeof p !== "string") return;
       const full = p.startsWith("/") ? p : conv?.thread?.cwd ? `${conv.thread.cwd.replace(/\/+$/, "")}/${p}` : p;
@@ -368,7 +406,6 @@ function useConversationItems(conv) {
       srcs.set(u, { name: name.slice(0, 60), full: u, url: true });
     };
     for (const turn of conv?.turns || []) {
-      const turnActive = activeTurnId && turn.id === activeTurnId;
       for (const item of turn.items || []) {
         if (item.type === "fileChange") {
           for (const c of item.changes || item.files || []) pushFile(outs, c.path || c.file || c.filename, "edited");
@@ -383,9 +420,6 @@ function useConversationItems(conv) {
               if (!srcs.has(key)) srcs.set(key, { name: c.name || c.skillName, full: key, icon: "sparkle" });
             }
           }
-        } else if (item.type === "subAgentActivity") {
-          if (turnActive && (item.kind === "started" || item.kind === "interacted")) working += 1;
-          else done += 1;
         } else if (item.type === "webSearch") {
           if (item.action?.url) pushUrl(item.action.url);
           if (!srcs.has("web:search")) srcs.set("web:search", { name: "Web search", full: "web:search", icon: "globe" });
@@ -399,7 +433,7 @@ function useConversationItems(conv) {
     return {
       outputs: [...outs.values()],
       sources: [...srcs.values()],
-      agents: { working, done, total: working + done },
+      agents,
     };
   }, [conv?.turns, conv?.thread?.cwd, conv?.activeTurnId]);
 }

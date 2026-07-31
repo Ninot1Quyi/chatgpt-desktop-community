@@ -1,6 +1,7 @@
 import React from "react";
 import { useStore } from "@app/store.js";
 import { cx } from "@app/lib/cx.js";
+import * as api from "@app/api.js";
 import {
   Conversation,
   ConversationHeaderContent,
@@ -14,6 +15,8 @@ import {
 } from "../../shared/lazy-panels.jsx";
 import { IconButton } from "@app/components/ui.jsx";
 import {
+  IconHeaderBack,
+  IconHeaderForward,
   IconHeaderSidebar,
   LucideIcon,
 } from "@app/components/icons.jsx";
@@ -30,6 +33,7 @@ import "./styles.css";
 
 export default function DesktopShell({ overlays }) {
   const ui = useStore((state) => state.ui);
+  const rightVisible = ui.navView === "chats" && ui.rightOpen;
   return (
     <div className="app-shell-root desktop-shell-macos relative h-full w-full overflow-hidden">
       <div className="flex h-full w-full">
@@ -37,7 +41,7 @@ export default function DesktopShell({ overlays }) {
         <div
           className={cx(
             "flex min-w-0 flex-1 flex-col bg-(--surface) pt-[46px]",
-            ui.rightOpen && ui.rightExpanded && "hidden",
+            rightVisible && ui.rightExpanded && "hidden",
           )}
         >
           {ui.navView === "chats" ? <Conversation /> : <NavViews />}
@@ -47,12 +51,12 @@ export default function DesktopShell({ overlays }) {
             </div>
           )}
         </div>
-        {ui.rightOpen && (
+        {rightVisible && (
           <>
             {!ui.rightExpanded && <RightPanelDragHandle />}
             <div
               className={cx(
-                "slide-in-right shrink-0 border-l border-(--border-light)",
+                "pointer-events-none slide-in-right shrink-0 border-l border-(--border)",
                 ui.rightExpanded && "min-w-0 flex-1",
               )}
               style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
@@ -93,16 +97,18 @@ function NavigationButtons() {
   return (
     <>
       <IconButton
-        icon={<LucideIcon name="ChevronLeft" size={16} />}
+        icon={<IconHeaderBack />}
         size={16}
         title="Back"
+        className="!rounded-[12.5px] !text-(--fg-tertiary)"
         disabled={!navBack.length}
         onClick={goBack}
       />
       <IconButton
-        icon={<LucideIcon name="ChevronRight" size={16} />}
+        icon={<IconHeaderForward />}
         size={16}
         title="Forward"
+        className="!rounded-[12.5px] !text-(--fg-tertiary)"
         disabled={!navForward.length}
         onClick={goForward}
       />
@@ -113,8 +119,12 @@ function NavigationButtons() {
 function MacHeader() {
   const ui = useStore((state) => state.ui);
   const setUi = useStore((state) => state.setUi);
+  const dragHandlers = useMacWindowDrag();
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pl-[88px]">
+    <div
+      className="mac-window-drag-surface app-no-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pr-3 pl-[88px]"
+      {...dragHandlers}
+    >
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
@@ -137,7 +147,7 @@ function MacHeader() {
               <div className="w-2 shrink-0" />
               <div
                 className={cx(
-                  "flex h-full shrink-0 items-center",
+                  "app-drag flex h-full shrink-0 items-center",
                   ui.rightExpanded && "min-w-0 flex-1",
                 )}
                 style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
@@ -172,8 +182,12 @@ function MacHeader() {
 
 function MacPeekHeader() {
   const setUi = useStore((state) => state.setUi);
+  const dragHandlers = useMacWindowDrag();
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-[84px]">
+    <div
+      className="mac-window-drag-surface app-no-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-[84px]"
+      {...dragHandlers}
+    >
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
@@ -183,4 +197,38 @@ function MacPeekHeader() {
       <NavigationButtons />
     </div>
   );
+}
+
+function useMacWindowDrag() {
+  const pointerId = React.useRef(null);
+
+  const finishDrag = React.useCallback((event) => {
+    if (pointerId.current !== event.pointerId) return;
+    pointerId.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    api.windowDragEnd();
+  }, []);
+
+  return {
+    onPointerDown: (event) => {
+      if (
+        event.button !== 0
+        || event.target.closest?.(
+          "button, a, input, textarea, select, [role='button'], [contenteditable='true'], [draggable='true']",
+        )
+      ) {
+        return;
+      }
+      pointerId.current = event.pointerId;
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+      api.windowDragBegin(event.screenX, event.screenY);
+    },
+    onPointerMove: (event) => {
+      if (pointerId.current !== event.pointerId || !(event.buttons & 1)) return;
+      api.windowDragMove(event.screenX, event.screenY);
+    },
+    onPointerUp: finishDrag,
+    onPointerCancel: finishDrag,
+  };
 }

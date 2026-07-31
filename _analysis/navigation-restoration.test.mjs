@@ -28,8 +28,9 @@ test("Sites view uses the Sites plugin when available and can create a Sites cha
 test("project and thread drag write the official shared global-state keys", () => {
   const sidebar = read("modules/projects-navigation/renderer/Sidebar.jsx");
   const state = read("modules/projects-navigation/renderer/state.js");
-  assert.match(sidebar, /application\/x-chatgpt-project-id/);
-  assert.match(sidebar, /application\/x-chatgpt-thread-id/);
+  assert.match(sidebar, /application\/x-chatgpt-desktop-sidebar/);
+  assert.match(sidebar, /type: "project", projectId: project\.id/);
+  assert.match(sidebar, /type: "thread", threadId: thread\.id/);
   assert.match(sidebar, /gsPatch\(patch\)/);
   assert.match(state, /export function createProjectOrderPatch/);
   assert.match(state, /"project-order"/);

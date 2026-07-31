@@ -1,15 +1,77 @@
 // Voice: dictation prefs, dictionary and history. Persisted under `voice.*`.
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, Row, Toggle, Dropdown, Segmented, lsGet, lsSet } from "./shared.jsx";
 import { IconX } from "@app/components/icons.jsx";
+import * as api from "@app/api.js";
+
+const FALLBACK_GPT_LIVE_VOICES = [
+  { id: "alloy", label: "Alloy" },
+  { id: "ash", label: "Ash" },
+  { id: "ballad", label: "Ballad" },
+  { id: "coral", label: "Coral" },
+  { id: "echo", label: "Echo" },
+  { id: "marin", label: "Marin" },
+  { id: "sage", label: "Sage" },
+  { id: "shimmer", label: "Shimmer" },
+  { id: "verse", label: "Verse" },
+];
+
+function voiceOption(id) {
+  return {
+    id,
+    label: String(id).charAt(0).toUpperCase() + String(id).slice(1),
+  };
+}
 
 export default function VoiceSection() {
   const [mic, setMic] = useState(() => lsGet("voice.microphone", "default"));
+  const [mics, setMics] = useState([{ id: "default", label: "System default" }]);
   const [hold, setHold] = useState(() => lsGet("voice.holdToDictate", "off"));
   const [bar, setBar] = useState(() => lsGet("voice.keepBarVisible", false));
+  const [liveVoice, setLiveVoice] = useState(() => lsGet("voice.gptLive.voice", "marin"));
+  const [liveVoices, setLiveVoices] = useState(FALLBACK_GPT_LIVE_VOICES);
   const [dictionary, setDictionary] = useState(() => lsGet("voice.dictionary", []));
   const [draft, setDraft] = useState("");
   const [history] = useState(() => lsGet("voice.history", []));
+
+  useEffect(() => {
+    let live = true;
+    navigator.mediaDevices?.enumerateDevices?.()
+      .then((devices) => {
+        if (!live) return;
+        const inputs = devices
+          .filter((device) => device.kind === "audioinput")
+          .map((device, index) => ({
+            id: device.deviceId,
+            label: device.label || `Microphone ${index + 1}`,
+          }))
+          .filter((device) => device.id);
+        setMics([{ id: "default", label: "System default" }, ...inputs]);
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    api.rpc("thread/realtime/listVoices", {})
+      .then((response) => {
+        if (!live) return;
+        const voices = response?.voices?.v2?.length
+          ? response.voices.v2
+          : response?.voices?.v1;
+        if (Array.isArray(voices) && voices.length) {
+          setLiveVoices(voices.map(voiceOption));
+          const defaults = [response?.voices?.defaultV2, response?.voices?.defaultV1].filter(Boolean);
+          if (!voices.includes(liveVoice) && defaults.length) {
+            setLiveVoice(defaults[0]);
+            lsSet("voice.gptLive.voice", defaults[0]);
+          }
+        }
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [liveVoice]);
 
   const addEntry = () => {
     const word = draft.trim();
@@ -26,7 +88,7 @@ export default function VoiceSection() {
         <Row title="Microphone" desc="Used for dictation">
           <Dropdown
             value={mic}
-            options={[{ id: "default", label: "System default" }]}
+            options={mics}
             onChange={(v) => {
               setMic(v);
               lsSet("voice.microphone", v);
@@ -57,6 +119,19 @@ export default function VoiceSection() {
             onChange={(v) => {
               setBar(v);
               lsSet("voice.keepBarVisible", v);
+            }}
+          />
+        </Row>
+      </Card>
+
+      <Card title="GPT Live">
+        <Row title="Response voice" desc="Saved preference for realtime audio sessions">
+          <Dropdown
+            value={liveVoice}
+            options={liveVoices}
+            onChange={(v) => {
+              setLiveVoice(v);
+              lsSet("voice.gptLive.voice", v);
             }}
           />
         </Row>

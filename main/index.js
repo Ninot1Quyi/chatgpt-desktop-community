@@ -251,7 +251,7 @@ class AppServerBridge {
     const id = `${method}:${crypto.randomUUID()}`;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject, method });
-      if (!this.sendRaw({ id, method, params: params ?? {} })) {
+      if (!this.sendRaw(requestPayload(id, method, params, arguments.length >= 2))) {
         this.pending.delete(id);
         reject(new Error("app-server stdin not writable"));
       }
@@ -261,7 +261,7 @@ class AppServerBridge {
   // Renderer answering a server-initiated request (approvals etc).
   respond(id, result, error) {
     if (error) this.sendRaw({ id, error: { code: -32000, message: String(error) } });
-    else this.sendRaw({ id, result: result ?? {} });
+    else this.sendRaw(responsePayload(id, result, arguments.length >= 2));
   }
 
   onStdout(chunk) {
@@ -292,14 +292,14 @@ class AppServerBridge {
     if (hasId && msg.method) {
       // Server-initiated request → forward to renderer(s); first answer wins.
       this.serverRequests.set(msg.id, msg.method);
-      this.broadcast("rpc:server-request", { id: msg.id, method: msg.method, params: msg.params ?? {} });
+      this.broadcast("rpc:server-request", notificationPayload({ id: msg.id, method: msg.method }, msg));
       return;
     }
     if (msg.method) {
       if (msg.method === "account/rateLimits/updated" || msg.method === "account/updated") {
         invalidateCodexRateLimits();
       }
-      this.broadcast("rpc:notification", { method: msg.method, params: msg.params ?? {} });
+      this.broadcast("rpc:notification", notificationPayload({ method: msg.method }, msg));
     }
   }
 
@@ -336,6 +336,23 @@ class AppServerBridge {
   }
 }
 
+function requestPayload(id, method, params, hasParams) {
+  const payload = { id, method };
+  if (hasParams) payload.params = params;
+  return payload;
+}
+
+function responsePayload(id, result, hasResult) {
+  const payload = { id };
+  if (hasResult) payload.result = result;
+  return payload;
+}
+
+function notificationPayload(base, msg) {
+  if (Object.prototype.hasOwnProperty.call(msg, "params")) return { ...base, params: msg.params };
+  return base;
+}
+
 const bridge = new AppServerBridge();
 // The upstream read may take several seconds behind a proxy. Rate-limit and
 // account notifications invalidate this cache immediately, so a longer window
@@ -361,7 +378,7 @@ function readCodexRateLimits() {
 
   const generation = codexRateLimitsGeneration;
   const request = bridge
-    .request("account/rateLimits/read", {})
+    .request("account/rateLimits/read", null)
     .then((result) => {
       if (generation === codexRateLimitsGeneration) {
         codexRateLimitsCache = result;

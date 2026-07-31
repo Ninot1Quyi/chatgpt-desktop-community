@@ -7,7 +7,62 @@ import { useT } from "../i18n.jsx";
 import { IconX } from "./icons.jsx";
 
 export function ActivityDisclosure({ open, children }) {
-  return open ? <div>{children}</div> : null;
+  const ref = useRef(null);
+  const frame = useRef(null);
+  const timer = useRef(null);
+  const [rendered, setRendered] = useState(open);
+
+  useEffect(() => {
+    if (open) setRendered(true);
+  }, [open]);
+
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!rendered || !element) return undefined;
+
+    cancelAnimationFrame(frame.current);
+    clearTimeout(timer.current);
+
+    const duration = 300;
+    const easing = "cubic-bezier(0.19, 1, 0.22, 1)";
+    element.style.transition = `height ${duration}ms ${easing}, opacity ${duration}ms ${easing}`;
+    element.style.overflow = "hidden";
+    element.style.pointerEvents = open ? "auto" : "none";
+
+    if (open) {
+      element.style.height = "0px";
+      element.style.opacity = "0";
+      frame.current = requestAnimationFrame(() => {
+        element.style.height = `${element.scrollHeight}px`;
+        element.style.opacity = "1";
+      });
+      timer.current = setTimeout(() => {
+        if (!ref.current) return;
+        ref.current.style.height = "auto";
+        ref.current.style.overflow = "visible";
+      }, duration);
+    } else {
+      element.style.height = `${element.getBoundingClientRect().height}px`;
+      element.style.opacity = "1";
+      frame.current = requestAnimationFrame(() => {
+        element.style.height = "0px";
+        element.style.opacity = "0";
+      });
+      timer.current = setTimeout(() => setRendered(false), duration);
+    }
+
+    return () => {
+      cancelAnimationFrame(frame.current);
+      clearTimeout(timer.current);
+    };
+  }, [open, rendered]);
+
+  if (!rendered) return null;
+  return (
+    <div ref={ref} aria-hidden={!open}>
+      {children}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -34,7 +89,7 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
       items.reduce((height, item) => {
         if (item.sep) return height + 9;
         if (item.header) return height + 31;
-        return height + 28.57;
+        return height + (item.tall ? 56 : 28.57);
       }, 8),
     );
     if (top + estH > window.innerHeight - 8) top = Math.max(8, r.top - estH - 1);
@@ -97,13 +152,14 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
             onMouseEnter={(e) => openSub(it, e)}
             onMouseLeave={closeSubSoon}
             className={cx(
-              "flex h-[28.57px] w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
+              "flex w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
+              it.tall ? "min-h-14 py-2" : "h-[28.57px]",
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
-          >
-            {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
-            <span className="min-w-0 flex-1 truncate">{t(it.label)}</span>
+            >
+              {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
+            <span className={cx("min-w-0 flex-1", !it.tall && "truncate")}>{t(it.label)}</span>
           </button>
         ) : (
           <button
@@ -113,13 +169,14 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
             onClick={() => { it.onSelect?.(); if (!it.keepOpen) onClose(); }}
             onMouseEnter={closeSubSoon}
             className={cx(
-              "flex h-[28.57px] w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
+              "flex w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
+              it.tall ? "min-h-14 py-2" : "h-[28.57px]",
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
-          >
-            {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
-            <span className="min-w-0 flex-1 truncate">{t(it.label)}</span>
+            >
+              {it.icon && <span className="shrink-0 opacity-80">{it.icon}</span>}
+            <span className={cx("min-w-0 flex-1", !it.tall && "truncate")}>{t(it.label)}</span>
             {it.hint && <span className="shrink-0 text-xs text-(--fg-tertiary)">{it.hint}</span>}
             {it.checked && <span className="shrink-0 text-(--accent)">✓</span>}
           </button>

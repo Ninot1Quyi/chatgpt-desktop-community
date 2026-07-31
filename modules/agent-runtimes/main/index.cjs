@@ -2,7 +2,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFile, spawn } = require("node:child_process");
 const crypto = require("node:crypto");
-const { getKimiConfigDir, readIndex } = require("./kimi-history.cjs");
+const { getKimiConfigDir } = require("./kimi-history.cjs");
+const { runKimiAcp } = require("./kimi-acp.cjs");
 const { fetchKimiAccount } = require("./kimi-account.cjs");
 const { parseKimiOAuthProfile } = require("./kimi-profile.cjs");
 const { parseKimiUsagePayload } = require("./kimi-usage.cjs");
@@ -184,26 +185,13 @@ function claudePermissionArgs(permission, planMode) {
   return ["--permission-mode", mode];
 }
 
-function kimiPromptArgs(request, sessionId) {
-  if (request.planMode) {
-    throw new Error("Kimi Code prompt mode does not support plan mode");
-  }
-  // Kimi's non-interactive prompt mode rejects --auto, --yolo, and --plan.
-  // It creates/resumes the session with auto permission internally.
-  return [
-    ...(sessionId ? ["-S", sessionId] : []),
-    "-m", request.model,
-    "-p", request.prompt,
-    "--output-format", "stream-json",
-  ];
-}
-
 async function runExternalAgent(request, {
   homePath,
-  kimiConfigDir,
   env = process.env,
   host,
   onSpawn,
+  onUpdate,
+  onPermissionRequest,
 } = {}) {
   const implementation = requireHost(host);
   const catalog = await getRuntimeCatalog({ homePath, env, host: implementation });
@@ -231,16 +219,15 @@ async function runExternalAgent(request, {
     await waitForChild(child, { stdin: request.prompt });
   } else {
     const binary = implementation.resolveKimiBinary(homePath, env);
-    const before = new Set((await readIndex(kimiConfigDir)).map((entry) => entry.sessionId));
-    const args = kimiPromptArgs(request, sessionId);
-    child = spawnUtf8(binary, args, { cwd });
-    onSpawn?.(child);
-    await waitForChild(child);
-    if (!sessionId) {
-      const after = await readIndex(kimiConfigDir);
-      const created = after.filter((entry) => !before.has(entry.sessionId));
-      sessionId = (created.at(-1) || after.filter((entry) => path.resolve(entry.workDir || "") === path.resolve(cwd)).at(-1))?.sessionId;
-    }
+    const result = await runKimiAcp(request, {
+      binary,
+      cwd,
+      env,
+      onSpawn,
+      onUpdate,
+      onPermissionRequest,
+    });
+    sessionId = result.sessionId;
     if (!sessionId) throw new Error("Kimi Code completed but its session ID could not be identified");
   }
   return { runtime, sessionId };
@@ -358,7 +345,6 @@ module.exports = {
   getKimiAccount,
   getKimiAuth,
   getRuntimeCatalog,
-  kimiPromptArgs,
   loadKimiModels,
   normalizeKimiWebProfile,
   parseKimiOAuthProfile,

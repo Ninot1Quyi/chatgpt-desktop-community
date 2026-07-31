@@ -62,7 +62,10 @@ contextBridge.exposeInMainWorld("codexBridge", {
     if (r && r.ok === false) throw new Error(r.error);
     return r?.result;
   },
+  onAgentRuntimeEvent: subscribe("agent-runtime:event"),
   agentRuntimeCancel: (runId) => ipcRenderer.invoke("agent-runtime:cancel", { runId }),
+  agentRuntimePermissionResponse: (permissionId, optionId) =>
+    ipcRenderer.invoke("agent-runtime:permission-response", { permissionId, optionId }),
   agentRuntimeAuthStatus: async () => {
     const r = await ipcRenderer.invoke("agent-runtime:auth-status");
     if (r && r.ok === false) throw new Error(r.error);
@@ -151,6 +154,11 @@ contextBridge.exposeInMainWorld("codexBridge", {
   viewReload: () => ipcRenderer.invoke("view:reload"),
   viewToggleDevtools: () => ipcRenderer.invoke("view:toggle-devtools"),
   windowClose: () => ipcRenderer.invoke("window:close"),
+  windowDragBegin: (screenX, screenY) =>
+    ipcRenderer.send("window:drag-begin", { screenX, screenY }),
+  windowDragMove: (screenX, screenY) =>
+    ipcRenderer.send("window:drag-move", { screenX, screenY }),
+  windowDragEnd: () => ipcRenderer.send("window:drag-end"),
 
   // Custom Windows caption buttons
   windowMinimize: () => ipcRenderer.invoke("window:minimize"),

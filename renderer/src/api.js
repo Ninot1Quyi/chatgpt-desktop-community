@@ -30,7 +30,10 @@ export const kimiHistoryList = () => b.kimiHistoryList();
 export const kimiHistoryRead = (sessionId) => b.kimiHistoryRead(sessionId);
 export const agentRuntimeCatalog = () => b.agentRuntimeCatalog();
 export const agentRuntimeSend = (request) => b.agentRuntimeSend(request);
+export const onAgentRuntimeEvent = (cb) => b.onAgentRuntimeEvent(cb);
 export const agentRuntimeCancel = (runId) => b.agentRuntimeCancel(runId);
+export const agentRuntimePermissionResponse = (permissionId, optionId) =>
+  b.agentRuntimePermissionResponse(permissionId, optionId);
 export const agentRuntimeAuthStatus = () => b.agentRuntimeAuthStatus();
 export const agentRuntimeAccount = (runtime, refresh = false) => b.agentRuntimeAccount(runtime, refresh);
 export const agentRuntimeProfileLogin = (runtime) => b.agentRuntimeProfileLogin(runtime);
@@ -68,6 +71,11 @@ export const viewZoom = (direction) => b.viewZoom(direction);
 export const viewReload = () => b.viewReload();
 export const viewToggleDevtools = () => b.viewToggleDevtools();
 export const windowClose = () => b.windowClose();
+export const windowDragBegin = (screenX, screenY) =>
+  b.windowDragBegin(screenX, screenY);
+export const windowDragMove = (screenX, screenY) =>
+  b.windowDragMove(screenX, screenY);
+export const windowDragEnd = () => b.windowDragEnd();
 
 // Custom Windows caption buttons
 export const windowMinimize = () => b.windowMinimize();

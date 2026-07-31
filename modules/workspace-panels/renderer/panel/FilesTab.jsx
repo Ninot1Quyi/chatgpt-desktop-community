@@ -11,7 +11,7 @@ import { Menu, Spinner } from "@app/components/ui.jsx";
 import { Markdown } from "@modules/conversations";
 import {
   IconFile, IconFolder, IconChevronRight, IconChevronDown, IconExternal,
-  IconList, IconSearch,
+  IconListFiles, IconSearch,
 } from "@app/components/icons.jsx";
 import { usePanelStore } from "../state.js";
 import { FileIcon } from "./FileIcon.jsx";
@@ -19,6 +19,30 @@ import { revealInFileManager } from "@modules/host-copy";
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|ico)$/i;
 const MD_EXT = /\.(md|markdown|mdx)$/i;
+const SAVE_HINT = "Ctrl/⌘S";
+
+function encodeTextBase64(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function decodeTextBase64(value) {
+  const binary = atob(value);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function fileContentFromRpcResult(result) {
+  if (typeof result === "string") return result;
+  if (typeof result?.dataBase64 === "string") return decodeTextBase64(result.dataBase64);
+  return result?.content ?? result?.data ?? "";
+}
+
+function directoryEntriesFromRpcResult(result) {
+  return Array.isArray(result) ? result : result?.entries || [];
+}
 
 export default function FilesTab({ tab }) {
   const conv = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId] : null));
@@ -27,7 +51,7 @@ export default function FilesTab({ tab }) {
   const setTabFile = usePanelStore((s) => s.setFile);
   const toast = useStore((s) => s.toast);
   const [treeOpen, setTreeOpen] = useState(true);
-  const [treeWidth, setTreeWidth] = useState(250);
+  const [treeWidth, setTreeWidth] = useState(243);
   const [source, setSource] = useState(false); // markdown: source vs rendered
   const [file, setFile] = useState(null); // {path, content|null, loading, error, image?}
   const [text, setText] = useState(null); // edited draft (null = pristine)
@@ -45,10 +69,7 @@ export default function FilesTab({ tab }) {
     api.rpc("fs/readFile", { path })
       .then((r) => {
         if (!live) return;
-        let content = "";
-        if (typeof r === "string") content = r;
-        else if (typeof r?.dataBase64 === "string") { try { content = decodeURIComponent(escape(atob(r.dataBase64))); } catch { try { content = atob(r.dataBase64); } catch { content = ""; } } }
-        else content = r?.content ?? r?.data ?? "";
+        const content = fileContentFromRpcResult(r);
         setFile({ path, content: String(content), loading: false });
       })
       .catch((e) => live && setFile({ path, content: null, loading: false, error: e.message }));
@@ -62,7 +83,11 @@ export default function FilesTab({ tab }) {
     if (!file || text === null || saving) return;
     setSaving(true);
     try {
-      await api.rpc("fs/writeFile", { path: file.path, dataBase64: btoa(unescape(encodeURIComponent(text))) });
+      await api.rpc("fs/writeFile", {
+        path: file.path,
+        content: text,
+        dataBase64: encodeTextBase64(text),
+      });
       setFile({ ...file, content: text });
       setText(null);
       toast(`Saved ${basename(file.path)}`);
@@ -81,10 +106,10 @@ export default function FilesTab({ tab }) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* breadcrumb bar (h-toolbar-pane = 40px) */}
-      <nav className="flex h-10 shrink-0 items-center gap-1 border-b border-(--border-light) px-2 select-none">
+      {/* breadcrumb bar (h-toolbar-pane = 39px) */}
+      <nav className="flex h-[39px] shrink-0 items-center gap-1 border-b border-(--border-light) px-2 select-none">
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1 text-xs text-(--fg-secondary)">
-          <Crumb text={basename(root.replace(/\/+$/, "")) || root} />
+          <Crumb text={path ? basename(root.replace(/\/+$/, "")) || root : "/"} />
           {segments.map((seg, i) => (
             <React.Fragment key={i}>
               <IconChevronRight size={10} className="shrink-0 text-(--fg-faint)" />
@@ -105,14 +130,14 @@ export default function FilesTab({ tab }) {
             className="mr-1 flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-(--border) px-2.5 text-[13px] text-(--fg) hover:bg-(--surface-hover)"
             onClick={save}
             disabled={saving}
-            title="Save (⌘S)"
+            title={`Save (${SAVE_HINT})`}
           >
             {saving ? "Saving…" : "Save"}
-            <kbd className="rounded bg-(--surface-hover) px-1 py-px text-[10px] text-(--fg-tertiary)">⌘S</kbd>
+            <kbd className="rounded bg-(--surface-hover) px-1 py-px text-[10px] text-(--fg-tertiary)">{SAVE_HINT}</kbd>
           </button>
         )}
         <IconBtn title="Toggle file tree" active={treeOpen} onClick={() => setTreeOpen(!treeOpen)}>
-          <IconList size={14} />
+          <IconListFiles size={18} />
         </IconBtn>
         {path && <OpenSplitButton path={path} />}
       </nav>
@@ -121,10 +146,10 @@ export default function FilesTab({ tab }) {
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">
           {!path ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2">
+            <div className="relative top-[3px] flex h-full flex-col items-center justify-center gap-2">
               <IconFolder size={30} className="text-(--fg-faint)" />
-              <div className="text-[17px] font-medium text-(--fg)">Open file</div>
-              <div className="text-[13px] text-(--fg-secondary)">Select a file from the workspace tree</div>
+              <div className="text-[16px] leading-6 font-medium text-(--fg)">Open file</div>
+              <div className="max-w-[130px] text-center text-[13px] leading-[18.57px] font-[445] text-(--fg-secondary)">Select a file from the workspace tree</div>
             </div>
           ) : file?.loading ? (
             <div className="flex h-full items-center justify-center text-(--fg-tertiary)"><Spinner size={16} /></div>
@@ -448,7 +473,7 @@ function FileTree({ root, selected, onSelect }) {
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
       <div className="shrink-0 px-2 pt-2 pb-px">
-        <div className="flex h-7 w-full items-center gap-1.5 rounded-lg border border-(--border-light) bg-(--surface-fog)">
+        <div className="flex h-7 w-full items-center gap-1.5 rounded-[12.5px] border border-(--border) bg-(--panel-action-bg)">
           <IconSearch size={13} className="ms-2 shrink-0 text-(--fg-faint)" />
           <input
             value={query}
@@ -496,7 +521,7 @@ function DirNode({ path, depth, selected, onSelect, gitMap }) {
     api.rpc("fs/readDirectory", { path })
       .then((r) => {
         if (!live) return;
-        const sorted = [...(r?.entries || [])].sort((a, b) =>
+        const sorted = [...directoryEntriesFromRpcResult(r)].sort((a, b) =>
           a.isDirectory === b.isDirectory ? a.fileName.localeCompare(b.fileName) : a.isDirectory ? -1 : 1
         );
         setEntries(sorted);
@@ -511,7 +536,6 @@ function DirNode({ path, depth, selected, onSelect, gitMap }) {
   return (
     <>
       {entries
-        .filter((e) => !e.fileName.startsWith("."))
         .map((e) => (
           <TreeEntry key={e.fileName} entry={e} parent={path} depth={depth} selected={selected} onSelect={onSelect} gitMap={gitMap} />
         ))}
@@ -554,10 +578,13 @@ function TreeRow({ depth, name, full, isDir, open, selected, git, onToggle, onSe
       onClick={() => (isDir ? onToggle?.() : onSelect(full))}
     >
       {isDir ? (
-        <IconChevronRight
-          size={12}
-          className={cx("shrink-0 text-(--fg-tertiary) transition-transform duration-150", open && "rotate-90")}
-        />
+        <>
+          <IconChevronRight
+            size={12}
+            className={cx("shrink-0 text-(--fg-tertiary) transition-transform duration-150", open && "rotate-90")}
+          />
+          <IconFolder size={13} className="shrink-0 text-(--fg-tertiary)" />
+        </>
       ) : (
         <FileIcon name={name} size={13} />
       )}

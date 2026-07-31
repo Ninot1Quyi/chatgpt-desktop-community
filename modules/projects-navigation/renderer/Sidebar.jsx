@@ -13,15 +13,15 @@ import {
   codexRemainingPercent,
   codexResetDate,
 } from "@modules/agent-runtimes";
-import { openExternal, toggleQuickChat, showItemInFolder, rpc, gsPatch, logout } from "@app/api.js";
+import { openExternal, toggleQuickChat, showItemInFolder, rpc, logout, gsPatch } from "@app/api.js";
 import { Menu, Dialog, Spinner, IconButton } from "@app/components/ui.jsx";
 import { EXTERNAL_RUNTIMES, RUNTIMES, runtimeMeta } from "@modules/agent-runtimes";
 import {
   IconPlus, IconSearch, IconMore, IconGear, IconArchive, IconPencil,
-  IconTrash, IconUndo, IconChevronDown, IconChevronRight, IconFolder, IconFolderFilled, IconClock,
+  IconTrash, IconUndo, IconChevronDown, IconChevronRight, IconFolder, IconClock,
   IconUsage, IconInvite, IconLogout, IconBranch, IconX, IconGlobe,
-  IconHelpCircle, IconNavNewChat, IconNavPullRequests, IconNavScheduled, IconNavPlugins,
-  IconCircleAlert, IconPin, IconPinFilled, IconQuickChat, IconRefresh,
+  IconHelpCircle, IconNavNewChat, IconNavPullRequests, IconNavSites, IconNavScheduled, IconNavPlugins,
+  IconCircleAlert, IconPin, IconPinFilled, IconQuickChat, IconRefresh, IconHeaderChevronDown,
 } from "@app/components/icons.jsx";
 import {
   formatHomePath,
@@ -29,18 +29,86 @@ import {
 } from "@modules/host-copy";
 import { isSidebarEmpty } from "./sidebar-empty.mjs";
 import {
+  createPinnedPatch,
   createProjectOrderPatch,
+  createReorderedIdsPatch,
   createThreadProjectAssignmentPatch,
 } from "./state.js";
 
 const NAV_ITEMS = [
   { id: "pull-requests", label: "Pull requests", icon: <IconNavPullRequests size={16} /> },
   { id: "scheduled", label: "Scheduled", icon: <IconNavScheduled size={16} /> },
-  { id: "sites", label: "Sites", icon: <IconGlobe size={16} /> },
+  { id: "sites", label: "Sites", icon: <IconNavSites size={16} /> },
   { id: "plugins", label: "Plugins", icon: <IconNavPlugins size={16} /> },
 ];
 
 const HELP_URL = "https://developers.openai.com/codex/";
+const SIDEBAR_DRAG_TYPE = "application/x-chatgpt-desktop-sidebar";
+
+function commitGlobalStatePatch(patch, localPatch = {}) {
+  if (!patch) return false;
+  const state = useStore.getState();
+  const nextGs = { ...(state.gs || {}), ...patch };
+  useStore.setState({ ...localPatch, gs: nextGs });
+  gsPatch(patch).then((ok) => {
+    if (!ok) useStore.getState().toast("Could not update sidebar order", "error");
+  }).catch((error) => {
+    useStore.getState().toast(error?.message || "Could not update sidebar order", "error");
+  });
+  return true;
+}
+
+function pinProject(projectId) {
+  const state = useStore.getState();
+  const patch = createPinnedPatch(state.gs, "pinned-project-ids", projectId);
+  commitGlobalStatePatch(patch, { pinnedProjectIds: patch["pinned-project-ids"] });
+}
+
+function pinThread(threadId) {
+  const state = useStore.getState();
+  const patch = createPinnedPatch(state.gs, "pinned-thread-ids", threadId);
+  commitGlobalStatePatch(patch, { pinnedThreadIds: patch["pinned-thread-ids"] });
+}
+
+function readSidebarDrag(event) {
+  try {
+    return JSON.parse(event.dataTransfer.getData(SIDEBAR_DRAG_TYPE) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function hasSidebarDrag(event) {
+  return Array.from(event.dataTransfer?.types || []).includes(SIDEBAR_DRAG_TYPE);
+}
+
+function writeSidebarDrag(event, payload) {
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData(SIDEBAR_DRAG_TYPE, JSON.stringify(payload));
+}
+
+function moveProjectBefore(draggedProjectId, targetProjectId, pinnedTarget) {
+  const state = useStore.getState();
+  const patch = pinnedTarget
+    ? createReorderedIdsPatch(state.gs, "pinned-project-ids", draggedProjectId, targetProjectId)
+    : createProjectOrderPatch(state.gs, draggedProjectId, targetProjectId);
+  const localPatch = patch?.["pinned-project-ids"]
+    ? { pinnedProjectIds: patch["pinned-project-ids"] }
+    : {};
+  return commitGlobalStatePatch(patch, localPatch);
+}
+
+function moveThreadBefore(draggedThreadId, targetThreadId) {
+  const state = useStore.getState();
+  const patch = createReorderedIdsPatch(state.gs, "pinned-thread-ids", draggedThreadId, targetThreadId);
+  return commitGlobalStatePatch(patch, patch ? { pinnedThreadIds: patch["pinned-thread-ids"] } : {});
+}
+
+function moveThreadToProject(threadId, project) {
+  if (!project || project.kind === "remote" || project.kind === "external") return false;
+  const projectId = project.kind === "virtual" ? null : project.id;
+  return commitGlobalStatePatch(createThreadProjectAssignmentPatch(useStore.getState().gs, threadId, projectId));
+}
 
 // ---------------------------------------------------------------------------
 export default function Sidebar() {
@@ -136,16 +204,6 @@ export default function Sidebar() {
   };
 
   const onRename = (t) => setRenaming({ id: t.id, name: t.name || t.preview || "" });
-  const applyGsPatch = (patch) => {
-    useStore.setState((state) => ({ gs: { ...(state.gs || {}), ...patch } }));
-    gsPatch(patch).catch(() => useStore.getState().toast("Could not save sidebar order", "error"));
-  };
-  const moveProject = (sourceProjectId, targetProjectId) => {
-    applyGsPatch(createProjectOrderPatch(useStore.getState().gs, sourceProjectId, targetProjectId));
-  };
-  const assignThreadToProject = (threadId, projectId) => {
-    applyGsPatch(createThreadProjectAssignmentPatch(useStore.getState().gs, threadId, projectId));
-  };
   const empty = isSidebarEmpty({
     archivedView,
     externalSections,
@@ -245,8 +303,6 @@ export default function Sidebar() {
                 onToggle={() => toggleOpen(`pin:${p.id}`, isOpen(`pin:${p.id}`))}
                 archived={false}
                 onRename={onRename}
-                onMoveProject={moveProject}
-                onAssignThread={assignThreadToProject}
               />
             ))}
             {pinnedExternalProjects.map((project) => (
@@ -287,8 +343,6 @@ export default function Sidebar() {
                         onToggle={() => toggleOpen(`proj:${p.id}`, isOpen(`proj:${p.id}`))}
                         archived={archivedView}
                         onRename={onRename}
-                        onMoveProject={moveProject}
-                        onAssignThread={assignThreadToProject}
                       />
                     ))}
                     {!archivedView && codexProjects.length === 0 && !threadsLoading && (
@@ -367,8 +421,6 @@ function SectionLabel({ children }) {
 // Shows at most 5 threads, then a "Show more" row — like the reference app.
 // ---------------------------------------------------------------------------
 const THREAD_CAP = 5;
-const DRAG_PROJECT = "application/x-chatgpt-project-id";
-const DRAG_THREAD = "application/x-chatgpt-thread-id";
 
 function ProjectSection({
   project,
@@ -378,8 +430,6 @@ function ProjectSection({
   onToggle,
   archived,
   onRename,
-  onMoveProject,
-  onAssignThread,
 }) {
   const t = useT();
   const activeThreadId = useStore((s) => s.activeThreadId);
@@ -441,32 +491,27 @@ function ProjectSection({
     <div>
       <div
         ref={rowRef}
+        draggable={project.kind !== "virtual"}
         className={cx(
           "group/proj relative mx-2 flex h-[30px] cursor-pointer select-none items-center gap-2 rounded-[12.5px] pr-2 hover:bg-(--surface-hover)",
           nested ? "pl-6" : "pl-2",
         )}
-        draggable={runtime === "codex" && project.kind !== "virtual"}
-        onDragStart={(event) => {
-          if (runtime !== "codex" || project.kind === "virtual") return;
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData(DRAG_PROJECT, project.id);
-        }}
+        onDragStart={(event) => writeSidebarDrag(event, { type: "project", projectId: project.id })}
         onDragOver={(event) => {
-          const types = Array.from(event.dataTransfer.types || []);
-          if (types.includes(DRAG_PROJECT) || types.includes(DRAG_THREAD)) {
+          if (hasSidebarDrag(event)) {
             event.preventDefault();
             event.dataTransfer.dropEffect = "move";
           }
         }}
         onDrop={(event) => {
-          const sourceProjectId = event.dataTransfer.getData(DRAG_PROJECT);
-          const threadId = event.dataTransfer.getData(DRAG_THREAD);
-          if (sourceProjectId && sourceProjectId !== project.id) {
-            event.preventDefault();
-            onMoveProject?.(sourceProjectId, project.id);
-          } else if (threadId && runtime === "codex" && project.kind === "local") {
-            event.preventDefault();
-            onAssignThread?.(threadId, project.id);
+          const payload = readSidebarDrag(event);
+          if (!payload) return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (payload.type === "project") {
+            moveProjectBefore(payload.projectId, project.id, pinned);
+          } else if (payload.type === "thread") {
+            moveThreadToProject(payload.threadId, project);
           }
         }}
         onClick={onToggle}
@@ -475,7 +520,7 @@ function ProjectSection({
       >
         <span className="flex h-4 w-4 shrink-0 items-center justify-center text-(--fg-secondary)">
           <span className="group-hover/proj:hidden">
-            <IconFolderFilled size={16} />
+            <IconFolder size={16} />
           </span>
           <span className="hidden group-hover/proj:block">
             <IconChevronRight
@@ -523,7 +568,7 @@ function ProjectSection({
               id: "pin",
               label: pinned ? "Unpin project" : "Pin project",
               icon: <IconPin size={14} />,
-              onSelect: () => useStore.getState().togglePinnedProjectId(project.id),
+              onSelect: () => pinProject(project.id),
             },
             ...(project.path && project.kind !== "remote"
               ? [{ id: "explorer", label: showInFileManager, icon: <IconFolder size={14} />, onSelect: () => showItemInFolder(project.path) }]
@@ -566,7 +611,6 @@ function ProjectSection({
                       active={row.t.id === activeThreadId}
                       archived={archived}
                       onRename={() => onRename(row.t)}
-                      draggable={!archived && runtime === "codex"}
                     />
                   ) : (
                     <ExternalThreadRow key={row.t.id} thread={row.t} runtime={runtime} />
@@ -615,7 +659,6 @@ function ChatList({ threads, archived, onRename }) {
           active={t.id === activeThreadId}
           archived={archived}
           onRename={() => onRename(t)}
-          draggable={!archived}
         />
       ))}
       {hidden > 0 && (
@@ -633,7 +676,7 @@ function ChatList({ threads, archived, onRename }) {
 function RuntimeHeader({ runtime, label, loading, configDir, open, onToggle, onRefresh }) {
   const t = useT();
   return (
-    <div className={cx("px-2", open ? "pt-4 pb-1" : "pt-1 pb-1")}>
+    <div className="px-2 pt-4 pb-1">
       <div
         role="button"
         tabIndex={0}
@@ -802,7 +845,7 @@ function ExternalThreadRow({ thread, runtime }) {
             id: "pin",
             label: pinned ? "Unpin chat" : "Pin chat",
             icon: <IconPin size={14} />,
-            onSelect: () => useStore.getState().togglePinnedThread(thread.id),
+            onSelect: () => pinThread(thread.id),
           },
           { sep: true },
           {
@@ -829,16 +872,65 @@ function ExternalThreadRow({ thread, runtime }) {
 }
 
 // ---------------------------------------------------------------------------
-// Product wordmark (product switching dropdown was removed).
+// Product switcher (ChatGPT / Codex), like the reference wordmark menu.
 function WordmarkMenu() {
+  const mode = useStore((s) => s.mode);
+  const setMode = useStore((s) => s.setMode);
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const label = mode === "chatgpt" ? "ChatGPT" : "Codex";
   return (
-    <div className="-ml-2 flex h-8 items-center rounded-xl px-2 py-0.5 text-[17px] leading-6">
-      <span className="truncate font-openai-sans font-semibold">ChatGPT</span>
-    </div>
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="-ml-2 flex h-8 items-center gap-1 rounded-xl border border-transparent px-2 py-0.5 text-[17px] leading-6 hover:bg-(--surface-hover)"
+        title="Switch product"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="truncate font-openai-sans font-semibold">{label}</span>
+        <IconHeaderChevronDown size={14} className="shrink-0 text-(--fg-tertiary)" />
+      </button>
+      <Menu
+        open={open}
+        anchor={() => btnRef.current?.getBoundingClientRect()}
+        onClose={() => setOpen(false)}
+        width={240}
+        items={[
+          {
+            id: "chatgpt",
+            tall: true,
+            label: (
+              <span>
+                <span className="block text-[13px] font-medium">ChatGPT</span>
+                <span className="block text-xs text-(--fg-tertiary)">Create, learn, and explore</span>
+              </span>
+            ),
+            checked: mode === "chatgpt",
+            onSelect: () => setMode("chatgpt"),
+          },
+          {
+            id: "codex",
+            tall: true,
+            label: (
+              <span>
+                <span className="block text-[13px] font-medium">Codex</span>
+                <span className="block text-xs text-(--fg-tertiary)">Build, debug, and ship</span>
+              </span>
+            ),
+            checked: mode !== "chatgpt",
+            onSelect: () => setMode("codex"),
+          },
+        ]}
+      />
+    </>
   );
 }
 
-function ThreadRow({ thread, active, archived, onRename, draggable = false }) {  const needsInput = useStore((s) => s.approvals.some((a) => a.threadId === thread.id));
+function ThreadRow({ thread, active, archived, onRename }) {
+  const needsInput = useStore((s) => s.approvals.some((a) => a.threadId === thread.id));
   const t = useT();
   const pinned = useStore((s) => s.pinnedThreadIds.includes(thread.id));
   const [menuOpen, setMenuOpen] = useState(false);
@@ -856,7 +948,7 @@ function ThreadRow({ thread, active, archived, onRename, draggable = false }) { 
       id: "pin",
       label: pinned ? "Unpin chat" : "Pin chat",
       icon: <IconPin size={14} />,
-      onSelect: () => useStore.getState().togglePinnedThread(thread.id),
+      onSelect: () => pinThread(thread.id),
     },
     { sep: true },
     archived
@@ -874,15 +966,24 @@ function ThreadRow({ thread, active, archived, onRename, draggable = false }) { 
   return (
     <div
       ref={rowRef}
+      draggable
       className={cx(
         "group/thr relative mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] pl-8 pr-1",
         active ? "bg-(--sidebar-row-active) text-(--fg)" : "hover:bg-(--surface-hover)"
       )}
-      draggable={draggable}
-      onDragStart={(event) => {
-        if (!draggable) return;
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData(DRAG_THREAD, thread.id);
+      onDragStart={(event) => writeSidebarDrag(event, { type: "thread", threadId: thread.id })}
+      onDragOver={(event) => {
+        if (pinned && hasSidebarDrag(event)) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }
+      }}
+      onDrop={(event) => {
+        const payload = readSidebarDrag(event);
+        if (!pinned || payload?.type !== "thread") return;
+        event.preventDefault();
+        event.stopPropagation();
+        moveThreadBefore(payload.threadId, thread.id);
       }}
       onClick={open}
       onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true); }}
@@ -901,7 +1002,7 @@ function ThreadRow({ thread, active, archived, onRename, draggable = false }) { 
         <button
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg)"
           title={t(pinned ? "Unpin chat" : "Pin chat")}
-          onClick={(e) => { e.stopPropagation(); useStore.getState().togglePinnedThread(thread.id); }}
+          onClick={(e) => { e.stopPropagation(); pinThread(thread.id); }}
         >
           {pinned ? <IconPinFilled size={13} /> : <IconPin size={13} />}
         </button>

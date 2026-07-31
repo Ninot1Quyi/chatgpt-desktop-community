@@ -4,13 +4,22 @@ import React, { useEffect, useRef, useState } from "react";
 import { cx } from "@app/lib/cx.js";
 import { openExternal, captureWebview, saveTempFile } from "@app/api.js";
 import { useStore } from "@app/store.js";
-import { IconChevronLeft, IconChevronRight, IconRefresh, IconGlobe, IconX, IconExternal, IconPencil, IconCheck } from "@app/components/icons.jsx";
-
-const HOME_URL = "https://www.google.com";
+import { Menu } from "@app/components/ui.jsx";
+import { IconChevronLeft, IconChevronRight, IconRefresh, IconGlobe, IconX, IconExternal, IconPencil, IconCheck, IconMore } from "@app/components/icons.jsx";
+import {
+  browserStateFromWebview,
+  normalizeBrowserUrl,
+} from "./bus.js";
 
 export default function BrowserTab() {
   const wvRef = useRef(null);
-  const [url, setUrl] = useState(() => localStorage.getItem("browser.url") || "");
+  const [url, setUrl] = useState(() => {
+    const stored = localStorage.getItem("browser.url") || "";
+    const normalized = normalizeBrowserUrl(stored);
+    if (normalized) localStorage.setItem("browser.url", normalized);
+    else if (stored) localStorage.removeItem("browser.url");
+    return normalized;
+  });
   const [input, setInput] = useState(url);
   const [canBack, setCanBack] = useState(false);
   const [canFwd, setCanFwd] = useState(false);
@@ -20,51 +29,80 @@ export default function BrowserTab() {
   const [pins, setPins] = useState([]); // {x, y, note} in CSS px of the view area
   const [draftPin, setDraftPin] = useState(null); // {x, y, note} being edited
   const [busy, setBusy] = useState(false);
+  const [zoom, setZoom] = useState(100);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const optionsRef = useRef(null);
+
+  useEffect(() => {
+    const onOpenUrl = (e) => {
+      const u = normalizeBrowserUrl(e.detail?.url);
+      if (!u) return;
+      const wv = wvRef.current;
+      if (wv) wv.loadURL(u).catch(() => {});
+      setUrl(u);
+      setInput(u);
+      localStorage.setItem("browser.url", u);
+    };
+    window.addEventListener("codex:open-url", onOpenUrl);
+    return () => {
+      window.removeEventListener("codex:open-url", onOpenUrl);
+    };
+  }, []);
 
   useEffect(() => {
     const wv = wvRef.current;
     if (!wv) return;
     const sync = () => {
       try {
-        setCanBack(wv.canGoBack());
-        setCanFwd(wv.canGoForward());
-        setInput(wv.getURL());
-        setUrl(wv.getURL());
-        localStorage.setItem("browser.url", wv.getURL());
+        const next = browserStateFromWebview(wv);
+        setCanBack(next.canBack);
+        setCanFwd(next.canForward);
+        setInput(next.url);
+        setUrl(next.url);
+        localStorage.setItem("browser.url", next.url);
       } catch {}
     };
     const onStart = () => setLoading(true);
     const onStop = () => { setLoading(false); sync(); };
+    const onFail = () => { setLoading(false); sync(); };
     const onTitle = (e) => setTitle(e.title || "");
-    const onOpenUrl = (e) => {
-      const u = e.detail?.url;
-      if (u) { wv.loadURL(u).catch(() => {}); setInput(u); }
+    const onWillNavigate = (e) => {
+      const nextUrl = normalizeBrowserUrl(e.url);
+      if (!nextUrl || nextUrl !== String(e.url || "").trim()) e.preventDefault();
     };
-    window.addEventListener("codex:open-url", onOpenUrl);
     wv.addEventListener("did-start-loading", onStart);
     wv.addEventListener("did-stop-loading", onStop);
+    wv.addEventListener("did-fail-load", onFail);
+    wv.addEventListener("will-navigate", onWillNavigate);
     wv.addEventListener("did-navigate", sync);
     wv.addEventListener("did-navigate-in-page", sync);
     wv.addEventListener("page-title-updated", onTitle);
+    sync();
     return () => {
-      window.removeEventListener("codex:open-url", onOpenUrl);
       wv.removeEventListener("did-start-loading", onStart);
       wv.removeEventListener("did-stop-loading", onStop);
+      wv.removeEventListener("did-fail-load", onFail);
+      wv.removeEventListener("will-navigate", onWillNavigate);
       wv.removeEventListener("did-navigate", sync);
       wv.removeEventListener("did-navigate-in-page", sync);
       wv.removeEventListener("page-title-updated", onTitle);
     };
-  }, []);
+  }, [url]);
 
   const navigate = (raw) => {
-    let u = raw.trim();
+    const u = normalizeBrowserUrl(raw);
     if (!u) return;
-    if (!/^[a-z]+:\/\//i.test(u)) {
-      u = u.includes(".") && !u.includes(" ") ? `https://${u}` : `https://www.google.com/search?q=${encodeURIComponent(u)}`;
-    }
     const wv = wvRef.current;
     if (wv) wv.loadURL(u).catch(() => {});
+    setUrl(u);
     setInput(u);
+    localStorage.setItem("browser.url", u);
+  };
+
+  const applyZoom = (next) => {
+    const clamped = Math.min(200, Math.max(25, Math.round(next)));
+    setZoom(clamped);
+    try { wvRef.current?.setZoomFactor(clamped / 100); } catch {}
   };
 
   // ---- annotate mode ----
@@ -110,69 +148,86 @@ export default function BrowserTab() {
   return (
     <div className="flex h-full flex-col">
       {/* address bar */}
-      <div className="flex shrink-0 items-center gap-1 border-b border-(--border-light) px-2 py-1.5">
+      <div className="flex h-[39px] shrink-0 items-center border-b border-(--border-light) px-2">
+        <div className="flex items-center gap-px">
         <NavBtn title="Back" disabled={!canBack} onClick={() => wvRef.current?.goBack()}>
           <IconChevronLeft size={14} />
         </NavBtn>
-        <NavBtn title="Forward" disabled={!canFwd} onClick={() => wvRef.current?.goForward()}>
+        <NavBtn title="Next" disabled={!canFwd} onClick={() => wvRef.current?.goForward()}>
           <IconChevronRight size={14} />
         </NavBtn>
-        <NavBtn title="Reload" onClick={() => (loading ? wvRef.current?.stop() : wvRef.current?.reload())}>
+        <NavBtn title="Reload page" onClick={() => (loading ? wvRef.current?.stop() : wvRef.current?.reload())}>
           {loading ? <IconX size={13} /> : <IconRefresh size={13} />}
         </NavBtn>
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-full border border-(--border-light) bg-(--surface) px-2.5 py-1">
-          <IconGlobe size={11} className="shrink-0 text-(--fg-faint)" />
+        </div>
+        <div className="ml-2 flex h-7 min-w-0 flex-1 items-center overflow-hidden rounded-[10px] ring-1 ring-inset ring-(--border)">
           <input
-            className="w-full bg-transparent text-xs outline-none placeholder:text-(--fg-faint)"
+            id="browser-address-input"
+            className="h-7 min-w-0 flex-1 bg-transparent px-2 text-[13px] outline-none placeholder:text-(--fg-tertiary)"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") navigate(input); }}
             onFocus={(e) => e.target.select()}
-            placeholder="Search or enter URL"
+            placeholder="Enter a URL"
             spellCheck={false}
           />
+          <NavBtn title="Open in external browser" onClick={() => {
+            const u = normalizeBrowserUrl(input);
+            if (u) openExternal(u);
+          }}>
+            <IconExternal size={14} />
+          </NavBtn>
         </div>
-        <ZoomControl wvRef={wvRef} />
+        <div className="ml-2">
         {annotate ? (
           <button
-            className="flex h-6 items-center gap-1 rounded-md bg-(--accent) px-2 text-xs font-medium text-(--accent-fg) hover:opacity-90"
+            className="flex size-7 items-center justify-center rounded-lg bg-(--surface-active) text-(--fg) hover:bg-(--surface-hover)"
             title="Finish annotation"
+            aria-label="Annotate"
             onClick={finishAnnotate}
             disabled={busy}
           >
-            <IconCheck size={12} /> Done
+            <IconCheck size={14} />
+            <span className="sr-only">Annotating</span>
           </button>
         ) : (
-          <NavBtn title="Annotate" onClick={() => setAnnotate(true)}>
-            <IconPencil size={13} />
+          <NavBtn title="Annotate" ariaLabel="Annotate" onClick={() => setAnnotate(true)}>
+            <IconPencil size={14} />
           </NavBtn>
         )}
-        <NavBtn title="Open in browser" onClick={() => openExternal(input)}>
-          <IconExternal size={13} />
-        </NavBtn>
+        </div>
+        <div ref={optionsRef} className="ml-1.5">
+          <NavBtn title="Browser options" ariaLabel="Browser options" onClick={() => setOptionsOpen((value) => !value)}>
+            <IconMore size={15} />
+          </NavBtn>
+        </div>
       </div>
+      <Menu
+        open={optionsOpen}
+        anchor={() => optionsRef.current?.getBoundingClientRect()}
+        align="end"
+        width={210}
+        onClose={() => setOptionsOpen(false)}
+        items={[
+          { id: "zoom-out", label: "Zoom out", hint: `${zoom}%`, onSelect: () => applyZoom(zoom - 10) },
+          { id: "zoom-reset", label: "Reset zoom", hint: "100%", onSelect: () => applyZoom(100) },
+          { id: "zoom-in", label: "Zoom in", onSelect: () => applyZoom(zoom + 10) },
+          { sep: true },
+          { id: "external", label: "Open in external browser", icon: <IconExternal size={14} />, onSelect: () => {
+            const u = normalizeBrowserUrl(input);
+            if (u) openExternal(u);
+          } },
+        ]}
+      />
       {/* page */}
       <div className="relative min-h-0 flex-1">
         {!url ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
-            <IconGlobe size={28} className="text-(--fg-faint)" />
+          <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
+            <IconGlobe size={28} className="text-(--fg-tertiary)" />
             <div>
-              <div className="text-[15px] font-medium">Start browsing</div>
-              <div className="mt-1 text-xs text-(--fg-tertiary)">Enter a URL to open a page</div>
+              <div className="mx-auto w-fit text-[16px] leading-6 font-medium">Start browsing</div>
+              <div className="mt-2 text-[13px] leading-[18.57px] font-[445] text-(--fg-tertiary)">Enter a URL to open a page</div>
             </div>
-            <form
-              className="mt-2 flex w-full max-w-[320px] items-center gap-1.5 rounded-full border border-(--border) bg-(--surface) px-3 py-1.5"
-              onSubmit={(e) => { e.preventDefault(); navigate(input); }}
-            >
-              <IconGlobe size={12} className="shrink-0 text-(--fg-faint)" />
-              <input
-                className="w-full bg-transparent text-xs outline-none placeholder:text-(--fg-faint)"
-                placeholder="Enter a URL"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                spellCheck={false}
-              />
-            </form>
           </div>
         ) : (
           <>
@@ -269,45 +324,19 @@ async function compositePins(dataUrl, pins, wv) {
   return canvas.toDataURL("image/png");
 }
 
-function NavBtn({ children, title, onClick, disabled }) {
+function NavBtn({ children, title, ariaLabel, onClick, disabled }) {
   return (
     <button
       title={title}
+      aria-label={ariaLabel}
       disabled={disabled}
       onClick={onClick}
       className={cx(
-        "flex h-6 w-6 items-center justify-center rounded-md text-(--fg-secondary)",
+        "flex size-7 items-center justify-center rounded-lg text-(--fg-secondary)",
         disabled ? "opacity-35" : "hover:bg-(--surface-hover) hover:text-(--fg)"
       )}
     >
       {children}
     </button>
-  );
-}
-
-// Zoom percentage control, like the reference browser tab toolbar.
-function ZoomControl({ wvRef }) {
-  const [pct, setPct] = useState(100);
-  const apply = (next) => {
-    const clamped = Math.min(200, Math.max(25, Math.round(next)));
-    setPct(clamped);
-    try { wvRef.current?.setZoomFactor(clamped / 100); } catch {}
-  };
-  return (
-    <div className="flex shrink-0 items-center gap-0.5">
-      <NavBtn title="Zoom out" onClick={() => apply(pct - 10)}>
-        <span className="text-xs leading-none">−</span>
-      </NavBtn>
-      <button
-        title="Reset zoom"
-        className="w-9 rounded-md py-0.5 text-center text-[11px] text-(--fg-secondary) hover:bg-(--surface-hover)"
-        onClick={() => apply(100)}
-      >
-        {pct}%
-      </button>
-      <NavBtn title="Zoom in" onClick={() => apply(pct + 10)}>
-        <span className="text-xs leading-none">+</span>
-      </NavBtn>
-    </div>
   );
 }

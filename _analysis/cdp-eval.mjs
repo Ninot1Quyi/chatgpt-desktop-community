@@ -1,37 +1,56 @@
-// CDP driver: run a JS expression in the page, print result.
-const expr = process.argv[2];
-const waitMs = Number(process.argv[3] || 0);
-const port = Number(process.argv[4] || 9222);
-const targets = await fetch(`http://localhost:${port}/json`).then((r) => r.json());
-const page = targets.find((t) => t.type === "page" && t.url.endsWith("index.html"))
-  || targets.find((t) => t.type === "page");
-const ws = new WebSocket(page.webSocketDebuggerUrl);
-await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
-let seq = 0;
-const pending = new Map();
-ws.onmessage = (ev) => {
-  const m = JSON.parse(ev.data);
-  if (m.id && pending.has(m.id)) {
-    const p = pending.get(m.id); pending.delete(m.id);
-    m.error ? p.reject(new Error(JSON.stringify(m.error))) : p.resolve(m.result);
-  }
-};
-const call = (method, params) => new Promise((resolve, reject) => {
-  const id = ++seq; pending.set(id, { resolve, reject });
-  ws.send(JSON.stringify({ id, method, params }));
+// Evaluate a JavaScript expression in the main renderer target.
+//
+// Examples:
+//   node _analysis/cdp-eval.mjs --port 9222 --expression "innerWidth"
+//   node _analysis/cdp-eval.mjs --port 9222 \
+//     --expression "localStorage.setItem('ui.sidebarWidth', '320'); location.reload(); true"
+
+function option(name, fallback = "") {
+  const index = process.argv.indexOf(`--${name}`);
+  return index >= 0 ? process.argv[index + 1] : fallback;
+}
+
+const port = Number(option("port", 9222));
+const expression = option("expression");
+if (!expression) throw new Error("Provide --expression");
+
+const targets = await fetch(`http://127.0.0.1:${port}/json`).then((response) => response.json());
+const pages = targets.filter((target) => target.type === "page");
+const page = pages.find((target) => target.url === "app://-/index.html")
+  || pages.find((target) => !target.url.includes("window="))
+  || pages[0];
+if (!page) throw new Error(`No page target found on CDP port ${port}`);
+
+const socket = new WebSocket(page.webSocketDebuggerUrl);
+await new Promise((resolveOpen, rejectOpen) => {
+  socket.onopen = resolveOpen;
+  socket.onerror = rejectOpen;
 });
-if (process.env.CDP_COLOR_SCHEME) {
-  await call("Emulation.setEmulatedMedia", {
-    features: [{ name: "prefers-color-scheme", value: process.env.CDP_COLOR_SCHEME }],
-  });
+
+let sequence = 0;
+const pending = new Map();
+socket.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  if (!message.id || !pending.has(message.id)) return;
+  const operation = pending.get(message.id);
+  pending.delete(message.id);
+  if (message.error) operation.reject(new Error(JSON.stringify(message.error)));
+  else operation.resolve(message.result);
+};
+
+const call = (method, params = {}) => new Promise((resolveCall, rejectCall) => {
+  const id = ++sequence;
+  pending.set(id, { resolve: resolveCall, reject: rejectCall });
+  socket.send(JSON.stringify({ id, method, params }));
+});
+
+const evaluated = await call("Runtime.evaluate", {
+  expression,
+  awaitPromise: true,
+  returnByValue: true,
+});
+if (evaluated.exceptionDetails) {
+  throw new Error(evaluated.exceptionDetails.exception?.description || evaluated.exceptionDetails.text);
 }
-if (waitMs) await new Promise((r) => setTimeout(r, waitMs));
-const r = await call("Runtime.evaluate", { expression: expr, returnByValue: true, awaitPromise: true });
-if (r.exceptionDetails) {
-  console.log("EXC:", r.exceptionDetails.text, r.exceptionDetails.exception?.description?.slice(0, 600) || "");
-} else {
-  const v = r.result?.value;
-  console.log(typeof v === "string" ? v : JSON.stringify(v, null, 1)?.slice(0, 4000));
-}
-ws.close();
-process.exit(0);
+console.log(JSON.stringify(evaluated.result?.value, null, 2));
+socket.close();

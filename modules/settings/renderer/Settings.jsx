@@ -43,6 +43,7 @@ import ProfileSection from "./sections/ProfileSection.jsx";
 import AppearanceSection from "./sections/AppearanceSection.jsx";
 import VoiceSection from "./sections/VoiceSection.jsx";
 import ConfigurationSection from "./sections/ConfigurationSection.jsx";
+import ExperimentsSection from "./sections/ExperimentsSection.jsx";
 import PersonalizationSection from "./sections/PersonalizationSection.jsx";
 import PetsSection from "./sections/PetsSection.jsx";
 import AppshotsSection from "./sections/AppshotsSection.jsx";
@@ -60,6 +61,7 @@ const IconUser = (p) => <LucideIcon name="UserRound" {...p} />;
 const IconPalette = (p) => <LucideIcon name="Palette" {...p} />;
 const IconMic = (p) => <LucideIcon name="Mic" {...p} />;
 const IconSliders = (p) => <LucideIcon name="SlidersHorizontal" {...p} />;
+const IconFlask = (p) => <LucideIcon name="FlaskConical" {...p} />;
 const IconPaw = (p) => <LucideIcon name="PawPrint" {...p} />;
 const IconKeyboard = (p) => <LucideIcon name="Keyboard" {...p} />;
 const IconCard = (p) => <LucideIcon name="CreditCard" {...p} />;
@@ -82,6 +84,7 @@ const SECTIONS = [
       { id: "appearance", label: "Appearance", icon: IconPalette },
       { id: "voice", label: "Voice", icon: IconMic },
       { id: "configuration", label: "Configuration", icon: IconSliders },
+      { id: "experiments", label: "Experiments", icon: IconFlask },
       { id: "personalization", label: "Personalization", icon: IconSparkle },
       { id: "pets", label: "Pets", icon: IconPaw },
       { id: "shortcuts", label: "Keyboard shortcuts", icon: IconKeyboard },
@@ -245,6 +248,8 @@ function SectionContent({ id }) {
       return <VoiceSection />;
     case "configuration":
       return <ConfigurationSection />;
+    case "experiments":
+      return <ExperimentsSection />;
     case "personalization":
       return <PersonalizationSection />;
     case "pets":
@@ -897,7 +902,13 @@ function ArchivedSection() {
     let cursor;
     for (let page = 0; page < 30; page++) {
       const r = await api
-        .rpc("thread/list", { sortKey: "updated_at", archived: true, limit: 100, ...(cursor ? { cursor } : {}) })
+        .rpc("thread/list", {
+          sortKey: "updated_at",
+          archived: true,
+          limit: 100,
+          useStateDbOnly: true,
+          ...(cursor ? { cursor } : {}),
+        })
         .catch(() => null);
       const data = r?.data || [];
       all.push(...data);

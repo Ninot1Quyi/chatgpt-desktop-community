@@ -9,9 +9,9 @@ import { basename, formatDuration } from "@app/lib/time.js";
 import { commandActivity } from "@app/lib/commandActivity.mjs";
 import vscodeIcon from "@app/assets/vscode.png";
 import Composer from "./Composer.jsx";
-import { ItemView, PlanWidget, ApprovalCard, TurnActionRow } from "./items.jsx";
+import { ItemView, PlanWidget, ApprovalCard, TurnActionRow, TurnDiffCard } from "./items.jsx";
 import { ActivityDisclosure, Menu, Dialog, IconButton, Spinner } from "@app/components/ui.jsx";
-import { IconBranch, IconFolder, IconMore, IconChevronRight, IconChevronDown, IconX, IconFile, IconTerminal, IconGlobe, IconSparkle, IconFolderFilled, IconDots21, IconHeaderOutputs, IconHeaderPanelBottom, IconHeaderPanelSide, IconHeaderChevronDown, IconCmdGoal, IconBookOpen, IconCodeSearching, IconEditFiles, IconGoalEdit, IconGoalPause, IconGoalResume, IconGoalTrash, IconGoalChevron, IconListFiles, IconMcpSource, IconRunCommand, IconWebSearch, IconClaude, IconKimi, LucideIcon } from "@app/components/icons.jsx";
+import { IconBranch, IconFolder, IconMore, IconChevronRight, IconChevronDown, IconX, IconFile, IconTerminal, IconGlobe, IconSparkle, IconFolderFilled, IconDots21, IconHeaderSidebar, IconHeaderOutputs, IconHeaderPanelBottom, IconHeaderChevronDown, IconCmdGoal, IconBookOpen, IconCodeSearching, IconEditFiles, IconGoalEdit, IconGoalPause, IconGoalResume, IconGoalTrash, IconGoalChevron, IconListFiles, IconMcpSource, IconRunCommand, IconWebSearch, IconClaude, IconKimi, LucideIcon } from "@app/components/icons.jsx";
 import { panelHook } from "@app/lib/panelHook.js";
 import { usePanelStore } from "@modules/workspace-panels/state";
 import { CodexMark } from "@app/components/icons.jsx";
@@ -21,6 +21,7 @@ import {
 } from "@modules/host-copy";
 
 const IconArrowDown = (p) => <LucideIcon name="ArrowDown" size={p.size || 16} className={p.className} style={p.style} />;
+const IconBot = (p) => <LucideIcon name="Bot" size={p.size || 16} className={p.className} style={p.style} />;
 const OutputsPanel = React.lazy(() =>
   import("@modules/workspace-panels").then((module) => ({
     default: module.OutputsPanel,
@@ -73,7 +74,7 @@ export default function Conversation() {
           </div>
         </div>
       ) : (
-        <MessageList key={activeThreadId} conv={conv} />
+        <MessageList key={conv?.renderKey || activeThreadId} conv={conv} />
       )}
       {!hasTurns && !readOnly && <BottomArea conv={conv} />}
     </div>
@@ -178,7 +179,7 @@ export function HeaderPanelButtons() {
         onClick={() => setUi({ bottomOpen: !ui.bottomOpen })}
       />
       <IconButton
-        icon={<IconHeaderPanelSide />}
+        icon={<IconHeaderSidebar style={{ transform: "rotate(180deg)" }} />}
         size={16}
         title="Toggle side panel"
         active={!!ui.rightOpen}
@@ -203,7 +204,7 @@ function OpenInEditorButton() {
     api.openExternal(`vscode://file${cwd}`);
   };
   return (
-    <div className="flex h-7 w-[52px] items-stretch overflow-hidden rounded-[12.5px]">
+    <div className="app-no-drag flex h-7 w-[52px] items-stretch overflow-hidden rounded-[12.5px]">
       <button
         className="flex h-7 w-[29px] items-center rounded-l-[12.5px] border border-r-0 border-(--border) bg-black/[0.03] pl-2 pr-1 text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg) dark:bg-white/[0.03]"
         title="Open in"
@@ -606,6 +607,7 @@ function FindBar({ conv }) {
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
   const inputRef = useRef(null);
+  const showReasoning = conv?.thread?.source === "kimi";
 
   const matches = useMemo(() => {
     if (!q.trim()) return [];
@@ -613,12 +615,12 @@ function FindBar({ conv }) {
     const out = [];
     for (const turn of conv?.turns || []) {
       for (const item of turn.items || []) {
-        const text = itemText(item);
+        const text = itemText(item, showReasoning);
         if (text && text.toLowerCase().includes(needle)) out.push(item.id);
       }
     }
     return out;
-  }, [q, conv?.turns]);
+  }, [q, conv?.turns, showReasoning]);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
   useEffect(() => { setIdx(0); }, [q]);
@@ -667,12 +669,15 @@ function FindBar({ conv }) {
 }
 
 // Searchable text of a thread item.
-function itemText(item) {
+function itemText(item, showReasoning) {
   switch (item.type) {
     case "userMessage": return (item.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
     case "agentMessage":
     case "plan": return item.text;
-    case "reasoning": return [...(item.summary || []), ...(item.content || [])].join("\n");
+    case "reasoning":
+      return showReasoning
+        ? [...(item.summary || []), ...(item.content || [])].join("\n")
+        : "";
     case "commandExecution": return `${item.command}\n${item.aggregatedOutput || ""}`;
     case "fileChange": return (item.changes || []).map((c) => c.path).join("\n");
     case "mcpToolCall":
@@ -689,6 +694,7 @@ function MessageList({ conv }) {
   const [stickBottom, setStickBottom] = useState(true);
   const [externalActivity, setExternalActivity] = useState(null);
   const turns = conv?.turns || [];
+  const showReasoning = conv?.thread?.source === "kimi";
   const activeTurnId = conv?.activeTurnId;
   const activeItems = turns.find((turn) => turn.id === activeTurnId)?.items || [];
   const nativeLiveActivity = [...activeItems].reverse().find((item) => item.status === "inProgress");
@@ -700,8 +706,13 @@ function MessageList({ conv }) {
 
   // The active TurnView renders its own "Working for Xs" header once the turn
   // has work items; until then the standalone WorkingRow fills in.
-  const hasActiveWork = turns.some(
-    (t) => t.id === activeTurnId && (t.items || []).some((it) => it.type !== "userMessage")
+  const hasActiveWork = turns.some((turn) =>
+    turn.id === activeTurnId
+    && (turn.items || []).some((item) =>
+      item.type !== "userMessage"
+      && (showReasoning || item.type !== "reasoning")
+      && !(item.type === "agentMessage" && !item.text),
+    ),
   );
 
   useEffect(() => {
@@ -726,7 +737,7 @@ function MessageList({ conv }) {
     if (stickBottom && ref.current) {
       ref.current.scrollTop = ref.current.scrollHeight;
     }
-  }, [itemCount, turns, stickBottom]);
+  }, [itemCount, stickBottom]);
 
   useEffect(() => {
     if (!contentRef.current) return;
@@ -749,20 +760,32 @@ function MessageList({ conv }) {
   };
 
   return (
-    <div className="relative min-h-0 flex-1">
-      <div ref={ref} onScroll={onScroll} className="h-full overflow-x-hidden overflow-y-auto">
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={ref} onScroll={onScroll} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div ref={contentRef} className="flex min-h-full shrink-0 flex-col justify-start">
-          <div className="mx-auto flex w-full max-w-(--thread-content-max-width) flex-col gap-(--conversation-item-gap) px-4 pt-4 pb-6">
+          <div className="mx-auto flex w-full max-w-(--thread-content-max-width) flex-col gap-(--conversation-item-gap) px-4 pt-4 pb-11">
             {conv?.thread?.forkedFromId && <ForkedFromCard forkedFromId={conv.thread.forkedFromId} />}
-            {turns.map((turn) => (
-              <TurnView key={turn.id} turn={turn} streaming={turn.id === activeTurnId} />
+            {turns.map((turn, turnIndex) => (
+              <TurnView
+                key={turn.id}
+                turn={turn}
+                streaming={turn.id === activeTurnId}
+                latest={turnIndex === turns.length - 1}
+                showReasoning={showReasoning}
+                turnDiff={turnIndex === turns.length - 1 ? conv.diff : null}
+              />
             ))}
             {activeTurnId && !hasActiveWork && <WorkingRow conv={conv} />}
             {showExternalActivity && <WorklogActionRow item={externalActivity} live />}
           </div>
-          {!conv?.readOnly && <BottomArea conv={conv} />}
         </div>
       </div>
+      {!conv?.readOnly && (
+        <BottomArea
+          conv={conv}
+          onScrollToBottom={!stickBottom ? scrollToBottom : null}
+        />
+      )}
       {useStore((s) => s.ui.findOpen) && <FindBar conv={conv} />}
       <MessageRail turns={turns} scrollRef={ref} />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-(--surface) to-transparent" />
@@ -771,29 +794,26 @@ function MessageList({ conv }) {
           <OutputsPanel />
         </React.Suspense>
       )}
-      {!stickBottom && (
-        <button
-          title="Scroll to bottom"
-          className="absolute bottom-4 left-1/2 z-20 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-(--border) bg-(--surface-raised) text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)"
-          style={{ boxShadow: "var(--shadow-menu)" }}
-          onClick={scrollToBottom}
-        >
-          <IconArrowDown size={15} />
-        </button>
-      )}
     </div>
   );
 }
 
-function TurnView({ turn, streaming }) {
+function TurnView({ turn, streaming, latest, showReasoning, turnDiff }) {
   const items = turn.items || [];
   const lastAgent = items.reduce((acc, it, i) => (it.type === "agentMessage" ? i : acc), -1);
   const showActions = !streaming && turn.status === "completed" && lastAgent >= 0;
+  const compactHistorical = !streaming && !latest && turn.status === "completed";
 
   // A localhost web-preview card follows the final message (reference renders
   // one when the reply points at a local preview server).
   const agentText = items.filter((it) => it.type === "agentMessage").map((it) => it.text || "").join("\n");
   const previewUrl = (agentText.match(/https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/[^\s)\]>"']*)?/) || [])[0];
+  const fileChanges = useMemo(
+    () => items
+      .filter((item) => item.type === "fileChange" && item.status !== "inProgress")
+      .flatMap((item) => item.changes || []),
+    [items],
+  );
 
   // Commentary remains visible. Only consecutive work items collapse into
   // the reference activity summary row.
@@ -806,10 +826,20 @@ function TurnView({ turn, streaming }) {
       buf = [];
     };
     items.forEach((item, index) => {
+      if (compactHistorical) {
+        if (item.type === "agentMessage" && index !== lastAgent) return;
+        if (WORK_ITEM_TYPES.has(item.type)) return;
+      }
+      if (item.type === "reasoning" && !showReasoning) return;
       const emptyReasoning = item.type === "reasoning"
         && !(item.summary?.length || item.content?.length);
       if (emptyReasoning && !(streaming && index === items.length - 1)) return;
       if (WORK_ITEM_TYPES.has(item.type)) {
+        const subAgentKind = item.type === "subAgentActivity" ? item.kind || "interacted" : null;
+        const bufferedSubAgentKind = buf[0]?.type === "subAgentActivity"
+          ? buf[0].kind || "interacted"
+          : null;
+        if (buf.length && subAgentKind !== bufferedSubAgentKind) flush();
         if (buf.length === 0) firstIndex = index;
         buf.push(item);
       } else {
@@ -823,8 +853,12 @@ function TurnView({ turn, streaming }) {
   const renderItem = (item, index, streamLast) => {
     const body = (
       <React.Fragment key={item.id ?? `i${index}`}>
-        <ItemView item={item} streaming={streamLast} turnId={turn.id} />
-        {showActions && index === lastAgent && <TurnActionRow turn={turn} />}
+        <ItemView
+          item={item}
+          streaming={streamLast}
+          turnId={turn.id}
+          showReasoning={showReasoning}
+        />
       </React.Fragment>
     );
     return item.type === "userMessage"
@@ -845,7 +879,17 @@ function TurnView({ turn, streaming }) {
           renderItem(seg.item, seg.index, streaming && segmentIndex === segments.length - 1)
         )
       )}
-      {!streaming && previewUrl && <WebPreviewCard url={previewUrl} />}
+      {!streaming && (previewUrl || fileChanges.length > 0 || showActions) && (
+        <div className={cx("flex flex-col", previewUrl || fileChanges.length > 0 ? "-mt-1" : "-mt-4")}>
+          {previewUrl && (
+            <div className={fileChanges.length > 0 ? "mb-3" : ""}>
+              <WebPreviewCard url={previewUrl} />
+            </div>
+          )}
+          {fileChanges.length > 0 && <TurnDiffCard diff={turnDiff} changes={fileChanges} />}
+          {showActions && <TurnActionRow turn={turn} />}
+        </div>
+      )}
       {turn.status === "failed" && turn.error && (
         <div className="rounded-[12.5px] border border-(--danger) bg-(--danger-soft) px-3 py-2 text-[13px] text-(--danger)">
           {turn.error.message || String(turn.error)}
@@ -1008,6 +1052,14 @@ function MessageRail({ turns, scrollRef }) {
 function WorklogGroup({ items, live }) {
   const [open, setOpen] = useState(false);
   const activityKind = worklogActivityKind(items);
+  if (items.every((item) => item.type === "subAgentActivity")) {
+    return <SubAgentActivityGroup items={items} />;
+  }
+  if (items.length === 1
+    && items[0].type === "fileChange"
+    && (items[0].changes || []).length === 1) {
+    return <ItemView item={items[0]} streaming={live} turnId={undefined} />;
+  }
   if (items.length === 1 && items[0].type !== "fileChange") {
     return <WorklogActionRow item={items[0]} live={live} />;
   }
@@ -1019,7 +1071,7 @@ function WorklogGroup({ items, live }) {
         data-activity-icon={activityKind}
         className={cx(
           "group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[14px] leading-[21px] font-[445]",
-          live ? "text-(--fg)" : "text-(--conversation-body)",
+          "text-(--fg)",
         )}
         onClick={() => setOpen(!open)}
       >
@@ -1044,6 +1096,62 @@ function WorklogGroup({ items, live }) {
         </div>
       </ActivityDisclosure>
     </div>
+  );
+}
+
+function subAgentDisplayName(item) {
+  const raw = item.agentPath || item.agentNickname || item.agentThreadId || "Subagent";
+  const leaf = String(raw).split("/").filter(Boolean).at(-1) || "Subagent";
+  const words = leaf.replace(/[_-]+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Subagent";
+}
+
+function SubAgentActivityGroup({ items }) {
+  const openThread = useStore((s) => s.openThread);
+  const agents = [];
+  const seen = new Set();
+  for (const item of items) {
+    const key = item.agentThreadId || item.agentPath || item.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    agents.push(item);
+  }
+  const visible = agents.slice(0, 3);
+  const kind = items.at(-1)?.kind || "interacted";
+  const state = kind === "started"
+    ? "started working"
+    : kind === "interrupted"
+      ? "interrupted"
+      : "updated";
+  const remainder = agents.length - visible.length;
+  return (
+    <section
+      className="min-w-0 text-[14px] leading-5 text-(--conversation-body)"
+      data-testid="subagent-activity-inline-group"
+    >
+      {visible.map((item) => {
+        const label = subAgentDisplayName(item);
+        return (
+          <button
+            key={item.agentThreadId || item.agentPath || item.id}
+            type="button"
+            className="mr-1.5 inline-flex h-7 max-w-48 min-w-0 items-center gap-1.5 rounded-full border border-(--border-light) bg-(--surface-under) pr-2 pl-1.5 align-middle first:-ml-1.5 hover:border-(--border-heavy) hover:bg-(--surface-hover) hover:text-(--fg)"
+            title={label}
+            onClick={() => item.agentThreadId && openThread(item.agentThreadId)}
+          >
+            <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-(--surface-raised)">
+              <IconBot size={12} />
+            </span>
+            <span className="min-w-0 truncate">{label}</span>
+          </button>
+        );
+      })}
+      <span className="inline">
+        {remainder > 0
+          ? `and ${remainder} other subagent${remainder === 1 ? "" : "s"} ${state}`
+          : state}
+      </span>
+    </section>
   );
 }
 
@@ -1086,7 +1194,7 @@ function worklogLabel(items) {
     if (isReadAction(it)) reads++;
     else if (it.type === "commandExecution" && commandActivity(it).category === "exploration") reads++;
     else if (isCommandAction(it)) cmds++;
-    else if (it.type === "fileChange") edits++;
+    else if (it.type === "fileChange") edits += Math.max(1, (it.changes || []).length);
     else if (it.type === "webSearch") webs++;
     else tools++;
   }
@@ -1095,7 +1203,12 @@ function worklogLabel(items) {
   if (reads) parts.push("Read files");
   if (cmds) parts.push(cmds === 1 ? "Ran a command" : "Ran commands");
   if (webs) parts.push("searched the web");
-  if (tools) parts.push(`called ${tools} tool${tools > 1 ? "s" : ""}`);
+  if (tools && !parts.length) {
+    const toolItems = items.filter((item) =>
+      item.type === "mcpToolCall" || item.type === "dynamicToolCall");
+    const sources = new Set(toolItems.map((item) => item.server || item.tool || "tool"));
+    parts.push(toolItems.length && sources.size === 1 ? toolActivityLabel(toolItems[0]) : "Used tools");
+  }
   return parts.map((part, index) => index === 0 ? part : part.charAt(0).toLowerCase() + part.slice(1)).join(", ") || "Worked";
 }
 
@@ -1116,9 +1229,7 @@ function isReadAction(it) {
 }
 
 function isCommandAction(it) {
-  return it.type === "commandExecution"
-    || ((it.type === "mcpToolCall" || it.type === "dynamicToolCall")
-      && /node.?repl/i.test(`${it.server || ""} ${it.tool || ""}`));
+  return it.type === "commandExecution";
 }
 
 function readActionPath(it) {
@@ -1131,13 +1242,7 @@ function readActionPath(it) {
 function WorklogActionRow({ item, live }) {
   const [open, setOpen] = useState(false);
   if (item.type === "fileChange") {
-    return (
-      <div data-activity-icon="edit-files" className={cx("inline-flex items-center gap-1.5 text-[13px] leading-[21px]", live ? "text-(--fg)" : "text-(--fg-tertiary)")}>
-        <IconEditFiles size={16} className="activity-edit-files shrink-0" />
-        <span>{worklogLabel([item])}</span>
-        {live && <Spinner size={11} className="shrink-0" />}
-      </div>
-    );
+    return <ItemView item={item} streaming={live} turnId={undefined} />;
   }
   if (isReadAction(item)) {
     const name = readActionPath(item) || item.title || "file";
@@ -1185,12 +1290,7 @@ function WorklogActionRow({ item, live }) {
     );
   }
   if (item.type === "mcpToolCall" || item.type === "dynamicToolCall") {
-    return (
-      <div data-activity-icon="mcp-source" className={cx("inline-flex items-center gap-1.5 text-[14px] leading-[21px] font-[445]", live ? "text-(--fg)" : "text-(--conversation-body)")}>
-        <WorklogActivityIcon kind="mcp-source" item={item} live={live} />
-        <span>{toolActivityLabel(item)}</span>
-      </div>
-    );
+    return <ItemView item={item} streaming={live} turnId={undefined} />;
   }
   return <ItemView item={item} streaming={live} turnId={undefined} />;
 }
@@ -1245,7 +1345,7 @@ function WorkingRow({ conv }) {
 // ---------------------------------------------------------------------------
 // Bottom area: gradient fade, plan widget, approvals, composer, footer line.
 // ---------------------------------------------------------------------------
-function BottomArea({ conv }) {
+function BottomArea({ conv, onScrollToBottom }) {
   const t = useT();
   const approvalsAll = useStore((s) => s.approvals);
   const activeThreadId = useStore((s) => s.activeThreadId);
@@ -1253,8 +1353,19 @@ function BottomArea({ conv }) {
   const goalDialogOpen = useStore((s) => s.ui.goalDialogOpen);
   const approvals = approvalsAll.filter((a) => !a.threadId || a.threadId === activeThreadId);
   return (
-    <div className="sticky bottom-0 z-10 mt-auto w-full shrink-0">
-      <div className="pointer-events-none h-8" />
+    <div className="relative z-10 w-full shrink-0 bg-(--surface)">
+      {onScrollToBottom && (
+        <button
+          type="button"
+          aria-label="Scroll to bottom"
+          title={t("Scroll to bottom")}
+          className="absolute -top-10 left-1/2 z-20 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-(--border) bg-(--surface-raised) text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)"
+          style={{ boxShadow: "var(--shadow-menu)" }}
+          onClick={onScrollToBottom}
+        >
+          <IconArrowDown size={15} />
+        </button>
+      )}
       <div className="mx-auto flex w-full max-w-(--thread-content-max-width) flex-col gap-2 px-4">
         {conv?.plan && <PlanWidget plan={conv.plan} />}
         {approvals.map((a) => (
@@ -1443,24 +1554,51 @@ function Home() {
   }, [cwd]);
   // reference rules: a matched project always puts its name in the heading;
   // git projects say "build in", anything else "work on"
-  const title = !project
+  const projectMarker = "\u0000project\u0000";
+  const localizedTitle = !project
     ? t("What should we build?")
-    : hasGit
-      ? t("What should we build in {project}?", { project })
-      : t("What should we work on in {project}?", { project });
+    : t(
+      hasGit
+        ? "What should we build in {project}?"
+        : "What should we work on in {project}?",
+      { project: projectMarker },
+    );
+  const [titleBeforeProject, titleAfterProject = ""] = localizedTitle.split(projectMarker);
+  const title = !project ? localizedTitle : (
+    <>
+      {titleBeforeProject}
+      <span className="inline-block max-w-full break-words whitespace-normal underline decoration-(--fg-tertiary) decoration-dotted decoration-[1px] underline-offset-4">
+        {project}
+      </span>
+      {titleAfterProject}
+    </>
+  );
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center">
-      <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto">
-        <div className="my-auto flex w-full flex-col items-center px-4 py-6">
-          <CodexMark size={56} className="text-(--fg) opacity-[0.24]" />
-          <div className="mt-5 mb-7 max-w-[720px] text-center text-[28px] leading-9 font-medium">
-            {title}
+    <div className="relative flex min-h-0 w-full flex-1 flex-col overflow-y-auto">
+      <div className="flex min-h-0 w-full flex-1 flex-col pt-6">
+        <div className="flex min-h-fit grow basis-0 items-end justify-center pb-24">
+          <div className="relative mx-auto flex w-full min-w-0 justify-center px-5">
+            <div className="flex min-h-28 w-full items-end justify-center">
+              <div className="flex w-full flex-col items-center gap-6">
+                <CodexMark size={56} className="text-(--fg) opacity-[0.24]" />
+                <div className="flex max-w-full min-w-0 items-end justify-center whitespace-pre-wrap text-center text-[28px] leading-[33.6px] font-normal select-none">
+                  <span className="inline-block max-w-full">{title}</span>
+                </div>
+              </div>
+            </div>
+            <div
+              className="absolute inset-x-[29px] top-full mt-8 min-w-0"
+              style={{ containerType: "inline-size" }}
+            >
+              <HomeSuggestions />
+            </div>
           </div>
-          <HomeSuggestions />
         </div>
-      </div>
-      <div className="w-full max-w-[768px] shrink-0 px-4 pb-4">
-        <Composer centered />
+        <div className="flex min-h-fit min-w-0 shrink-0 grow basis-0 flex-col justify-end">
+          <div className="mx-auto w-full max-w-[768px] px-4 pb-4">
+            <Composer centered />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1477,21 +1615,27 @@ function SuggestionCards() {
   const t = useT();
   const sendMessage = useStore((s) => s.sendMessage);
   const cards = [
-    { icon: <IconTelescope />, color: "#339cff", text: "Explore and understand code", prompt: "Explore this repository and explain how it works: architecture, key modules, and entry points." },
-    { icon: <IconHammer />, color: "#ad7bf9", text: "Build a new feature, app, or tool", prompt: "Help me build something new in this project. Ask what I want to make, then plan and implement it." },
+    { icon: <IconTelescope />, color: "#0169cc", text: "Explore and understand code", prompt: "Explore this repository and explain how it works: architecture, key modules, and entry points." },
+    { icon: <IconHammer />, color: "#b06dff", text: "Build a new feature, app, or tool", prompt: "Help me build something new in this project. Ask what I want to make, then plan and implement it." },
     { icon: <IconReviewCheck />, color: "#40c977", text: "Review code and suggest changes", prompt: "Review the recent changes and the most important files in this project. Suggest concrete improvements." },
-    { icon: <IconBug />, color: "#ff8549", text: "Fix issues and failures", prompt: "Find likely bugs in this project (failing tests, obvious defects, error-prone code) and propose minimal fixes." },
+    { icon: <IconBug />, color: "#fb6a22", text: "Fix issues and failures", prompt: "Find likely bugs in this project (failing tests, obvious defects, error-prone code) and propose minimal fixes." },
   ];
   return (
-    <div className="grid w-full max-w-[708px] gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+    <div className="home-suggestion-grid mt-1 grid gap-3">
       {cards.map((c) => (
         <button
           key={c.text}
-          className="flex min-h-[104px] flex-col items-start gap-2 rounded-2xl border border-(--border-light) bg-(--surface-under) px-4 py-3 text-left transition-colors hover:border-(--border) hover:bg-(--surface-hover)"
+          className="flex h-full min-h-[104px] w-full min-w-0 flex-col rounded-[20px] bg-(--surface) px-4 py-3 text-left shadow-[0_0_0_0.5px_var(--border-heavy),0_2px_4px_-1px_rgb(0_0_0/0.1)] outline-none transition-colors hover:bg-(--surface-hover)"
           onClick={() => sendMessage(c.prompt)}
         >
-          <span style={{ color: c.color }}>{c.icon}</span>
-          <span className="text-[13px] leading-5 text-(--fg)">{t(c.text)}</span>
+          <span className="flex h-6 w-full items-center justify-between gap-2">
+            <span className="flex size-6 shrink-0 items-center justify-start" style={{ color: c.color }}>
+              {c.icon}
+            </span>
+          </span>
+          <span className="mt-auto flex min-h-10 w-full flex-col justify-end">
+            <span className="text-[13px] leading-5 font-medium text-(--fg)">{t(c.text)}</span>
+          </span>
         </button>
       ))}
     </div>
