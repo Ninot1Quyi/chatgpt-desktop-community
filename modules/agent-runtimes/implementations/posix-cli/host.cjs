@@ -32,6 +32,57 @@ function resolveKimiBinary(homePath, env = process.env) {
   ]);
 }
 
+function resolveBundledPluginMarketplace({
+  env = process.env,
+  existsSync = fs.existsSync,
+  homePath,
+  resourcesPath = process.resourcesPath,
+  systemApplicationsPath = "/Applications",
+} = {}) {
+  const candidates = [
+    env.CODEX_BUNDLED_PLUGINS_PATH,
+    resourcesPath && path.join(resourcesPath, "plugins", "openai-bundled"),
+    path.join(
+      systemApplicationsPath,
+      "ChatGPT.app",
+      "Contents",
+      "Resources",
+      "plugins",
+      "openai-bundled",
+    ),
+    path.join(
+      systemApplicationsPath,
+      "Codex.app",
+      "Contents",
+      "Resources",
+      "plugins",
+      "openai-bundled",
+    ),
+    homePath && path.join(
+      homePath,
+      "Applications",
+      "ChatGPT.app",
+      "Contents",
+      "Resources",
+      "plugins",
+      "openai-bundled",
+    ),
+    homePath && path.join(
+      homePath,
+      "Applications",
+      "Codex.app",
+      "Contents",
+      "Resources",
+      "plugins",
+      "openai-bundled",
+    ),
+  ];
+  return candidates.find((candidate) =>
+    candidate &&
+    existsSync(path.join(candidate, ".agents", "plugins", "marketplace.json"))
+  ) || null;
+}
+
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
@@ -65,6 +116,7 @@ function startLogin({ args, binary, runtime }) {
 }
 
 module.exports = {
+  resolveBundledPluginMarketplace,
   resolveClaudeBinary,
   resolveKimiBinary,
   startLogin,

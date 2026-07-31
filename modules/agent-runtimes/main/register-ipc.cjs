@@ -18,6 +18,10 @@ const {
   getPluginInstallTargets,
   installPluginForRuntime,
 } = require("./plugin-targets.cjs");
+const {
+  createBundledPluginMarketplaceRegistrar,
+  ensureBundledPluginMarketplace,
+} = require("./bundled-plugins.cjs");
 
 function resultOrError(operation) {
   return Promise.resolve()
@@ -240,4 +244,8 @@ function registerAgentRuntimeHandlers({
   });
 }
 
-module.exports = { registerAgentRuntimeHandlers };
+module.exports = {
+  createBundledPluginMarketplaceRegistrar,
+  ensureBundledPluginMarketplace,
+  registerAgentRuntimeHandlers,
+};

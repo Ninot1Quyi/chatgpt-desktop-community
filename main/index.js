@@ -33,6 +33,8 @@ const {
   setHotkeyAlwaysOnTop,
 } = require("@modules/desktop-shell");
 const {
+  createBundledPluginMarketplaceRegistrar,
+  ensureBundledPluginMarketplace,
   registerAgentRuntimeHandlers,
 } = require("@modules/agent-runtimes");
 const { readRolloutActivity } = require("./rollout-activity");
@@ -636,6 +638,27 @@ registerGlobalStateHandlers({
 // ipcMain.handle makes Electron log "Error occurred in handler" on every failed
 // RPC (e.g. rate-limit polls when chatgpt.com is unreachable), spamming the console.
 let codexModelIds = new Set();
+const registerBundledPluginMarketplace =
+  createBundledPluginMarketplaceRegistrar(() =>
+    ensureBundledPluginMarketplace({
+      homePath: app.getPath("home"),
+      host: agentRuntimeHost,
+      request: (method, params) => bridge.request(method, params),
+      resourcesPath: process.resourcesPath,
+    }),
+  );
+
+async function recoverBundledPluginMarketplace() {
+  try {
+    return await registerBundledPluginMarketplace();
+  } catch (error) {
+    diagnostics.log("warn", "plugins", "bundled_marketplace_recovery_failed", {
+      error,
+    });
+    return null;
+  }
+}
+
 function rememberCodexModels(result) {
   if (Array.isArray(result?.data)) {
     codexModelIds = new Set(result.data.map((model) => model?.model).filter(Boolean));
@@ -644,6 +667,9 @@ function rememberCodexModels(result) {
 
 ipcMain.handle("rpc:request", async (_e, { method, params }) => {
   try {
+    if (method === "plugin/list") {
+      await recoverBundledPluginMarketplace();
+    }
     if (method === "thread/start" || method === "turn/start") {
       if (!codexModelIds.size) {
         rememberCodexModels(await bridge.request("model/list", { limit: 100 }));

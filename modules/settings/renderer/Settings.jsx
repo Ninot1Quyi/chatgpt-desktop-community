@@ -200,18 +200,10 @@ export default function Settings() {
                       ? "bg-(--surface-active) font-medium"
                       : "text-(--fg-secondary) hover:bg-(--surface-hover)"
                   )}
-                  onClick={() => {
-                    // Account links out to the web account page (reference behavior).
-                    if (it.id === "account") {
-                      api.openExternal("https://chatgpt.com/#settings");
-                      return;
-                    }
-                    setSection(it.id);
-                  }}
+                  onClick={() => setSection(it.id)}
                 >
                   <it.icon size={15} className="shrink-0 text-(--fg-tertiary)" />
                   <span className="min-w-0 flex-1">{t(it.label)}</span>
-                  {it.id === "account" && <span className="shrink-0 text-(--fg-faint)">↗</span>}
                 </button>
               ))}
             </div>

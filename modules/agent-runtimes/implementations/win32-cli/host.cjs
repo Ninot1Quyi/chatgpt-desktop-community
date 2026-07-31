@@ -30,6 +30,59 @@ function resolveKimiBinary(homePath, env = process.env) {
   ]);
 }
 
+function resolveBundledPluginMarketplace({
+  env = process.env,
+  existsSync = fs.existsSync,
+  homePath,
+  resourcesPath = process.resourcesPath,
+} = {}) {
+  const candidates = [
+    env.CODEX_BUNDLED_PLUGINS_PATH,
+    resourcesPath && path.win32.join(
+      resourcesPath,
+      "plugins",
+      "openai-bundled",
+    ),
+    env.LOCALAPPDATA && path.win32.join(
+      env.LOCALAPPDATA,
+      "Programs",
+      "OpenAI",
+      "Codex",
+      "resources",
+      "plugins",
+      "openai-bundled",
+    ),
+    env.ProgramFiles && path.win32.join(
+      env.ProgramFiles,
+      "OpenAI",
+      "Codex",
+      "resources",
+      "plugins",
+      "openai-bundled",
+    ),
+    homePath && path.win32.join(
+      homePath,
+      "AppData",
+      "Local",
+      "Programs",
+      "OpenAI",
+      "Codex",
+      "resources",
+      "plugins",
+      "openai-bundled",
+    ),
+  ];
+  return candidates.find((candidate) =>
+    candidate &&
+    existsSync(path.win32.join(
+      candidate,
+      ".agents",
+      "plugins",
+      "marketplace.json",
+    ))
+  ) || null;
+}
+
 function startLogin({ args, binary, runtime }) {
   const launcher = path.join(
     os.tmpdir(),
@@ -54,6 +107,7 @@ function startLogin({ args, binary, runtime }) {
 }
 
 module.exports = {
+  resolveBundledPluginMarketplace,
   resolveClaudeBinary,
   resolveKimiBinary,
   startLogin,
