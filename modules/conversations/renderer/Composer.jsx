@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useStore, PERMISSIONS, normalizePermission, runtimeConnected } from "@app/store.js";
 import * as api from "@app/api.js";
 import { cx } from "@app/lib/cx.js";
+import { useT } from "@app/i18n.jsx";
 import { basename } from "@app/lib/time.js";
 import { Menu } from "@app/components/ui.jsx";
 import { usePanelStore } from "@modules/workspace-panels/state";
@@ -140,6 +141,7 @@ function FitIcon({ children, className }) {
 
 // ---------------------------------------------------------------------------
 export default function Composer({ centered = false, quick = false }) {
+  const t = useT();
   const activeThreadId = useStore((s) => s.activeThreadId);
   const conv = useStore((s) => (s.activeThreadId ? s.conversations[s.activeThreadId] : null));
   const queueAll = useStore((s) => s.queue);
@@ -615,17 +617,17 @@ export default function Composer({ centered = false, quick = false }) {
             ref={taRef}
             rows={1}
             value={text}
-            placeholder="Message ChatGPT"
+            placeholder={t("Message ChatGPT")}
             className="min-w-0 flex-1 resize-none bg-transparent px-1 py-1 text-[14px] leading-6 text-(--fg) outline-none placeholder:text-(--fg-faint)"
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKeyDown}
             onPaste={onPasteFiles}
           />
-          <span className="shrink-0 px-1 text-[13px] text-(--fg-tertiary)">Instant</span>
+          <span className="shrink-0 px-1 text-[13px] text-(--fg-tertiary)">{t("Instant")}</span>
           <VoiceButton />
           {running && !canSend ? (
             <button
-              title="Stop"
+              title={t("Stop")}
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--fg) font-[445] text-(--surface) hover:text-(--danger)"
               onClick={interrupt}
             >
@@ -633,7 +635,7 @@ export default function Composer({ centered = false, quick = false }) {
             </button>
           ) : (
             <button
-              title="Send (Enter)"
+              title={t("Send (Enter)")}
               disabled={!canSend}
               onClick={() => doSend()}
               className={cx(
@@ -666,7 +668,7 @@ export default function Composer({ centered = false, quick = false }) {
     >
       {dragOver && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[25px] border-2 border-dashed border-(--accent) bg-(--accent-soft) text-[13px] font-medium text-(--accent)">
-          Drop to attach
+          {t("Drop to attach")}
         </div>
       )}
 
@@ -679,7 +681,7 @@ export default function Composer({ centered = false, quick = false }) {
             >
               <span className="min-w-0 truncate">{q.text}</span>
               <button
-                title="Remove queued message"
+                title={t("Remove queued message")}
                 className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-(--fg-tertiary) hover:text-(--danger)"
                 onClick={() => removeQueuedMessage(activeThreadId, q.id)}
               >
@@ -801,7 +803,7 @@ export default function Composer({ centered = false, quick = false }) {
             {menu.kind === "slash" && (
               <>
                 {menuCount === 0 && (
-                  <div className="px-3 py-2 text-xs text-(--fg-tertiary)">No matching commands</div>
+                  <div className="px-3 py-2 text-xs text-(--fg-tertiary)">{t("No matching commands")}</div>
                 )}
                 {filteredCommands.map((c, i) => (
                   <button
@@ -815,8 +817,8 @@ export default function Composer({ centered = false, quick = false }) {
                     onClick={() => runCommand(c)}
                   >
                     <FitIcon>{c.icon}</FitIcon>
-                    <span className="max-w-[60%] flex-none truncate">{c.label}</span>
-                    <span className="ml-auto min-w-0 flex-1 truncate text-right text-sm text-(--fg-tertiary)">{c.desc}</span>
+                    <span className="max-w-[60%] flex-none truncate">{t(c.label)}</span>
+                    <span className="ml-auto min-w-0 flex-1 truncate text-right text-sm text-(--fg-tertiary)">{t(c.desc)}</span>
                   </button>
                 ))}
                 {promptResults.map((p, i) => {
@@ -870,7 +872,7 @@ export default function Composer({ centered = false, quick = false }) {
               <>
                 {skillResults.length === 0 && (
                   <div className="px-3 py-2 text-xs text-(--fg-tertiary)">
-                    {menu.query ? "No matching skills" : "Loading skills…"}
+                    {t(menu.query ? "No matching skills" : "Loading skills…")}
                   </div>
                 )}
                 {skillResults.map((s, i) => (
@@ -901,7 +903,7 @@ export default function Composer({ centered = false, quick = false }) {
               <>
                 {mentionResults.length === 0 && (
                   <div className="px-3 py-2 text-xs text-(--fg-tertiary)">
-                    {menu.query ? "Searching…" : "Type to search files"}
+                    {t(menu.query ? "Searching…" : "Type to search files")}
                   </div>
                 )}
                 {mentionResults.map((f, i) => (
@@ -927,14 +929,14 @@ export default function Composer({ centered = false, quick = false }) {
           {mentions.some((mention) => mention.kind === "site") && (
             <span className="mt-px flex shrink-0 items-center gap-1.5 py-0 text-[14px] leading-5 font-medium text-(--accent)">
               <IconNavSites size={16} />
-              Sites
+              {t("Sites")}
             </span>
           )}
           <textarea
             ref={taRef}
             rows={1}
             value={text}
-            placeholder={useStore((s) => s.mode) === "chatgpt" ? "Message ChatGPT" : "Do anything"}
+            placeholder={t(useStore((s) => s.mode) === "chatgpt" ? "Message ChatGPT" : "Do anything")}
             className="block min-h-11 min-w-0 flex-1 resize-none bg-transparent p-0 text-[14px] leading-5 font-[445] text-(--fg) outline-none placeholder:text-(--fg-faint)"
             onChange={(e) => { setText(e.target.value); detectMenu(e.target.value, e.target.selectionStart); }}
             onKeyDown={onKeyDown}
@@ -959,7 +961,7 @@ export default function Composer({ centered = false, quick = false }) {
               <VoiceButton />
               {running && !canSend ? (
                 <button
-                  title="Stop"
+                  title={t("Stop")}
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--fg) font-[445] text-(--surface) hover:text-(--danger)"
                   onClick={interrupt}
                 >
@@ -967,7 +969,7 @@ export default function Composer({ centered = false, quick = false }) {
                 </button>
               ) : (
                 <button
-                  title="Send (Enter)"
+                  title={t("Send (Enter)")}
                   disabled={!canSend}
                   onClick={() => doSend()}
                   className={cx(
@@ -998,6 +1000,7 @@ export default function Composer({ centered = false, quick = false }) {
 // chips stay hidden, like the official client.
 // ---------------------------------------------------------------------------
 function HomeContextBar() {
+  const t = useT();
   const cwd = useStore((s) => s.cwd);
   const pickCwd = useStore((s) => s.pickCwd);
   const gs = useStore((s) => s.gs);
@@ -1082,19 +1085,19 @@ function HomeContextBar() {
       <div ref={wrapRef} className="relative">
         <div className="group/projchip relative inline-flex min-w-0 rounded-full">
           <button
-            title={project ? (project.rootPaths || [])[0] : "Select project"}
+            title={project ? (project.rootPaths || [])[0] : t("Select project")}
             onClick={() => { setOpen(!open); setQuery(""); }}
             className={cx(chipCls, "hover:bg-(--surface-hover)")}
           >
             <IconFolder size={13} className={cx(iconCls, project && "group-hover/projchip:invisible")} />
-            <span className="max-w-[220px] truncate">{project ? project.name : "Select project"}</span>
+            <span className="max-w-[220px] truncate">{project ? project.name : t("Select project")}</span>
           </button>
           {project && (
             // official behavior: hovering the chip covers the folder icon with a
             // circled-X ("Don't work in a project") that clears the selection
             <button
-              aria-label="Don't work in a project"
-              title="Don't work in a project"
+              aria-label={t("Don't work in a project")}
+              title={t("Don't work in a project")}
               className="pointer-events-none absolute inset-y-0 left-0 z-10 flex aspect-square items-center justify-center rounded-full text-(--fg-tertiary) opacity-0 transition-opacity group-hover/projchip:pointer-events-auto group-hover/projchip:opacity-100 hover:text-(--fg)"
               onClick={(e) => {
                 e.stopPropagation();
@@ -1117,7 +1120,7 @@ function HomeContextBar() {
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search projects"
+                placeholder={t("Search projects")}
                 className="w-full bg-transparent text-[13px] outline-none placeholder:text-(--fg-faint)"
               />
             </div>
@@ -1132,7 +1135,7 @@ function HomeContextBar() {
                     <span className="min-w-0 flex-1 truncate">{p.name}</span>
                   </button>
                   <button
-                    title={`Remove ${p.name}`}
+                    title={t("Remove {project}", { project: p.name })}
                     className="absolute top-1/2 right-1.5 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-(--fg-tertiary) opacity-0 group-hover/projrow:opacity-100 hover:bg-(--surface-active) hover:text-(--fg)"
                     onClick={(e) => { e.stopPropagation(); removeProject(p.id); }}
                   >
@@ -1141,7 +1144,7 @@ function HomeContextBar() {
                 </div>
               ))}
               {filtered.length === 0 && (
-                <div className="px-3 py-2 text-xs text-(--fg-tertiary)">No matching projects</div>
+                <div className="px-3 py-2 text-xs text-(--fg-tertiary)">{t("No matching projects")}</div>
               )}
             </div>
             <div className="border-t border-(--border-light) p-1">
@@ -1150,7 +1153,7 @@ function HomeContextBar() {
                 onClick={() => { setOpen(false); pickCwd(); }}
               >
                 <LucideIcon name="Plus" size={14} className="shrink-0 text-(--fg-tertiary)" />
-                New project…
+                {t("New project…")}
               </button>
             </div>
           </div>
@@ -1160,7 +1163,7 @@ function HomeContextBar() {
         <>
           <span className={chipCls}>
             <IconMonitor size={13} className={iconCls} />
-            Local
+            {t("Local")}
           </span>
           {branch && (
             <span className={chipCls}>
@@ -1178,6 +1181,7 @@ function HomeContextBar() {
 // "+" button with attach menu.
 // ---------------------------------------------------------------------------
 function AttachButton({ onPickImages, onPickFiles, onInsertText, browserTab }) {
+  const translateText = useT();
   const ref = useRef(null);
   const [open, setOpen] = useState(false);
   const [plugins, setPlugins] = useState([]);
@@ -1267,8 +1271,8 @@ function AttachButton({ onPickImages, onPickFiles, onInsertText, browserTab }) {
       label: (
         <span className="flex items-center gap-2">
           <IconChat size={16} />
-          <span className="min-w-0 flex-1 truncate">{t.name || "Untitled chat"}</span>
-          <span className="shrink-0 text-xs text-(--fg-faint)">ChatGPT conversation</span>
+          <span className="min-w-0 flex-1 truncate">{t.name || translateText("Untitled chat")}</span>
+          <span className="shrink-0 text-xs text-(--fg-faint)">{translateText("ChatGPT conversation")}</span>
         </span>
       ),
       onSelect: () => onInsertText(`Chat: ${t.name || "Untitled chat"} `),
@@ -1279,7 +1283,7 @@ function AttachButton({ onPickImages, onPickFiles, onInsertText, browserTab }) {
     <>
       <button
         ref={ref}
-        title="Add files and more"
+        title={translateText("Add files and more")}
         onClick={() => setOpen(true)}
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-transparent text-[13px] leading-[18px] font-[445] text-(--fg) hover:bg-(--surface-hover)"
       >
@@ -1302,6 +1306,7 @@ function AttachButton({ onPickImages, onPickFiles, onInsertText, browserTab }) {
 // Permission preset chip.
 // ---------------------------------------------------------------------------
 function PermissionChip() {
+  const t = useT();
   const permission = useStore((s) => normalizePermission(s.permission));
   const setPermission = useStore((s) => s.setPermission);
   const ref = useRef(null);
@@ -1324,18 +1329,18 @@ function PermissionChip() {
       >
         <FullAccessIcon size={16} className={full ? "text-(--warning)" : "text-(--fg-tertiary)"} />
         <span className={cx("font-normal", full && "text-(--warning)")}>
-          {PERMISSIONS[permission]?.label || "Permissions"}
+          {t(PERMISSIONS[permission]?.label || "Permissions")}
         </span>
       </button>
       {open && (
         <RichPopover anchor={() => ref.current?.getBoundingClientRect()} onClose={() => setOpen(false)} width={400}>
           <div className="flex items-center justify-between gap-2 px-3 pt-2.5 pb-1.5">
-            <span className="whitespace-nowrap text-xs font-medium text-(--fg-tertiary)">How should ChatGPT actions be approved?</span>
+            <span className="whitespace-nowrap text-xs font-medium text-(--fg-tertiary)">{t("How should ChatGPT actions be approved?")}</span>
             <button
               className="shrink-0 text-xs whitespace-nowrap text-(--fg-secondary) underline hover:text-(--fg)"
               onClick={() => api.openExternal("https://developers.openai.com/codex/")}
             >
-              Learn more
+              {t("Learn more")}
             </button>
           </div>
           {OPTIONS.map((o) => (
@@ -1346,8 +1351,8 @@ function PermissionChip() {
             >
               <span className={cx("mt-0.5 shrink-0", o.warn ? "text-(--warning)" : "text-(--fg-tertiary)")}>{o.icon}</span>
               <span className="min-w-0 flex-1">
-                <span className={cx("block text-[13px]", o.warn && "text-(--warning)")}>{o.label}</span>
-                <span className="block text-xs leading-4 text-(--fg-tertiary)">{o.desc}</span>
+                <span className={cx("block text-[13px]", o.warn && "text-(--warning)")}>{t(o.label)}</span>
+                <span className="block text-xs leading-4 text-(--fg-tertiary)">{t(o.desc)}</span>
               </span>
               {permission === o.id && <IconCheck size={14} className="mt-0.5 shrink-0 text-(--accent)" />}
             </button>
@@ -1413,17 +1418,18 @@ const IconGear = (p) => <LucideIcon name="Settings" size={p.size || 16} classNam
 // Plan-mode indicator chip (visible while plan mode is on; click to exit).
 // Goal is not a resident composer button — it is set from the "/" menu.
 function PlanChip() {
+  const t = useT();
   const planMode = useStore((s) => s.planMode);
   const setPlanMode = useStore((s) => s.setPlanMode);
   if (!planMode) return null;
   return (
     <button
-      title="Plan mode is on — click to turn off"
+      title={t("Plan mode is on — click to turn off")}
       className="flex h-7 items-center gap-1 rounded-full border border-(--accent) bg-(--accent-soft) px-2.5 text-xs font-medium text-(--accent)"
       onClick={() => setPlanMode(false)}
     >
       <IconList size={12} />
-      Plan
+      {t("Plan")}
       <IconX size={11} className="opacity-60" />
     </button>
   );
@@ -1445,6 +1451,7 @@ function effortLabel(e) {
 
 // ---------------------------------------------------------------------------
 function ModelChip() {
+  const t = useT();
   const models = useStore((s) => s.models);
   const modelsByRuntime = useStore((s) => s.modelsByRuntime);
   const runtimeCatalog = useStore((s) => s.runtimeCatalog);
@@ -1506,7 +1513,7 @@ function ModelChip() {
       <button
         ref={ref}
         onClick={() => setOpen(true)}
-        title="Model, effort, and speed"
+        title={t("Model, effort, and speed")}
         aria-haspopup="menu"
         aria-expanded={open}
         data-state={open ? "open" : "closed"}
@@ -1547,6 +1554,7 @@ function ModelChip() {
 // The reasoning menu: Model / Effort / Speed rows whose submenus fly out on
 // hover (like the reference client).
 function ModelMenu({ anchor, onClose, models, modelGroups, runtime, current, model, modelName, effLabel, effort, serviceTier, setModel, setEffort, setServiceTier, advanced, setAdvanced }) {
+  const t = useT();
   const ref = useRef(null);
   const [fly, setFly] = useState(null); // {kind, topViewport}
   const closeTimer = useRef(null);
@@ -1622,7 +1630,7 @@ function ModelMenu({ anchor, onClose, models, modelGroups, runtime, current, mod
             aria-expanded={advanced}
           >
             <span className="inline-flex items-center gap-1 px-1 py-0.5">
-              Advanced
+              {t("Advanced")}
               <IconComposerChevronRight
                 className="size-3 shrink-0"
                 style={{
@@ -1668,7 +1676,7 @@ function ModelMenu({ anchor, onClose, models, modelGroups, runtime, current, mod
           )}
           {fly.kind === "effort" && (
             <>
-              <div className="px-2 py-1 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary)">Effort</div>
+              <div className="px-2 py-1 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary)">{t("Effort")}</div>
               {efforts.map((e) => {
                 const ultra = e.reasoningEffort === "ultra";
                 return (
@@ -1685,7 +1693,7 @@ function ModelMenu({ anchor, onClose, models, modelGroups, runtime, current, mod
           )}
           {fly.kind === "speed" && (
             <>
-              <div className="px-2 py-1 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary)">Speed</div>
+              <div className="px-2 py-1 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary)">{t("Speed")}</div>
               <FlyOption label="Standard" desc="Default speed" checked={!serviceTier} onClick={pick(() => setServiceTier(null))} />
               {hasFast && (
                 <FlyOption label="Fast" desc="1.5x speed, more usage" checked={serviceTier === "priority"} onClick={pick(() => setServiceTier("priority"))} />
@@ -1799,7 +1807,9 @@ function EffortSlider({ efforts, effLabel, onPick }) {
   );
 }
 
-function MenuRow({ label, value, onEnter, onLeave }) {  return (
+function MenuRow({ label, value, onEnter, onLeave }) {
+  const t = useT();
+  return (
     <button
       role="menuitem"
       data-model-menu-row={label.toLowerCase()}
@@ -1808,9 +1818,9 @@ function MenuRow({ label, value, onEnter, onLeave }) {  return (
       onMouseLeave={onLeave}
       onClick={onEnter}
     >
-      <span className="text-(--fg)">{label}</span>
+      <span className="text-(--fg)">{t(label)}</span>
       <span className="flex items-center gap-3 tabular-nums text-(--fg-tertiary)">
-        {value}
+        {t(value)}
         <IconGoalChevron size={16} />
       </span>
     </button>
@@ -1818,11 +1828,12 @@ function MenuRow({ label, value, onEnter, onLeave }) {  return (
 }
 
 function FlyOption({ label, desc, checked, onClick }) {
+  const t = useT();
   return (
     <button role="menuitem" data-model-fly-option={label} data-checked={checked || undefined} className="flex w-full items-center gap-2 rounded-[12.5px] px-2 py-[5px] text-left text-[13px] leading-[18.5714px] font-[445] hover:bg-(--sidebar-row-active)" onClick={onClick}>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-(--fg)">{label}</span>
-        {desc && <span className="block truncate text-(--fg-tertiary)">{desc}</span>}
+        <span className="block truncate text-(--fg)">{t(label)}</span>
+        {desc && <span className="block truncate text-(--fg-tertiary)">{t(desc)}</span>}
       </span>
       {checked && <IconSkillCheck size={16} className="shrink-0 text-(--fg) opacity-75" />}
     </button>

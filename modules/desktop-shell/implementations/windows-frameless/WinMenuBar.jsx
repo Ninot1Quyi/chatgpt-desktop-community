@@ -7,10 +7,12 @@ import { useStore } from "@app/store.js";
 import * as api from "@app/api.js";
 import { cx } from "@app/lib/cx.js";
 import { Menu } from "@app/components/ui.jsx";
+import { useT } from "@app/i18n.jsx";
 
 const DOCS_URL = "https://developers.openai.com/codex/";
 
 export default function WinMenuBar() {
+  const t = useT();
   const [openId, setOpenId] = useState(null);
   const btnRefs = useRef({});
 
@@ -86,7 +88,7 @@ export default function WinMenuBar() {
             openId === m.id ? "bg-(--surface-hover) text-(--fg)" : "text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)"
           )}
         >
-          {m.label}
+          {t(m.label)}
         </button>
       ))}
       <Menu

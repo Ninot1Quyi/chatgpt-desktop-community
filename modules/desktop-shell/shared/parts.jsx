@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { useStore } from "@app/store.js";
 import { cx } from "@app/lib/cx.js";
+import { useT } from "@app/i18n.jsx";
 import { Sidebar } from "@modules/projects-navigation";
 import { IconButton, Menu } from "@app/components/ui.jsx";
 import {
@@ -134,6 +135,7 @@ export function HeaderNewChatButton({ IconButtonComponent, icon }) {
 }
 
 export function PluginsHeaderTabs() {
+  const t = useT();
   const tab = useStore((state) => state.ui.pluginsTab || "plugins");
   const setUi = useStore((state) => state.setUi);
   return (
@@ -149,7 +151,7 @@ export function PluginsHeaderTabs() {
               : "border-transparent text-(--fg-tertiary) hover:text-(--fg)",
           )}
         >
-          {label}
+          {t(label)}
         </button>
       ))}
     </div>
@@ -157,6 +159,7 @@ export function PluginsHeaderTabs() {
 }
 
 export function NavHeaderActions({ view }) {
+  const t = useT();
   const setUi = useStore((state) => state.setUi);
   const [createOpen, setCreateOpen] = useState(false);
   const createRef = useRef(null);
@@ -221,7 +224,7 @@ export function NavHeaderActions({ view }) {
           onClick={createExtension}
         >
           <IconPlus size={12} />
-          Create
+          {t("Create")}
           <IconChevronDown size={12} className="text-(--fg-tertiary)" />
         </button>
       </div>
@@ -237,7 +240,7 @@ export function NavHeaderActions({ view }) {
           onClick={() => setCreateOpen(true)}
         >
           <IconPlus size={12} />
-          Create
+          {t("Create")}
           <IconChevronDown size={12} className="text-(--fg-tertiary)" />
         </button>
         <Menu
@@ -259,11 +262,12 @@ export function NavHeaderActions({ view }) {
 }
 
 export function BottomPanel() {
+  const t = useT();
   const setUi = useStore((state) => state.setUi);
   return (
     <div className="flex h-full flex-col bg-(--surface-under)">
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-(--border-light) px-2">
-        <span className="px-1 text-xs text-(--fg-tertiary)">Terminal</span>
+        <span className="px-1 text-xs text-(--fg-tertiary)">{t("Terminal")}</span>
         <IconButton
           icon={<IconX />}
           title="Close"

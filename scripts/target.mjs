@@ -172,8 +172,8 @@ function builderConfig() {
 }
 
 async function packageApplication() {
-  await buildApplication();
   await prepareRuntime();
+  await buildApplication();
   const platform = Platform[distribution.builderPlatform];
   const arch = Arch[target.arch];
   await buildElectron({

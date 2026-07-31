@@ -76,8 +76,31 @@ contextBridge.exposeInMainWorld("codexBridge", {
     if (r && r.ok === false) throw new Error(r.error);
     return r?.result;
   },
+  agentRuntimeProfileLogin: async (runtime) => {
+    const r = await ipcRenderer.invoke("agent-runtime:profile-login", { runtime });
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
+  agentRuntimeProfileLogout: async (runtime) => {
+    const r = await ipcRenderer.invoke("agent-runtime:profile-logout", { runtime });
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
   agentRuntimeLogin: async (runtime) => {
     const r = await ipcRenderer.invoke("agent-runtime:login", { runtime });
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
+  agentRuntimePluginTargets: async (plugin) => {
+    const r = await ipcRenderer.invoke("agent-runtime:plugin-targets", { plugin });
+    if (r && r.ok === false) throw new Error(r.error);
+    return r?.result;
+  },
+  agentRuntimePluginInstall: async (runtime, plugin) => {
+    const r = await ipcRenderer.invoke(
+      "agent-runtime:plugin-install",
+      { plugin, runtime },
+    );
     if (r && r.ok === false) throw new Error(r.error);
     return r?.result;
   },

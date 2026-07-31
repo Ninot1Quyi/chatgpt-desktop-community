@@ -1,7 +1,17 @@
 // Electron main process: window management + codex app-server stdio bridge.
 // Clean-room reimplementation. The app-server (codex CLI) owns all auth —
 // it reads %USERPROFILE%\.codex\auth.json itself; we never touch credentials here.
-const { app, BrowserWindow, ipcMain, protocol, net, dialog, shell, nativeTheme } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  protocol,
+  net,
+  dialog,
+  session,
+  shell,
+  nativeTheme,
+} = require("electron");
 const { spawn, execFile } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs");
@@ -126,7 +136,16 @@ class AppServerBridge {
     this.broadcastStatus();
     const bin = this.resolveBinary();
     this.binary = bin;
-    const args = ["-c", "features.code_mode_host=true", "-c", "features.realtime_conversation=true", "app-server", "--analytics-default-enabled"];
+    const args = [
+      "-c",
+      "features.code_mode_host=true",
+      "-c",
+      "features.realtime_conversation=true",
+      "-c",
+      "features.respect_system_proxy=true",
+      "app-server",
+      "--analytics-default-enabled",
+    ];
     console.log(`[bridge] spawning ${bin} ${args.join(" ")}`);
     this.proc = spawn(bin, args, {
       stdio: ["pipe", "pipe", "pipe"],
@@ -696,8 +715,10 @@ ipcMain.handle("app:info", () => ({
 }));
 registerAgentRuntimeHandlers({
   app,
+  BrowserWindow,
   host: agentRuntimeHost,
   ipcMain,
+  session,
 });
 ipcMain.handle("rollout:activity", (_e, { file }) => {
   try {

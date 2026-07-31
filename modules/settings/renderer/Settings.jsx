@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useStore, normalizePermission, runtimeConnected, planLabel } from "@app/store.js";
 import * as api from "@app/api.js";
 import { cx } from "@app/lib/cx.js";
+import { SUPPORTED_LANGUAGES, normalizeLanguage, useT } from "@app/i18n.jsx";
 import {
   codexRateLimitSections,
   codexRateLimitWindows,
@@ -120,6 +121,7 @@ const SECTIONS = [
 // Settings window
 // ---------------------------------------------------------------------------
 export default function Settings() {
+  const t = useT();
   const open = useStore((s) => s.ui.settingsOpen);
   const setUi = useStore((s) => s.setUi);
   const [section, setSection] = useState("general");
@@ -154,7 +156,10 @@ export default function Settings() {
   const q = query.trim().toLowerCase();
   const groups = SECTIONS.map((g) => ({
     ...g,
-    items: g.items.filter((it) => !q || it.label.toLowerCase().includes(q)),
+    items: g.items.filter((it) =>
+      !q
+      || it.label.toLowerCase().includes(q)
+      || t(it.label).toLowerCase().includes(q)),
   })).filter((g) => g.items.length > 0);
   const active = SECTIONS.flatMap((g) => g.items).find((it) => it.id === section);
 
@@ -168,7 +173,7 @@ export default function Settings() {
           onClick={close}
         >
           <IconChevronLeft size={14} />
-          Back to app
+          {t("Back to app")}
         </button>
         <div className="shrink-0 px-3 pb-2">
           <div className="relative">
@@ -176,7 +181,7 @@ export default function Settings() {
             <input
               autoFocus
               className="h-7 w-full rounded-full border border-(--border-light) bg-(--surface) pr-3 pl-7 text-[12px] outline-none placeholder:text-(--fg-faint) focus:border-(--accent)"
-              placeholder="Search settings…"
+              placeholder={t("Search settings…")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -185,7 +190,7 @@ export default function Settings() {
         <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
           {groups.map((g) => (
             <div key={g.header}>
-              <div className="px-2 pt-3 pb-1 text-[11px] font-medium text-(--fg-tertiary)">{g.header}</div>
+              <div className="px-2 pt-3 pb-1 text-[11px] font-medium text-(--fg-tertiary)">{t(g.header)}</div>
               {g.items.map((it) => (
                 <button
                   key={it.id}
@@ -205,14 +210,14 @@ export default function Settings() {
                   }}
                 >
                   <it.icon size={15} className="shrink-0 text-(--fg-tertiary)" />
-                  <span className="min-w-0 flex-1">{it.label}</span>
+                  <span className="min-w-0 flex-1">{t(it.label)}</span>
                   {it.id === "account" && <span className="shrink-0 text-(--fg-faint)">↗</span>}
                 </button>
               ))}
             </div>
           ))}
           {groups.length === 0 && (
-            <div className="px-2 pt-4 text-[12px] text-(--fg-faint)">No matching settings</div>
+            <div className="px-2 pt-4 text-[12px] text-(--fg-faint)">{t("No matching settings")}</div>
           )}
         </nav>
       </div>
@@ -222,7 +227,7 @@ export default function Settings() {
         <div className="app-drag h-[46px] shrink-0" />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[640px] px-8 pt-2 pb-16">
-            <h1 className="mb-5 text-[22px] font-semibold">{active?.label}</h1>
+            <h1 className="mb-5 text-[22px] font-semibold">{active ? t(active.label) : ""}</h1>
             <SectionContent id={section} />
           </div>
         </div>
@@ -311,6 +316,7 @@ function GeneralSection() {
   const permission = useStore((s) => normalizePermission(s.permission));
   const setPermission = useStore((s) => s.setPermission);
   const bottomOpen = useStore((s) => s.ui.bottomOpen);
+  const language = useStore((s) => s.ui.language);
   const setUi = useStore((s) => s.setUi);
   const [openDest, setOpenDest] = useState(() => {
     const saved = lsGet("settings.openDestination", "editor");
@@ -339,7 +345,11 @@ function GeneralSection() {
           />
         </Row>
         <Row title="Language" desc="Language for the app UI">
-          <Dropdown value="en" options={[{ id: "en", label: "English (United States)" }]} onChange={() => {}} disabled />
+          <Dropdown
+            value={normalizeLanguage(language)}
+            options={SUPPORTED_LANGUAGES}
+            onChange={(value) => setUi({ language: value })}
+          />
         </Row>
         <Row title="Bottom panel" desc="Show the bottom panel control in the app header">
           <Toggle on={bottomOpen} onChange={(v) => setUi({ bottomOpen: v })} />
@@ -384,6 +394,7 @@ function GeneralSection() {
 }
 
 function DiagnosticsCard() {
+  const t = useT();
   const [info, setInfo] = useState(null);
   const [openError, setOpenError] = useState("");
 
@@ -417,7 +428,7 @@ function DiagnosticsCard() {
         desc={openError || info?.logFile || "Startup and renderer errors are recorded automatically"}
       >
         <button className={buttonClass} onClick={openLogs}>
-          Open logs folder
+          {t("Open logs folder")}
         </button>
       </Row>
     </Card>
@@ -444,6 +455,7 @@ function RuntimeOrderCard() {
 // App update row: version + check / download progress / restart-to-update.
 // Status comes from the main process (electron-updater, packaged builds only).
 function UpdateRow() {
+  const t = useT();
   const version = useStore((s) => s.appInfo?.version);
   const [st, setSt] = useState(null);
   useEffect(() => {
@@ -453,28 +465,28 @@ function UpdateRow() {
   }, []);
   const status = st?.status || "idle";
   const desc =
-    status === "dev" ? "Updates are only available in packaged builds" :
-    status === "disabled" ? "Updates are disabled in this portable build" :
-    status === "checking" ? "Checking for updates…" :
-    status === "available" ? `Version ${st.version} found, downloading…` :
-    status === "downloading" ? `Downloading update — ${st.percent ?? 0}%` :
-    status === "downloaded" ? `Version ${st.version} is ready to install` :
-    status === "none" ? "You're up to date" :
-    status === "error" ? `Update check failed: ${st.message || "unknown error"}` :
-    `Current version ${version || "unknown"}`;
+    status === "dev" ? t("Updates are only available in packaged builds") :
+    status === "disabled" ? t("Updates are disabled in this portable build") :
+    status === "checking" ? t("Checking for updates…") :
+    status === "available" ? t("Version {version} found, downloading…", { version: st.version }) :
+    status === "downloading" ? t("Downloading update — {percent}%", { percent: st.percent ?? 0 }) :
+    status === "downloaded" ? t("Version {version} is ready to install", { version: st.version }) :
+    status === "none" ? t("You're up to date") :
+    status === "error" ? t("Update check failed: {message}", { message: st.message || t("unknown error") }) :
+    t("Current version {version}", { version: version || t("unknown") });
   const busy = status === "checking" || status === "available" || status === "downloading";
   const btnCls = "flex h-7 shrink-0 items-center rounded-full border border-(--border) px-3 text-sm hover:bg-(--surface-hover) disabled:opacity-50";
   return (
     <Row title="App updates" desc={desc}>
       {status === "downloaded" ? (
-        <button className={btnCls} onClick={() => api.installUpdate()}>Restart to update</button>
+        <button className={btnCls} onClick={() => api.installUpdate()}>{t("Restart to update")}</button>
       ) : (
         <button
           className={btnCls}
           disabled={busy || status === "dev" || status === "disabled"}
           onClick={() => api.checkForUpdates()}
         >
-          {busy ? "Working…" : "Check for updates"}
+          {t(busy ? "Working…" : "Check for updates")}
         </button>
       )}
     </Row>

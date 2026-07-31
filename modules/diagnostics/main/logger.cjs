@@ -85,19 +85,93 @@ function rotateLog(logFile, maxBytes, retainedFiles) {
   } catch {}
 }
 
+function padDatePart(value) {
+  return String(value).padStart(2, "0");
+}
+
+function localDateKey(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  return [
+    date.getFullYear(),
+    padDatePart(date.getMonth() + 1),
+    padDatePart(date.getDate()),
+  ].join("-");
+}
+
+function dateFromLogFile(fileName) {
+  const match = /^main-(\d{4})-(\d{2})-(\d{2})\.log(?:\.\d+)?$/.exec(fileName);
+  if (!match) return null;
+  const date = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+  );
+  return localDateKey(date) === `${match[1]}-${match[2]}-${match[3]}`
+    ? date
+    : null;
+}
+
+function startOfLocalDay(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function cleanupExpiredLogs(logsDirectory, currentDate, retentionDays) {
+  const cutoff = startOfLocalDay(currentDate);
+  cutoff.setDate(cutoff.getDate() - (retentionDays - 1));
+  let fileNames = [];
+  try {
+    fileNames = fs.readdirSync(logsDirectory);
+  } catch {
+    return;
+  }
+  for (const fileName of fileNames) {
+    const datedLog = dateFromLogFile(fileName);
+    const legacyLog = /^main\.log(?:\.\d+)?$/.test(fileName);
+    if (!datedLog && !legacyLog) continue;
+    const filePath = path.join(logsDirectory, fileName);
+    try {
+      const expired = datedLog
+        ? datedLog < cutoff
+        : fs.statSync(filePath).mtime < cutoff;
+      if (expired) fs.rmSync(filePath);
+    } catch {}
+  }
+}
+
 function createFileLogger({
   logsDirectory,
   maxBytes = 4 * 1024 * 1024,
   retainedFiles = 3,
+  retentionDays = 7,
+  now = () => new Date(),
 }) {
+  if (!Number.isInteger(retentionDays) || retentionDays < 1) {
+    throw new Error("Log retention days must be a positive integer");
+  }
   fs.mkdirSync(logsDirectory, { recursive: true });
-  const logFile = path.join(logsDirectory, "main.log");
-  rotateLog(logFile, maxBytes, retainedFiles);
   const sessionId = crypto.randomUUID();
+  let lastCleanupDate = null;
+
+  function currentState() {
+    const date = new Date(now());
+    const dateKey = localDateKey(date);
+    if (dateKey !== lastCleanupDate) {
+      cleanupExpiredLogs(logsDirectory, date, retentionDays);
+      lastCleanupDate = dateKey;
+    }
+    return {
+      date,
+      logFile: path.join(logsDirectory, `main-${dateKey}.log`),
+    };
+  }
+
+  currentState();
 
   function write(level, source, event, details = {}) {
+    const { date, logFile } = currentState();
     const entry = {
-      timestamp: new Date().toISOString(),
+      timestamp: date.toISOString(),
       level: ["debug", "info", "warn", "error"].includes(level) ? level : "info",
       source: redactString(source || "main"),
       event: redactString(event || "event"),
@@ -123,7 +197,9 @@ function createFileLogger({
 
   return {
     consoleMessage,
-    logFile,
+    get logFile() {
+      return currentState().logFile;
+    },
     logsDirectory,
     sessionId,
     write,
@@ -131,7 +207,9 @@ function createFileLogger({
 }
 
 module.exports = {
+  cleanupExpiredLogs,
   createFileLogger,
+  localDateKey,
   redactString,
   safeValue,
 };

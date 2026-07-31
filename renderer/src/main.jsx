@@ -7,6 +7,7 @@ import {
   DiagnosticsBoundary,
   installRendererDiagnostics,
 } from "@modules/diagnostics";
+import { LanguageDocumentSync } from "./i18n.jsx";
 import "./theme.css";
 
 const w = new URLSearchParams(window.location.search).get("window");
@@ -16,6 +17,7 @@ installRendererDiagnostics(windowKind);
 const root = createRoot(document.getElementById("root"));
 root.render(
   <DiagnosticsBoundary>
+    <LanguageDocumentSync />
     <Root />
   </DiagnosticsBoundary>,
 );
