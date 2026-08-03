@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@app/store.js";
 import * as api from "@app/api.js";
 import { cx } from "@app/lib/cx.js";
+import { rem } from "@app/lib/cssUnits.js";
 import { basename } from "@app/lib/time.js";
 import { Menu, Spinner } from "@app/components/ui.jsx";
 import { Markdown } from "@modules/conversations";
@@ -51,7 +52,9 @@ export default function FilesTab({ tab }) {
   const setTabFile = usePanelStore((s) => s.setFile);
   const toast = useStore((s) => s.toast);
   const [treeOpen, setTreeOpen] = useState(true);
-  const [treeWidth, setTreeWidth] = useState(243);
+  const [treeRatio, setTreeRatio] = useState(0.46);
+  const bodyRef = useRef(null);
+  const treeRef = useRef(null);
   const [source, setSource] = useState(false); // markdown: source vs rendered
   const [file, setFile] = useState(null); // {path, content|null, loading, error, image?}
   const [text, setText] = useState(null); // edited draft (null = pristine)
@@ -106,8 +109,8 @@ export default function FilesTab({ tab }) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* breadcrumb bar (h-toolbar-pane = 39px) */}
-      <nav className="flex h-[39px] shrink-0 items-center gap-1 border-b border-(--border-light) px-2 select-none">
+      {/* breadcrumb bar (h-toolbar-pane = 2.4375rem) */}
+      <nav className="flex h-[2.4375rem] shrink-0 items-center gap-1 border-b border-(--border-light) px-2 select-none">
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1 text-xs text-(--fg-secondary)">
           <Crumb text={path ? basename(root.replace(/\/+$/, "")) || root : "/"} />
           {segments.map((seg, i) => (
@@ -119,7 +122,7 @@ export default function FilesTab({ tab }) {
         </div>
         {file && !file.loading && !file.error && !file.image && MD_EXT.test(file.path) && (
           <button
-            className="mr-1 flex h-7 shrink-0 items-center rounded-lg border border-(--border) px-2.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)"
+            className="mr-1 flex h-7 shrink-0 items-center rounded-lg border border-(--border) px-2.5 text-[0.8125rem] text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)"
             onClick={() => setSource(!source)}
           >
             {source ? "View rendered" : "View source"}
@@ -127,13 +130,13 @@ export default function FilesTab({ tab }) {
         )}
         {dirty && (
           <button
-            className="mr-1 flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-(--border) px-2.5 text-[13px] text-(--fg) hover:bg-(--surface-hover)"
+            className="mr-1 flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-(--border) px-2.5 text-[0.8125rem] text-(--fg) hover:bg-(--surface-hover)"
             onClick={save}
             disabled={saving}
             title={`Save (${SAVE_HINT})`}
           >
             {saving ? "Saving…" : "Save"}
-            <kbd className="rounded bg-(--surface-hover) px-1 py-px text-[10px] text-(--fg-tertiary)">{SAVE_HINT}</kbd>
+            <kbd className="rounded bg-(--surface-hover) px-1 py-[0.0625rem] text-[0.625rem] text-(--fg-tertiary)">{SAVE_HINT}</kbd>
           </button>
         )}
         <IconBtn title="Toggle file tree" active={treeOpen} onClick={() => setTreeOpen(!treeOpen)}>
@@ -143,25 +146,25 @@ export default function FilesTab({ tab }) {
       </nav>
 
       {/* body: reserved preview area + tree column */}
-      <div className="flex min-h-0 flex-1">
+      <div ref={bodyRef} className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">
           {!path ? (
-            <div className="relative top-[3px] flex h-full flex-col items-center justify-center gap-2">
+            <div className="relative top-[0.1875rem] flex h-full flex-col items-center justify-center gap-2">
               <IconFolder size={30} className="text-(--fg-faint)" />
-              <div className="text-[16px] leading-6 font-medium text-(--fg)">Open file</div>
-              <div className="max-w-[130px] text-center text-[13px] leading-[18.57px] font-[445] text-(--fg-secondary)">Select a file from the workspace tree</div>
+              <div className="text-[1rem] leading-6 font-medium text-(--fg)">Open file</div>
+              <div className="max-w-[8.125rem] text-center text-[0.8125rem] leading-[1.160625rem] font-[445] text-(--fg-secondary)">Select a file from the workspace tree</div>
             </div>
           ) : file?.loading ? (
             <div className="flex h-full items-center justify-center text-(--fg-tertiary)"><Spinner size={16} /></div>
           ) : file?.error ? (
-            <div className="flex h-full items-center justify-center text-[13px] text-(--danger)">{file.error}</div>
+            <div className="flex h-full items-center justify-center text-[0.8125rem] text-(--danger)">{file.error}</div>
           ) : file?.image ? (
             <div className="flex h-full items-center justify-center overflow-auto p-4">
               <img src={api.localFileUrl(file.path)} className="max-h-full max-w-full object-contain" alt={basename(file.path)} />
             </div>
           ) : file && MD_EXT.test(file.path) && !source ? (
             <div className="h-full overflow-y-auto">
-              <div className="md mx-auto max-w-[720px] px-6 py-5 text-[14px]"><Markdown>{text ?? file.content}</Markdown></div>
+              <div className="md mx-auto max-w-[45rem] px-6 py-5 text-[0.875rem]"><Markdown>{text ?? file.content}</Markdown></div>
             </div>
           ) : file ? (
             <CodeEditor
@@ -176,26 +179,64 @@ export default function FilesTab({ tab }) {
         {treeOpen && root && (
           <>
             <div
-              className="relative z-20 w-[5px] shrink-0 cursor-col-resize"
+              className="relative z-20 w-[0.3125rem] shrink-0 cursor-col-resize"
               onMouseDown={(e) => {
                 e.preventDefault();
                 const startX = e.clientX;
-                const baseW = treeWidth;
+                const containerWidth = Math.max(
+                  1,
+                  bodyRef.current?.getBoundingClientRect().width || window.innerWidth,
+                );
+                const baseRatio = Math.max(
+                  0.3,
+                  Math.min(
+                    0.7,
+                    (treeRef.current?.getBoundingClientRect().width || containerWidth * treeRatio)
+                      / containerWidth,
+                  ),
+                );
+                let latestDelta = 0;
+                let pendingRatio = baseRatio;
+                let frame = null;
+                const flush = () => {
+                  frame = null;
+                  pendingRatio = Math.max(
+                    0.3,
+                    Math.min(0.7, baseRatio - latestDelta / containerWidth),
+                  );
+                  treeRef.current?.style.setProperty(
+                    "--file-tree-size",
+                    `${pendingRatio * 100}%`,
+                  );
+                };
                 const move = (ev) => {
-                  setTreeWidth(Math.max(180, Math.min(420, baseW - (ev.clientX - startX))));
+                  latestDelta = ev.clientX - startX;
+                  if (frame == null) frame = window.requestAnimationFrame(flush);
                 };
                 const up = () => {
                   window.removeEventListener("mousemove", move);
                   window.removeEventListener("mouseup", up);
+                  if (frame != null) {
+                    window.cancelAnimationFrame(frame);
+                    flush();
+                  }
+                  if (latestDelta) setTreeRatio(pendingRatio);
                 };
                 window.addEventListener("mousemove", move);
                 window.addEventListener("mouseup", up);
               }}
             >
-              <div className="absolute inset-y-0 -left-[6px] w-[17px]" />
-              <div className="absolute inset-y-0 left-[2px] w-px bg-transparent transition-colors hover:bg-(--accent-soft)" />
+              <div className="absolute inset-y-0 -left-[0.375rem] w-[1.0625rem]" />
+              <div className="absolute inset-y-0 left-[0.125rem] w-[0.0625rem] bg-transparent transition-colors hover:bg-(--accent-soft)" />
             </div>
-            <div className="flex h-full shrink-0 flex-col border-l border-(--border-light)" style={{ width: treeWidth }}>
+            <div
+              ref={treeRef}
+              className="flex h-full shrink-0 flex-col border-l border-(--border-light)"
+              style={{
+                "--file-tree-size": `${treeRatio * 100}%`,
+                width: "clamp(11.25rem, var(--file-tree-size), 26.25rem)",
+              }}
+            >
               <FileTree root={root} selected={path} onSelect={select} />
             </div>
           </>
@@ -241,14 +282,14 @@ function OpenSplitButton({ path }) {
   return (
     <div className="ml-1 flex h-7 shrink-0 items-stretch overflow-hidden rounded-lg border border-(--border)">
       <button
-        className="flex items-center gap-1.5 px-2.5 text-[13px] whitespace-nowrap text-(--fg) hover:bg-(--surface-hover)"
+        className="flex items-center gap-1.5 px-2.5 text-[0.8125rem] whitespace-nowrap text-(--fg) hover:bg-(--surface-hover)"
         onClick={() => api.openPath(path)}
         title="Open in default app"
       >
         <IconExternal size={12} />
         Open
       </button>
-      <div className="w-px bg-(--border-light)" />
+      <div className="w-[0.0625rem] bg-(--border-light)" />
       <button ref={ref} className="px-1 text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={() => setOpen(true)} title="Open options">
         <IconChevronDown size={11} />
       </button>
@@ -389,11 +430,11 @@ function CodeEditor({ path, value, onChange, onSave }) {
       <pre
         ref={preRef}
         aria-hidden="true"
-        className="absolute inset-0 overflow-hidden py-2 font-mono text-[12px] leading-[22px] text-(--fg)"
+        className="absolute inset-0 overflow-hidden py-2 font-mono text-[0.75rem] leading-[1.375rem] text-(--fg)"
       >
         {rendered.map((toks, n) => (
           <div key={n} className="flex">
-            <span className="w-[44px] shrink-0 pr-4 text-right text-(--fg-faint) select-none">{n + 1}</span>
+            <span className="w-[2.75rem] shrink-0 pr-4 text-right text-(--fg-faint) select-none">{n + 1}</span>
             <span className="pr-4 whitespace-pre">
               {toks.map((tk, i) => (
                 <span key={i} style={tk.c ? { color: TOKEN_COLORS[tk.c] } : undefined}>{tk.t || " "}</span>
@@ -415,7 +456,7 @@ function CodeEditor({ path, value, onChange, onSave }) {
             onSave?.();
           }
         }}
-        className="absolute inset-0 resize-none overflow-auto bg-transparent py-2 pr-4 pl-[44px] font-mono text-[12px] leading-[22px] whitespace-pre text-transparent caret-(--fg) outline-none selection:bg-(--accent-soft) selection:text-transparent"
+        className="absolute inset-0 resize-none overflow-auto bg-transparent py-2 pr-4 pl-[2.75rem] font-mono text-[0.75rem] leading-[1.375rem] whitespace-pre text-transparent caret-(--fg) outline-none selection:bg-(--accent-soft) selection:text-transparent"
       />
     </div>
   );
@@ -472,14 +513,14 @@ function FileTree({ root, selected, onSelect }) {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      <div className="shrink-0 px-2 pt-2 pb-px">
-        <div className="flex h-7 w-full items-center gap-1.5 rounded-[12.5px] border border-(--border) bg-(--panel-action-bg)">
+      <div className="shrink-0 px-2 pt-2 pb-[0.0625rem]">
+        <div className="flex h-7 w-full items-center gap-1.5 rounded-[0.78125rem] border border-(--border) bg-(--panel-action-bg)">
           <IconSearch size={13} className="ms-2 shrink-0 text-(--fg-faint)" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter files…"
-            className="w-full appearance-none border-none bg-transparent py-0 ps-0 pe-1.5 text-[13px] text-(--fg) ring-0 outline-none placeholder:text-(--fg-faint)"
+            className="w-full appearance-none border-none bg-transparent py-0 ps-0 pe-1.5 text-[0.8125rem] text-(--fg) ring-0 outline-none placeholder:text-(--fg-faint)"
           />
         </div>
       </div>
@@ -570,10 +611,10 @@ function TreeRow({ depth, name, full, isDir, open, selected, git, onToggle, onSe
   return (
     <button
       className={cx(
-        "flex min-h-7 w-full items-center gap-1.5 rounded-md px-1.5 text-left text-[13px] transition-colors",
+        "flex min-h-7 w-full items-center gap-1.5 rounded-md px-1.5 text-left text-[0.8125rem] transition-colors",
         selected ? "bg-(--surface-active) text-(--fg)" : "text-(--fg) hover:bg-(--surface-hover)"
       )}
-      style={{ paddingLeft: 6 + depth * 14 }}
+      style={{ paddingLeft: rem(6 + depth * 14) }}
       title={name}
       onClick={() => (isDir ? onToggle?.() : onSelect(full))}
     >
@@ -590,7 +631,7 @@ function TreeRow({ depth, name, full, isDir, open, selected, git, onToggle, onSe
       )}
       <span className="min-w-0 flex-1 truncate">{name}</span>
       {git && !isDir && (
-        <span className="shrink-0 text-[11px] font-medium" style={{ color: git.color }}>{git.letter}</span>
+        <span className="shrink-0 text-[0.6875rem] font-medium" style={{ color: git.color }}>{git.letter}</span>
       )}
     </button>
   );

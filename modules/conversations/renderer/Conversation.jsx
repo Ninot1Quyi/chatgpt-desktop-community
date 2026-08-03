@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@app/store.js";
 import { cx } from "@app/lib/cx.js";
+import { rem } from "@app/lib/cssUnits.js";
 import { useT } from "@app/i18n.jsx";
 import * as api from "@app/api.js";
 import { basename, formatDuration } from "@app/lib/time.js";
@@ -49,22 +50,22 @@ export default function Conversation() {
       {conv?.loading ? (
         <div className="flex flex-1 items-center justify-center text-(--fg-tertiary)"><Spinner size={18} /></div>
       ) : conv?.error ? (
-        <div className="flex flex-1 items-center justify-center px-8 text-center text-[13px] text-(--danger)">{conv.error}</div>
+        <div className="flex flex-1 items-center justify-center px-8 text-center text-[0.8125rem] text-(--danger)">{conv.error}</div>
       ) : !hasTurns ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="my-auto flex flex-col items-center px-4 py-6">
             {readOnly ? (
               <>
                 <IconClaude size={48} className="text-[#d97757] opacity-70" />
-                <div className="mt-5 text-center text-[20px] leading-8 font-medium">{t("No displayable messages")}</div>
-                <div className="mt-1 text-center text-[13px] text-(--fg-tertiary)">
+                <div className="mt-5 text-center text-[1.25rem] leading-8 font-medium">{t("No displayable messages")}</div>
+                <div className="mt-1 text-center text-[0.8125rem] text-(--fg-tertiary)">
                   {t("This Claude Code transcript is available as read-only history.")}
                 </div>
               </>
             ) : (
               <>
                 <CodexMark size={56} className="text-(--fg) opacity-[0.24]" />
-                <div className="mt-5 text-center text-[28px] leading-9 font-medium">
+                <div className="mt-5 text-center text-[1.75rem] leading-9 font-medium">
                   {t("What should we build in {project}?", {
                     project: matchProjectName(gs, threadCwdOf(conv)) || basename(threadCwdOf(conv)) || t("this folder"),
                   })}
@@ -116,10 +117,10 @@ function ThreadHeaderContent() {
                 ? <IconKimi size={16} className="text-[#7777e8]" />
                 : <IconFolderFilled size={16} className="text-(--fg-secondary)" />}
           </button>
-          <div className="max-w-[320px] truncate text-[14px] font-medium">{thread?.name || t("New chat")}</div>
+          <div className="max-w-[20rem] truncate text-[0.875rem] font-medium">{thread?.name || t("New chat")}</div>
           {(thread?.source === "claude" || thread?.source === "kimi") && (
             <span className={cx(
-              "shrink-0 rounded-full px-1.5 py-0.5 text-[10px]",
+              "shrink-0 rounded-full px-1.5 py-0.5 text-[0.625rem]",
               thread.source === "claude"
                 ? "bg-[#d97757]/10 text-[#b85f43] dark:text-[#e39a80]"
                 : "bg-[#7777e8]/10 text-[#6262ce] dark:text-[#aaaaf4]",
@@ -204,9 +205,9 @@ function OpenInEditorButton() {
     api.openExternal(`vscode://file${cwd}`);
   };
   return (
-    <div className="app-no-drag flex h-7 w-[52px] items-stretch overflow-hidden rounded-[12.5px]">
+    <div className="app-no-drag flex h-7 w-[3.25rem] items-stretch overflow-hidden rounded-[0.78125rem]">
       <button
-        className="flex h-7 w-[29px] items-center rounded-l-[12.5px] border border-r-0 border-(--border) bg-black/[0.03] pl-2 pr-1 text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg) dark:bg-white/[0.03]"
+        className="flex h-7 w-[1.8125rem] items-center rounded-l-[0.78125rem] border border-r-0 border-(--border) bg-black/[0.03] pl-2 pr-1 text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg) dark:bg-white/[0.03]"
         title="Open in"
         onClick={openVSCode}
       >
@@ -214,7 +215,7 @@ function OpenInEditorButton() {
       </button>
       <button
         ref={chevRef}
-        className="flex h-7 w-[23px] items-center rounded-r-[12.5px] border border-l-0 border-(--border) bg-black/[0.03] pl-0.5 pr-1.5 text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg) dark:bg-white/[0.03]"
+        className="flex h-7 w-[1.4375rem] items-center rounded-r-[0.78125rem] border border-l-0 border-(--border) bg-black/[0.03] pl-0.5 pr-1.5 text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg) dark:bg-white/[0.03]"
         title="Open options"
         onClick={() => setMenuOpen(true)}
       >
@@ -472,13 +473,13 @@ function ThreadMenu({ thread }) {
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[14px] outline-none focus:border-(--accent)"
+            className="w-full rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[0.875rem] outline-none focus:border-(--accent)"
             placeholder={t("Chat name")}
           />
           <div className="mt-4 flex justify-end gap-2">
             <button
               type="button"
-              className="rounded-lg border border-(--border) px-3 py-1.5 text-[13px] hover:bg-(--surface-hover)"
+              className="rounded-lg border border-(--border) px-3 py-1.5 text-[0.8125rem] hover:bg-(--surface-hover)"
               onClick={() => setRenameOpen(false)}
             >
               {t("Cancel")}
@@ -486,7 +487,7 @@ function ThreadMenu({ thread }) {
             <button
               type="submit"
               disabled={!name.trim()}
-              className="rounded-lg bg-(--fg) px-3 py-1.5 text-[13px] font-medium text-(--surface) hover:opacity-85 disabled:opacity-40"
+              className="rounded-lg bg-(--fg) px-3 py-1.5 text-[0.8125rem] font-medium text-(--surface) hover:opacity-85 disabled:opacity-40"
             >
               {t("Save")}
             </button>
@@ -495,16 +496,16 @@ function ThreadMenu({ thread }) {
       </Dialog>
 
       <Dialog open={archiveOpen} title="Archive chat?" onClose={() => setArchiveOpen(false)}>
-        <div className="text-[13px] text-(--fg-secondary)">{t("You can find it later in your archived chats.")}</div>
+        <div className="text-[0.8125rem] text-(--fg-secondary)">{t("You can find it later in your archived chats.")}</div>
         <div className="mt-4 flex justify-end gap-2">
           <button
-            className="rounded-lg border border-(--border) px-3 py-1.5 text-[13px] hover:bg-(--surface-hover)"
+            className="rounded-lg border border-(--border) px-3 py-1.5 text-[0.8125rem] hover:bg-(--surface-hover)"
             onClick={() => setArchiveOpen(false)}
           >
             {t("Cancel")}
           </button>
           <button
-            className="rounded-lg bg-(--fg) px-3 py-1.5 text-[13px] font-medium text-(--surface) hover:opacity-85"
+            className="rounded-lg bg-(--fg) px-3 py-1.5 text-[0.8125rem] font-medium text-(--surface) hover:opacity-85"
             onClick={() => {
               setArchiveOpen(false);
               if (activeThreadId) archiveThread(activeThreadId);
@@ -574,16 +575,16 @@ function WorktreeDialog({ open, thread, activeThreadId, onClose }) {
       </div>
       <input
         autoFocus
-        className="mt-3 w-full rounded-lg border border-(--border) bg-(--surface) px-3 py-2 font-mono text-[13px] outline-none focus:border-(--accent)"
+        className="mt-3 w-full rounded-lg border border-(--border) bg-(--surface) px-3 py-2 font-mono text-[0.8125rem] outline-none focus:border-(--accent)"
         placeholder="codex/my-branch"
         value={branch}
         onChange={(e) => setBranch(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && !busy) run(); }}
       />
       <div className="mt-4 flex justify-end gap-2">
-        <button className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={onClose}>{t("Cancel")}</button>
+        <button className="rounded-lg px-3 py-1.5 text-[0.8125rem] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={onClose}>{t("Cancel")}</button>
         <button
-          className="rounded-lg bg-(--fg) px-3 py-1.5 text-[13px] font-medium text-(--surface) hover:opacity-85 disabled:opacity-50"
+          className="rounded-lg bg-(--fg) px-3 py-1.5 text-[0.8125rem] font-medium text-(--surface) hover:opacity-85 disabled:opacity-50"
           disabled={busy || !branch.trim()}
           onClick={run}
         >
@@ -626,18 +627,18 @@ function FindBar({ conv }) {
   useEffect(() => { setIdx(0); }, [q]);
   useEffect(() => {
     // Highlight the current match.
-    document.querySelectorAll("[data-item-id].ring-2").forEach((el) => el.classList.remove("ring-2", "ring-(--accent)", "rounded-[12.5px]"));
+    document.querySelectorAll("[data-item-id].ring-2").forEach((el) => el.classList.remove("ring-2", "ring-(--accent)", "rounded-[0.78125rem]"));
     if (matches.length && matches[Math.min(idx, matches.length - 1)]) {
       const el = document.querySelector(`[data-item-id="${matches[Math.min(idx, matches.length - 1)]}"]`);
       if (el) {
         el.scrollIntoView({ block: "center", behavior: "smooth" });
-        el.classList.add("ring-2", "ring-(--accent)", "rounded-[12.5px]");
+        el.classList.add("ring-2", "ring-(--accent)", "rounded-[0.78125rem]");
       }
     }
   }, [idx, matches]);
 
   const close = () => {
-    document.querySelectorAll("[data-item-id].ring-2").forEach((el) => el.classList.remove("ring-2", "ring-(--accent)", "rounded-[12.5px]"));
+    document.querySelectorAll("[data-item-id].ring-2").forEach((el) => el.classList.remove("ring-2", "ring-(--accent)", "rounded-[0.78125rem]"));
     setUi({ findOpen: false });
   };
   const step = (d) => {
@@ -649,7 +650,7 @@ function FindBar({ conv }) {
     <div className="absolute top-2 right-4 z-30 flex items-center gap-1 rounded-xl border border-(--border) bg-(--surface-raised) px-2 py-1.5" style={{ boxShadow: "var(--shadow-menu)" }}>
       <input
         ref={inputRef}
-        className="w-44 bg-transparent px-1 text-[13px] outline-none placeholder:text-(--fg-faint)"
+        className="w-44 bg-transparent px-1 text-[0.8125rem] outline-none placeholder:text-(--fg-faint)"
         placeholder={t("Find in chat")}
         value={q}
         onChange={(e) => setQ(e.target.value)}
@@ -891,17 +892,17 @@ function TurnView({ turn, streaming, latest, showReasoning, turnDiff }) {
         </div>
       )}
       {turn.status === "failed" && turn.error && (
-        <div className="rounded-[12.5px] border border-(--danger) bg-(--danger-soft) px-3 py-2 text-[13px] text-(--danger)">
+        <div className="rounded-[0.78125rem] border border-(--danger) bg-(--danger-soft) px-3 py-2 text-[0.8125rem] text-(--danger)">
           {turn.error.message || String(turn.error)}
         </div>
       )}
       {turn.status === "interrupted" && (
         <div className="flex items-center gap-3 py-1">
-          <div className="h-px flex-1 bg-(--border-light)" />
+          <div className="h-[0.0625rem] flex-1 bg-(--border-light)" />
           <span className="text-xs text-(--fg-faint)">
             You stopped{turn.durationMs ? ` after ${formatDuration(turn.durationMs)}` : ""}
           </span>
-          <div className="h-px flex-1 bg-(--border-light)" />
+          <div className="h-[0.0625rem] flex-1 bg-(--border-light)" />
         </div>
       )}
     </div>
@@ -918,16 +919,16 @@ function WebPreviewCard({ url }) {
     setTimeout(() => window.dispatchEvent(new CustomEvent("codex:open-url", { detail: { url } })), 80);
   };
   return (
-    <div className="relative flex items-center gap-3 rounded-[14px] border border-(--border-light) bg-(--surface-under) px-3.5 py-2.5">
+    <div className="relative flex items-center gap-3 rounded-[0.875rem] border border-(--border-light) bg-(--surface-under) px-3.5 py-2.5">
       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--surface)">
         <IconGlobe size={17} className="text-(--fg-secondary)" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-[14px]">Web preview</div>
+        <div className="text-[0.875rem]">Web preview</div>
         <div className="text-xs text-(--fg-tertiary)">Website</div>
       </div>
       <button
-        className="flex h-7 shrink-0 items-center gap-1 rounded-full border border-(--border) px-3 text-[13px] hover:bg-(--surface-hover)"
+        className="flex h-7 shrink-0 items-center gap-1 rounded-full border border-(--border) px-3 text-[0.8125rem] hover:bg-(--surface-hover)"
         onClick={() => setMenu(!menu)}
       >
         Open in <IconChevronDown size={12} className="text-(--fg-tertiary)" />
@@ -938,13 +939,13 @@ function WebPreviewCard({ url }) {
           style={{ boxShadow: "var(--shadow-menu)" }}
         >
           <button
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-(--surface-hover)"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[0.8125rem] hover:bg-(--surface-hover)"
             onClick={openInApp}
           >
             Browser
           </button>
           <button
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] hover:bg-(--surface-hover)"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[0.8125rem] hover:bg-(--surface-hover)"
             onClick={() => { api.openExternal(url); setMenu(false); }}
           >
             Default browser
@@ -1002,10 +1003,10 @@ function MessageRail({ turns, scrollRef }) {
               el?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
           >
-            <span className="flex h-0.5 w-[30px] items-center">
+            <span className="flex h-0.5 w-[1.875rem] items-center">
               <span
                 className={cx(
-                  "h-0.5 w-[26px] origin-left transition-[transform,background-color,opacity]",
+                  "h-0.5 w-[1.625rem] origin-left transition-[transform,background-color,opacity]",
                   i === hovered
                     ? "bg-(--fg) opacity-100"
                     : i === current
@@ -1024,18 +1025,18 @@ function MessageRail({ turns, scrollRef }) {
       </div>
       {hovered != null && (
         <div
-          className="pointer-events-none absolute left-9 w-80 -translate-y-1/2 select-none rounded-[15px] p-2 text-left backdrop-blur-[2px]"
+          className="pointer-events-none absolute left-9 w-80 -translate-y-1/2 select-none rounded-[0.9375rem] p-2 text-left backdrop-blur-[0.125rem]"
           style={{
-            top: hovered * 10 + 5,
+            top: rem(hovered * 10 + 5),
             background: "color-mix(in srgb, var(--surface-raised) 95%, transparent)",
-            boxShadow: "0 0 0 0.5px rgb(26 28 31 / 0.08), 0 8px 16px -4px rgb(0 0 0 / 0.12)",
+            boxShadow: "0 0 0 0.03125rem rgb(26 28 31 / 0.08), 0 0.5rem 1rem -0.25rem rgb(0 0 0 / 0.12)",
           }}
         >
-          <div className="h-5 truncate text-[13px] leading-5 font-medium">
+          <div className="h-5 truncate text-[0.8125rem] leading-5 font-medium">
             {userMsgs[hovered].title || "Message"}
           </div>
           <div
-            className="mt-1 h-[60px] overflow-hidden text-[13px] leading-[21px] text-(--fg-tertiary)"
+            className="mt-1 h-[3.75rem] overflow-hidden text-[0.8125rem] leading-[1.3125rem] text-(--fg-tertiary)"
             style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 3 }}
           >
             {userMsgs[hovered].preview}
@@ -1070,7 +1071,7 @@ function WorklogGroup({ items, live }) {
         aria-expanded={open}
         data-activity-icon={activityKind}
         className={cx(
-          "group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[14px] leading-[21px] font-[445]",
+          "group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[0.875rem] leading-[1.3125rem] font-[445]",
           "text-(--fg)",
         )}
         onClick={() => setOpen(!open)}
@@ -1126,7 +1127,7 @@ function SubAgentActivityGroup({ items }) {
   const remainder = agents.length - visible.length;
   return (
     <section
-      className="min-w-0 text-[14px] leading-5 text-(--conversation-body)"
+      className="min-w-0 text-[0.875rem] leading-5 text-(--conversation-body)"
       data-testid="subagent-activity-inline-group"
     >
       {visible.map((item) => {
@@ -1178,7 +1179,7 @@ function WorklogActivityIcon({ kind, item, live }) {
   if (kind === "mcp-source") {
     const logo = item?.source?.logoUrl || item?.source?.logoUrlDark || item?.logoUrl || item?.toolIcons?.[0];
     return logo
-      ? <img src={logo} alt="" className="size-4 shrink-0 rounded-[2px] object-contain" />
+      ? <img src={logo} alt="" className="size-4 shrink-0 rounded-[0.125rem] object-contain" />
       : <IconMcpSource size={16} className={cx("activity-mcp-source shrink-0", tone)} />;
   }
   return <IconRunCommand size={16} className={cx("activity-run-command shrink-0", tone)} />;
@@ -1247,7 +1248,7 @@ function WorklogActionRow({ item, live }) {
   if (isReadAction(item)) {
     const name = readActionPath(item) || item.title || "file";
     return (
-      <div data-activity-icon="read-files" className={cx("flex items-center gap-1.5 text-[13px]", live ? "text-(--fg)" : "text-(--fg-tertiary)")}>
+      <div data-activity-icon="read-files" className={cx("flex items-center gap-1.5 text-[0.8125rem]", live ? "text-(--fg)" : "text-(--fg-tertiary)")}>
         <IconBookOpen size={16} className="activity-read-files shrink-0" />
         <span className="min-w-0 truncate">Read <span className="underline">{name}</span></span>
         {live && <Spinner size={11} className="shrink-0" />}
@@ -1264,7 +1265,7 @@ function WorklogActionRow({ item, live }) {
           aria-expanded={open}
           data-activity-icon={activity.kind}
           className={cx(
-            "group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[14px] leading-[21px] font-[445]",
+            "group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[0.875rem] leading-[1.3125rem] font-[445]",
             live ? "text-(--fg)" : "text-(--conversation-body)",
           )}
           onClick={() => setOpen(!open)}
@@ -1308,13 +1309,13 @@ function ForkedFromCard({ forkedFromId }) {
   }, [forkedFromId]);
   return (
     <button
-      className="flex items-center gap-2 rounded-[12.5px] border border-(--border-light) bg-(--surface-under) px-3 py-2 text-left hover:bg-(--surface-hover)"
+      className="flex items-center gap-2 rounded-[0.78125rem] border border-(--border-light) bg-(--surface-under) px-3 py-2 text-left hover:bg-(--surface-hover)"
       onClick={() => openThread(forkedFromId)}
       title={source?.name || forkedFromId}
     >
       <IconBranch size={13} className="shrink-0 text-(--fg-tertiary)" />
-      <span className="text-[13px] text-(--fg-tertiary)">Continued from chat</span>
-      <span className="min-w-0 flex-1 truncate text-[13px] text-(--accent)">
+      <span className="text-[0.8125rem] text-(--fg-tertiary)">Continued from chat</span>
+      <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-(--accent)">
         {source?.name || (source?.preview || "").split("\n")[0] || "source chat"}
       </span>
     </button>
@@ -1335,7 +1336,7 @@ function WorkingRow({ conv }) {
   }, [turn?.startedAt]);
   if (conv.plan) return null;
   return (
-    <div className="flex flex-col items-start gap-2 text-[14px] leading-[21px]">
+    <div className="flex flex-col items-start gap-2 text-[0.875rem] leading-[1.3125rem]">
       <span className="text-(--conversation-body)">Working{elapsed > 1500 ? ` for ${formatDuration(elapsed)}` : ""}</span>
       <div className="w-full border-t border-(--border)" />
     </div>
@@ -1372,13 +1373,13 @@ function BottomArea({ conv, onScrollToBottom }) {
           <ApprovalCard key={a.reqId} approval={a} />
         ))}
         {pendingNewThread && (
-          <div className="flex items-center gap-2 text-[13px] text-(--fg-tertiary)">
+          <div className="flex items-center gap-2 text-[0.8125rem] text-(--fg-tertiary)">
             <Spinner size={13} /> {t("Starting chat…")}
           </div>
         )}
         {conv?.goal?.objective && <GoalChip goal={conv.goal} />}
       </div>
-      <div className="mx-auto w-full max-w-[768px]">
+      <div className="mx-auto w-full max-w-[48rem]">
         <Composer />
       </div>
       <GoalDialog open={goalDialogOpen} goal={conv?.goal} />
@@ -1417,10 +1418,10 @@ function GoalChip({ goal }) {
   };
   return (
     <div
-      className="active-goal-bar mx-[13px] overflow-clip rounded-t-2xl border-x border-t bg-[rgb(255_255_255/0.67)] backdrop-blur-sm dark:bg-[rgb(38_38_38/0.672)]"
+      className="active-goal-bar mx-[0.8125rem] overflow-clip rounded-t-2xl border-x border-t bg-[rgb(255_255_255/0.67)] backdrop-blur-sm dark:bg-[rgb(38_38_38/0.672)]"
       style={{ borderColor: "color-mix(in srgb, var(--border) 80%, transparent)" }}
     >
-      <div className="flex h-[34px] items-center gap-2 px-3 py-[5px] text-[14px] leading-4 font-[445]">
+      <div className="flex h-[2.125rem] items-center gap-2 px-3 py-[0.3125rem] text-[0.875rem] leading-4 font-[445]">
         <IconCmdGoal size={14} className="shrink-0 text-(--fg-tertiary) opacity-70" />
         <span className="shrink-0">{t("Pursuing goal")}</span>
         <span ref={objectiveRef} className="-ml-1 min-w-0 flex-1 truncate text-(--fg-tertiary)">
@@ -1448,7 +1449,7 @@ function GoalChip({ goal }) {
         )}
       </div>
       {expanded && (
-        <div className="max-h-[120px] overflow-y-auto px-3 pb-2 text-[14px] leading-5 break-words whitespace-pre-wrap text-(--fg-tertiary)">
+        <div className="max-h-[7.5rem] overflow-y-auto px-3 pb-2 text-[0.875rem] leading-5 break-words whitespace-pre-wrap text-(--fg-tertiary)">
           {goal.objective}
         </div>
       )}
@@ -1490,21 +1491,21 @@ function GoalDialog({ open, goal }) {
       <textarea
         autoFocus
         rows={3}
-        className="w-full resize-none rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[13px] outline-none focus:border-(--accent)"
+        className="w-full resize-none rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[0.8125rem] outline-none focus:border-(--accent)"
         placeholder={t("Describe your goal, define measurable outcomes for best results")}
         value={objective}
         onChange={(e) => setObjective(e.target.value)}
       />
       <input
-        className="mt-2 w-full rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[13px] outline-none focus:border-(--accent)"
+        className="mt-2 w-full rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[0.8125rem] outline-none focus:border-(--accent)"
         placeholder={t("Token budget (optional)")}
         value={budget}
         onChange={(e) => setBudget(e.target.value)}
       />
       <div className="mt-4 flex justify-end gap-2">
-        <button className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={close}>{t("Cancel")}</button>
+        <button className="rounded-lg px-3 py-1.5 text-[0.8125rem] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={close}>{t("Cancel")}</button>
         <button
-          className="rounded-lg bg-(--fg) px-3 py-1.5 text-[13px] font-medium text-(--surface) hover:opacity-85 disabled:opacity-50"
+          className="rounded-lg bg-(--fg) px-3 py-1.5 text-[0.8125rem] font-medium text-(--surface) hover:opacity-85 disabled:opacity-50"
           disabled={!objective.trim()}
           onClick={submit}
         >
@@ -1567,7 +1568,7 @@ function Home() {
   const title = !project ? localizedTitle : (
     <>
       {titleBeforeProject}
-      <span className="inline-block max-w-full break-words whitespace-normal underline decoration-(--fg-tertiary) decoration-dotted decoration-[1px] underline-offset-4">
+      <span className="inline-block max-w-full break-words whitespace-normal underline decoration-(--fg-tertiary) decoration-dotted decoration-[0.0625rem] underline-offset-4">
         {project}
       </span>
       {titleAfterProject}
@@ -1581,13 +1582,13 @@ function Home() {
             <div className="flex min-h-28 w-full items-end justify-center">
               <div className="flex w-full flex-col items-center gap-6">
                 <CodexMark size={56} className="text-(--fg) opacity-[0.24]" />
-                <div className="flex max-w-full min-w-0 items-end justify-center whitespace-pre-wrap text-center text-[28px] leading-[33.6px] font-normal select-none">
+                <div className="flex max-w-full min-w-0 items-end justify-center whitespace-pre-wrap text-center text-[1.75rem] leading-[2.1rem] font-normal select-none">
                   <span className="inline-block max-w-full">{title}</span>
                 </div>
               </div>
             </div>
             <div
-              className="absolute inset-x-[29px] top-full mt-8 min-w-0"
+              className="absolute inset-x-[1.8125rem] top-full mt-8 min-w-0"
               style={{ containerType: "inline-size" }}
             >
               <HomeSuggestions />
@@ -1595,7 +1596,7 @@ function Home() {
           </div>
         </div>
         <div className="flex min-h-fit min-w-0 shrink-0 grow basis-0 flex-col justify-end">
-          <div className="mx-auto w-full max-w-[768px] px-4 pb-4">
+          <div className="mx-auto w-full max-w-[48rem] px-4 pb-4">
             <Composer centered />
           </div>
         </div>
@@ -1625,7 +1626,7 @@ function SuggestionCards() {
       {cards.map((c) => (
         <button
           key={c.text}
-          className="flex h-full min-h-[104px] w-full min-w-0 flex-col rounded-[20px] bg-(--surface) px-4 py-3 text-left shadow-[0_0_0_0.5px_var(--border-heavy),0_2px_4px_-1px_rgb(0_0_0/0.1)] outline-none transition-colors hover:bg-(--surface-hover)"
+          className="flex h-full min-h-[6.5rem] w-full min-w-0 flex-col rounded-[1.25rem] bg-(--surface) px-4 py-3 text-left shadow-[0_0_0_0.5px_var(--border-heavy),0_2px_4px_-1px_rgb(0_0_0/0.1)] outline-none transition-colors hover:bg-(--surface-hover)"
           onClick={() => sendMessage(c.prompt)}
         >
           <span className="flex h-6 w-full items-center justify-between gap-2">
@@ -1634,7 +1635,7 @@ function SuggestionCards() {
             </span>
           </span>
           <span className="mt-auto flex min-h-10 w-full flex-col justify-end">
-            <span className="text-[13px] leading-5 font-medium text-(--fg)">{t(c.text)}</span>
+            <span className="text-[0.8125rem] leading-5 font-medium text-(--fg)">{t(c.text)}</span>
           </span>
         </button>
       ))}

@@ -6,6 +6,7 @@
 // into itself (rows ping-pong); the container rect is stable.
 import React, { useState } from "react";
 import { cx } from "@app/lib/cx.js";
+import { rem } from "@app/lib/cssUnits.js";
 import { LucideIcon } from "@app/components/icons.jsx";
 
 const ROW_H = 40; // h-10, fixed so translateY math lines up
@@ -51,7 +52,7 @@ export function SortableList({ items, onChange }) {
             draggable
             onDragStart={(e) => { setDragId(it.id); setInsertAt(ids.indexOf(it.id)); e.dataTransfer.effectAllowed = "move"; }}
             onDragEnd={() => endDrag(false)}
-            style={{ transform: shift ? `translateY(${shift * ROW_H}px)` : undefined }}
+            style={{ transform: shift ? `translateY(${rem(shift * ROW_H)})` : undefined }}
             className={cx(
               "flex h-10 cursor-grab items-center gap-2.5 px-4 select-none active:cursor-grabbing",
               dragging && "transition-transform duration-150 ease-out",
@@ -60,7 +61,7 @@ export function SortableList({ items, onChange }) {
           >
             <LucideIcon name="GripVertical" size={14} className="shrink-0 text-(--fg-faint)" />
             {it.icon && <span className="flex h-4 w-4 shrink-0 items-center justify-center">{it.icon}</span>}
-            <span className="text-[13px]">{it.label}</span>
+            <span className="text-[0.8125rem]">{it.label}</span>
           </div>
         );
       })}

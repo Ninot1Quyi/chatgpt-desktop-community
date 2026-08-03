@@ -8,7 +8,7 @@ export default function AppshotsSection() {
 
   return (
     <>
-      <div className="-mt-3 mb-4 text-[13px] text-(--fg-tertiary)">
+      <div className="-mt-3 mb-4 text-[0.8125rem] text-(--fg-tertiary)">
         Take an appshot to show ChatGPT your frontmost window
         <div className="mt-0.5">Appshots include visual and text content, including text scrolled offscreen</div>
       </div>

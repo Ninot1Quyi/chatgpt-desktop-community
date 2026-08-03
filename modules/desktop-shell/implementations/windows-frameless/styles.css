@@ -21,3 +21,19 @@
 .desktop-shell-windows .right-panel-root {
   background: var(--surface);
 }
+
+/* The main panel floats 0.5rem to the right of the sidebar edge (ml-2), so the
+   visible divider is the panel's left border, not the sidebar edge. Stretch the
+   sidebar footer divider across that gutter and align the resize handle's hit
+   area and hover line with the panel border. */
+.desktop-shell-windows .sidebar-frame .sidebar-footer {
+  margin-right: -0.5rem;
+}
+
+.desktop-shell-windows .sidebar-frame + .drag-handle .drag-handle-hit {
+  left: 0;
+}
+
+.desktop-shell-windows .sidebar-frame + .drag-handle .drag-handle-line {
+  left: 0.5rem;
+}

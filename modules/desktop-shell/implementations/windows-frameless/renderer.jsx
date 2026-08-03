@@ -1,6 +1,5 @@
-import React from "react";
+import React, { useRef } from "react";
 import { useStore } from "@app/store.js";
-import { cx } from "@app/lib/cx.js";
 import {
   Conversation,
   ConversationHeaderContent,
@@ -25,23 +24,32 @@ import { bindingFor } from "@modules/shortcuts";
 import {
   BottomPanel,
   CollapsedSidebar,
+  HeaderNewChatButton,
   PluginsHeaderTabs,
   NavHeaderActions,
   RightPanelDragHandle,
   SidebarColumn,
+  rightPanelResponsiveStyle,
 } from "../../shared/parts.jsx";
 import "./styles.css";
 
 export default function DesktopShell({ overlays }) {
   const ui = useStore((state) => state.ui);
   const rightVisible = ui.navView === "chats" && ui.rightOpen;
+  const rightPanelRef = useRef(null);
   return (
     <div className="app-shell-root win-shell desktop-shell-windows relative h-full w-full overflow-hidden">
       <div className="flex h-full w-full">
         <SidebarColumn />
-        <div className="mt-[46px] ml-2 flex min-w-0 flex-1 overflow-hidden rounded-tl-[10px] border-t border-l border-(--border-light) bg-(--surface)">
-          <div className={cx("flex min-w-[360px] flex-1 flex-col", rightVisible && ui.rightExpanded && "hidden")}>
-            <div className="flex h-[46px] shrink-0 items-center gap-1 pl-3 pr-2">
+        <div className="mt-[2.875rem] ml-2 flex min-w-0 flex-1 overflow-hidden rounded-tl-[0.625rem] border-t border-l border-(--border-light) bg-(--surface)">
+          <div className="flex min-w-[22.5rem] flex-1 flex-col">
+            <div className={`flex h-[2.875rem] shrink-0 items-center gap-1 pr-2 ${ui.sidebarOpen ? "pl-3" : "pl-0"}`}>
+              {!ui.sidebarOpen && (
+                <HeaderNewChatButton
+                  IconButtonComponent={IconButton}
+                  icon={<LucideIcon name="SquarePen" size={16} />}
+                />
+              )}
               {ui.navView === "chats" ? (
                 <>
                   <div className="min-w-0 flex-1">
@@ -62,22 +70,21 @@ export default function DesktopShell({ overlays }) {
               {ui.navView === "chats" ? <Conversation /> : <NavViews />}
             </div>
             {ui.bottomOpen && (
-              <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
+              <div className="slide-in-up h-[17.5rem] shrink-0 border-t border-(--border-light)">
                 <BottomPanel />
               </div>
             )}
           </div>
           {rightVisible && (
             <>
-              {!ui.rightExpanded && <RightPanelDragHandle />}
+              {!ui.rightExpanded && <RightPanelDragHandle panelRefs={[rightPanelRef]} />}
               <div
-                className={cx(
-                  "slide-in-right flex shrink-0 flex-col border-l border-(--border-light) bg-(--surface)",
-                  ui.rightExpanded && "min-w-0 flex-1",
-                )}
-                style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
+                ref={rightPanelRef}
+                className="right-panel-frame slide-in-right flex min-w-0 flex-col border-l border-(--border-light) bg-(--surface)"
+                data-expanded={ui.rightExpanded ? "true" : "false"}
+                style={rightPanelResponsiveStyle(ui.rightPanelRatio)}
               >
-                <div className="flex h-[46px] shrink-0 items-center pl-2">
+                <div className="flex h-[2.875rem] shrink-0 items-center pl-2">
                   <div className="h-full min-w-0 flex-1">
                     <React.Suspense fallback={null}>
                       <LazyRightPanelHeader />
@@ -114,7 +121,7 @@ function NavigationButtons() {
         icon={<IconHeaderBack />}
         size={16}
         title={`Back (${bindingFor("back")})`}
-        className="!rounded-[12.5px] !text-(--fg-tertiary)"
+        className="!rounded-[0.78125rem] !text-(--fg-tertiary)"
         disabled={!navBack.length}
         onClick={goBack}
       />
@@ -122,7 +129,7 @@ function NavigationButtons() {
         icon={<IconHeaderForward />}
         size={16}
         title={`Forward (${bindingFor("forward")})`}
-        className="!rounded-[12.5px] !text-(--fg-tertiary)"
+        className="!rounded-[0.78125rem] !text-(--fg-tertiary)"
         disabled={!navForward.length}
         onClick={goForward}
       />
@@ -134,7 +141,7 @@ function WindowsHeader() {
   const ui = useStore((state) => state.ui);
   const setUi = useStore((state) => state.setUi);
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pl-3">
+    <div className="app-drag absolute inset-x-0 top-0 z-40 flex h-[2.875rem] items-center gap-1 pl-3">
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}
@@ -143,27 +150,15 @@ function WindowsHeader() {
       />
       <NavigationButtons />
       <WinMenuBar />
-      {!ui.sidebarOpen && (
-        <IconButton
-          icon={<LucideIcon name="SquarePen" size={16} />}
-          title="New chat"
-          onClick={() => {
-            const state = useStore.getState();
-            state.setUi({ navView: "chats" });
-            state.newChat();
-          }}
-        />
-      )}
       <div className="flex-1" />
       <WinWindowControls />
     </div>
   );
 }
-
 function WindowsPeekHeader() {
   const setUi = useStore((state) => state.setUi);
   return (
-    <div className="app-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-3">
+    <div className="app-drag absolute inset-x-0 top-0 z-10 flex h-[2.875rem] items-center gap-1.5 pl-3">
       <IconButton
         icon={<IconHeaderSidebar />}
         size={16}

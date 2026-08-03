@@ -84,7 +84,7 @@ export default function WinMenuBar() {
           onClick={() => setOpenId(openId === m.id ? null : m.id)}
           onMouseEnter={() => { if (openId && openId !== m.id) setOpenId(m.id); }}
           className={cx(
-            "rounded-md px-2 py-1 text-[13px]",
+            "rounded-md px-2 py-1 text-[0.8125rem]",
             openId === m.id ? "bg-(--surface-hover) text-(--fg)" : "text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)"
           )}
         >

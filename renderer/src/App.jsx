@@ -199,16 +199,16 @@ function BootScreen({ status }) {
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-(--surface)">
       {status === "crashed" ? (
         <>
-          <div className="text-[15px] font-medium text-(--danger)">
+          <div className="text-[0.9375rem] font-medium text-(--danger)">
             {t("ChatGPT Desktop Community backend failed to start")}
           </div>
-          <div className="max-w-[420px] text-center text-[13px] text-(--fg-tertiary)">
+          <div className="max-w-[26.25rem] text-center text-[0.8125rem] text-(--fg-tertiary)">
             {t("Tried to launch:")} <span className="font-mono">{binary || "codex"}</span>
             <br />
             {backendError || t("The bundled Codex runtime could not be started.")}
           </div>
           {binaryCandidates.length > 0 && (
-            <details className="max-w-[560px] text-[12px] text-(--fg-tertiary)">
+            <details className="max-w-[35rem] text-[0.75rem] text-(--fg-tertiary)">
               <summary className="cursor-pointer text-center">{t("Show searched locations")}</summary>
               <div className="mt-2 break-all rounded-lg bg-(--surface-secondary) px-3 py-2 font-mono">
                 {binaryCandidates.join("\n")}
@@ -216,7 +216,7 @@ function BootScreen({ status }) {
             </details>
           )}
           <button
-            className="mt-2 rounded-lg bg-(--accent) px-4 py-2 text-[13px] font-medium text-(--accent-fg)"
+            className="mt-2 rounded-lg bg-(--accent) px-4 py-2 text-[0.8125rem] font-medium text-(--accent-fg)"
             onClick={() => api.restartAppServer()}
           >
             {t("Retry")}
@@ -225,7 +225,7 @@ function BootScreen({ status }) {
       ) : (
         <>
           <Spinner size={22} className="text-(--fg-tertiary)" />
-          <div className="text-[13px] text-(--fg-tertiary)">
+          <div className="text-[0.8125rem] text-(--fg-tertiary)">
             {status === "starting"
               ? t("Starting ChatGPT Desktop Community…")
               : status === "checking-account"
@@ -250,12 +250,12 @@ function AuthScreen() {
 
   return (
     <div className="app-drag flex h-full w-full items-center justify-center bg-(--surface)">
-      <div className="app-no-drag flex w-[400px] flex-col items-center text-center">
+      <div className="app-no-drag flex w-[25rem] flex-col items-center text-center">
         <div className="mb-5 flex size-12 items-center justify-center rounded-2xl border border-(--border) bg-(--surface-raised)">
           <IconChat size={24} />
         </div>
-        <h1 className="text-[22px] font-semibold">ChatGPT Desktop Community</h1>
-        <p className="mt-2 max-w-[340px] text-[13px] leading-5 text-(--fg-tertiary)">
+        <h1 className="text-[1.375rem] font-semibold">ChatGPT Desktop Community</h1>
+        <p className="mt-2 max-w-[21.25rem] text-[0.8125rem] leading-5 text-(--fg-tertiary)">
           {t("Sign in with any provider below to use its account and models.")}
         </p>
         <div className="mt-6 flex w-full flex-col gap-2">
@@ -264,11 +264,11 @@ function AuthScreen() {
           ))}
         </div>
         {loginError && (
-          <div className="mt-4 text-[12px] leading-5 text-(--danger)">
+          <div className="mt-4 text-[0.75rem] leading-5 text-(--danger)">
             {loginError}
           </div>
         )}
-        <p className="mt-6 text-[11px] leading-4 text-(--fg-faint)">
+        <p className="mt-6 text-[0.6875rem] leading-4 text-(--fg-faint)">
           {t("Credentials are handled and stored locally by each provider's runtime.")}
         </p>
       </div>
@@ -303,8 +303,8 @@ function AuthVendorRow({ meta }) {
         {meta.icon(20)}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-medium">{meta.label}</div>
-        <div className="text-[11px] text-(--fg-tertiary)">
+        <div className="text-[0.8125rem] font-medium">{meta.label}</div>
+        <div className="text-[0.6875rem] text-(--fg-tertiary)">
           {connected
             ? t("Connected")
             : codex
@@ -316,7 +316,7 @@ function AuthVendorRow({ meta }) {
         <LucideIcon name="Check" size={16} className="shrink-0 text-(--success)" />
       ) : (
         <button
-          className="flex h-7 shrink-0 items-center rounded-lg bg-(--fg) px-3 text-[12px] font-medium text-(--surface) disabled:opacity-60"
+          className="flex h-7 shrink-0 items-center rounded-lg bg-(--fg) px-3 text-[0.75rem] font-medium text-(--surface) disabled:opacity-60"
           disabled={waiting}
           onClick={() => (codex ? startLogin() : startExternalLogin(meta.id))}
         >
@@ -373,14 +373,14 @@ function CommandMenu() {
       }}
     >
       <div
-        className="fade-in w-[520px] overflow-hidden rounded-2xl border border-(--border) bg-(--surface-raised)"
+        className="fade-in w-[32.5rem] overflow-hidden rounded-2xl border border-(--border) bg-(--surface-raised)"
         style={{ boxShadow: "var(--shadow-menu)" }}
       >
         <div className="flex items-center gap-2 border-b border-(--border-light) px-4 py-3">
           <IconSearch size={14} className="text-(--fg-tertiary)" />
           <input
             autoFocus
-            className="w-full bg-transparent text-[14px] outline-none placeholder:text-(--fg-faint)"
+            className="w-full bg-transparent text-[0.875rem] outline-none placeholder:text-(--fg-faint)"
             placeholder={t("Search chats…")}
             value={query}
             onChange={(event) => {
@@ -402,13 +402,13 @@ function CommandMenu() {
               }
             }}
           />
-          <span className="rounded border border-(--border-light) px-1.5 py-0.5 text-[10px] text-(--fg-faint)">
+          <span className="rounded border border-(--border-light) px-1.5 py-0.5 text-[0.625rem] text-(--fg-faint)">
             esc
           </span>
         </div>
-        <div className="max-h-[320px] overflow-y-auto py-1">
+        <div className="max-h-[20rem] overflow-y-auto py-1">
           <button
-            className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-[13px] hover:bg-(--surface-hover)"
+            className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-[0.8125rem] hover:bg-(--surface-hover)"
             onClick={() => {
               setUi({ commandMenuOpen: false });
               newChat();
@@ -425,7 +425,7 @@ function CommandMenu() {
               <button
                 key={thread.id}
                 className={cx(
-                  "flex w-full items-center gap-2.5 px-4 py-2 text-left text-[13px]",
+                  "flex w-full items-center gap-2.5 px-4 py-2 text-left text-[0.8125rem]",
                   index === selectedIndex
                     ? "bg-(--surface-active)"
                     : "hover:bg-(--surface-hover)",
@@ -440,7 +440,7 @@ function CommandMenu() {
                   {thread.name || (thread.preview || "").split("\n")[0] || t("New chat")}
                 </span>
                 {meta && (
-                  <span className="ml-auto shrink-0 text-[10px] text-(--fg-faint)">
+                  <span className="ml-auto shrink-0 text-[0.625rem] text-(--fg-faint)">
                     {meta.label}
                   </span>
                 )}
@@ -448,7 +448,7 @@ function CommandMenu() {
             );
           })}
           {filtered.length === 0 && (
-            <div className="px-4 py-6 text-center text-[13px] text-(--fg-tertiary)">
+            <div className="px-4 py-6 text-center text-[0.8125rem] text-(--fg-tertiary)">
               {t("No matches")}
             </div>
           )}

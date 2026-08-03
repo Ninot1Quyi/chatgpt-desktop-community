@@ -41,7 +41,7 @@ export default function PersonalizationSection() {
 
   return (
     <>
-      <div className="mb-4 px-1 text-[12px] leading-5 text-(--fg-tertiary)">
+      <div className="mb-4 px-1 text-[0.75rem] leading-5 text-(--fg-tertiary)">
         Personality settings are not supported by every model. The assistant&apos;s tone can be customized in Custom instructions.
       </div>
 
@@ -57,12 +57,12 @@ export default function PersonalizationSection() {
           />
         </Row>
         <div className="px-4 py-3.5">
-          <div className="text-[13px]">Custom instructions</div>
-          <div className="mt-0.5 text-[12px] leading-5 text-(--fg-tertiary)">
+          <div className="text-[0.8125rem]">Custom instructions</div>
+          <div className="mt-0.5 text-[0.75rem] leading-5 text-(--fg-tertiary)">
             Give ChatGPT extra instructions and context for all chats on this host. Learn more
           </div>
           <textarea
-            className="mt-2 h-28 w-full resize-y rounded-lg border border-(--border-light) bg-(--surface) px-2.5 py-2 text-[13px] outline-none placeholder:text-(--fg-faint) focus:border-(--accent)"
+            className="mt-2 h-28 w-full resize-y rounded-lg border border-(--border-light) bg-(--surface) px-2.5 py-2 text-[0.8125rem] outline-none placeholder:text-(--fg-faint) focus:border-(--accent)"
             placeholder="e.g. Prefer concise answers and TypeScript examples."
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
@@ -74,7 +74,7 @@ export default function PersonalizationSection() {
       </Card>
 
       <Card title="Memory">
-        <div className="px-4 py-3.5 text-[12px] leading-5 text-(--fg-tertiary)">
+        <div className="px-4 py-3.5 text-[0.75rem] leading-5 text-(--fg-tertiary)">
           Configure how ChatGPT collects, retains, and consolidates memories. Learn more
         </div>
         <Row title="Enable memories" desc="Generate new memories from chats and bring them into new chats">

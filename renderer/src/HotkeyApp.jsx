@@ -46,12 +46,12 @@ export default function HotkeyApp() {
   return (
     <div className="flex h-full w-full items-stretch justify-center p-2">
       <div
-        className="flex max-h-full w-full flex-col overflow-hidden rounded-[20px] border border-(--border-heavy) bg-(--surface-raised)"
+        className="flex max-h-full w-full flex-col overflow-hidden rounded-[1.25rem] border border-(--border-heavy) bg-(--surface-raised)"
         style={{ boxShadow: "var(--shadow-menu)" }}
       >
         {/* drag handle row: title + pin + minimize */}
         <div className="app-drag flex h-9 shrink-0 items-center justify-between pl-4 pr-2">
-          <span className="text-[14px] text-(--fg-tertiary)">{activeThreadId ? activeName || "Chat" : "New chat"}</span>
+          <span className="text-[0.875rem] text-(--fg-tertiary)">{activeThreadId ? activeName || "Chat" : "New chat"}</span>
           <div className="app-no-drag flex items-center gap-0.5">
             <button
               className={`flex h-6 w-6 items-center justify-center rounded-md hover:bg-(--surface-hover) ${pinned ? "text-(--fg)" : "text-(--fg-tertiary)"}`}
@@ -85,12 +85,12 @@ export default function HotkeyApp() {
                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-(--surface-hover)"
                   onClick={() => openThread(t.id)}
                 >
-                  <span className="min-w-0 flex-1 truncate text-[14px]">{t.name || (t.preview || "").split("\n")[0] || "New chat"}</span>
-                  <span className="shrink-0 text-[13px] text-(--fg-faint)">{shortTime(t.updatedAt)}</span>
+                  <span className="min-w-0 flex-1 truncate text-[0.875rem]">{t.name || (t.preview || "").split("\n")[0] || "New chat"}</span>
+                  <span className="shrink-0 text-[0.8125rem] text-(--fg-faint)">{shortTime(t.updatedAt)}</span>
                 </button>
               ))}
               <button
-                className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[14px] text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
+                className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[0.875rem] text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
                 onClick={() => { showMainWindow(); hideHotkey(); }}
               >
                 See all

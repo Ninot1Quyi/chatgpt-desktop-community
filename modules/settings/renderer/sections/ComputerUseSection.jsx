@@ -12,13 +12,13 @@ export default function ComputerUseSection() {
 
   return (
     <>
-      <div className="-mt-3 mb-4 text-[13px] text-(--fg-tertiary)">
+      <div className="-mt-3 mb-4 text-[0.8125rem] text-(--fg-tertiary)">
         Manage how ChatGPT uses other applications on your computer
       </div>
       <Card title="Control">
         <Row title="Any App" desc="Let ChatGPT control apps on your computer">
           {installed ? (
-            <span className="text-[12px] text-(--success)">Installed</span>
+            <span className="text-[0.75rem] text-(--success)">Installed</span>
           ) : (
             <Btn
               onClick={() => {
@@ -50,7 +50,7 @@ export default function ComputerUseSection() {
       </Card>
 
       <Card title="Always-allowed apps">
-        <div className="px-4 py-6 text-center text-[12px] text-(--fg-faint)">None yet</div>
+        <div className="px-4 py-6 text-center text-[0.75rem] text-(--fg-faint)">None yet</div>
       </Card>
     </>
   );

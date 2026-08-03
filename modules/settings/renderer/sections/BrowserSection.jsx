@@ -54,13 +54,13 @@ export default function BrowserSection() {
 
   return (
     <>
-      <div className="-mt-3 mb-4 text-[13px] text-(--fg-tertiary)">
+      <div className="-mt-3 mb-4 text-[0.8125rem] text-(--fg-tertiary)">
         Manage the built-in browser. Google Chrome can be set up in computer use settings
       </div>
       <Card title="Browser">
         <Row title="Browser" desc="Let ChatGPT control the built-in browser">
           {installed ? (
-            <span className="text-[12px] text-(--success)">Installed</span>
+            <span className="text-[0.75rem] text-(--success)">Installed</span>
           ) : (
             <Btn
               onClick={() => {
@@ -102,8 +102,8 @@ export default function BrowserSection() {
         <div className="px-4 py-3.5">
           <div className="flex items-center justify-between gap-6">
             <div className="min-w-0">
-              <div className="text-[13px]">Browsing data</div>
-              <div className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-(--fg-tertiary)">
+              <div className="text-[0.8125rem]">Browsing data</div>
+              <div className="mt-0.5 line-clamp-2 text-[0.75rem] leading-5 text-(--fg-tertiary)">
                 Clear browsing history, site data, cache, and download history from the in-app browser
               </div>
             </div>
@@ -117,7 +117,7 @@ export default function BrowserSection() {
             </Btn>
           </div>
           <button
-            className="mt-2 flex items-center gap-1 text-[12px] text-(--fg-secondary) hover:text-(--fg)"
+            className="mt-2 flex items-center gap-1 text-[0.75rem] text-(--fg-secondary) hover:text-(--fg)"
             onClick={() => setDataOpen(!dataOpen)}
           >
             {dataOpen ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
@@ -126,7 +126,7 @@ export default function BrowserSection() {
           {dataOpen && (
             <div className="mt-2 rounded-lg border border-(--border-light) bg-(--surface) p-2">
               {BROWSING_DATA_KINDS.map(([id, label]) => (
-                <label key={id} className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-[13px] hover:bg-(--surface-hover)">
+                <label key={id} className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-[0.8125rem] hover:bg-(--surface-hover)">
                   <input
                     type="checkbox"
                     className="accent-(--accent)"
@@ -212,13 +212,13 @@ export default function BrowserSection() {
         <div className="px-4 py-3.5">
           <div className="flex items-center justify-between gap-6">
             <div className="min-w-0">
-              <div className="text-[13px]">Site permissions</div>
-              <div className="mt-0.5 text-[12px] leading-5 text-(--fg-tertiary)">Override the defaults above for specific sites</div>
+              <div className="text-[0.8125rem]">Site permissions</div>
+              <div className="mt-0.5 text-[0.75rem] leading-5 text-(--fg-tertiary)">Override the defaults above for specific sites</div>
             </div>
           </div>
           <div className="mt-2 flex gap-2">
             <input
-              className="h-8 min-w-0 flex-1 rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[13px] outline-none placeholder:text-(--fg-faint) focus:border-(--accent)"
+              className="h-8 min-w-0 flex-1 rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[0.8125rem] outline-none placeholder:text-(--fg-faint) focus:border-(--accent)"
               placeholder="https://example.com"
               value={siteDraft}
               onChange={(e) => setSiteDraft(e.target.value)}
@@ -232,8 +232,8 @@ export default function BrowserSection() {
             <div className="mt-2 divide-y divide-(--border-light) rounded-lg border border-(--border-light) bg-(--surface)">
               {sites.map((s, i) => (
                 <div key={`${s.url}-${i}`} className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="min-w-0 truncate text-[13px]">{s.url}</span>
-                  <span className="flex shrink-0 items-center gap-2 text-[12px] text-(--fg-tertiary)">
+                  <span className="min-w-0 truncate text-[0.8125rem]">{s.url}</span>
+                  <span className="flex shrink-0 items-center gap-2 text-[0.75rem] text-(--fg-tertiary)">
                     status: {s.status}
                     <button
                       className="text-(--fg-faint) hover:text-(--danger)"
@@ -250,14 +250,14 @@ export default function BrowserSection() {
               ))}
             </div>
           ) : (
-            <div className="mt-2 text-[12px] text-(--fg-faint)">Only sites with custom permissions appear here</div>
+            <div className="mt-2 text-[0.75rem] text-(--fg-faint)">Only sites with custom permissions appear here</div>
           )}
         </div>
       </Card>
 
       <Card title="Developer mode">
         <div className="px-4 py-3.5">
-          <div className="flex items-center gap-2 text-[13px] font-medium text-(--warning)">
+          <div className="flex items-center gap-2 text-[0.8125rem] font-medium text-(--warning)">
             <LucideIcon name="TriangleAlert" size={14} />
             Elevated risk
           </div>
@@ -274,5 +274,5 @@ export default function BrowserSection() {
 }
 
 function PanelNote({ text }) {
-  return <div className="border-t border-(--border-light) bg-(--surface) px-4 py-3 text-[12px] text-(--fg-faint)">{text}</div>;
+  return <div className="border-t border-(--border-light) bg-(--surface) px-4 py-3 text-[0.75rem] text-(--fg-faint)">{text}</div>;
 }

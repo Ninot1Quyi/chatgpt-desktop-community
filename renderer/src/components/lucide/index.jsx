@@ -1,6 +1,7 @@
 // Lucide icon renderer, matching the reference app's createLucideIcon output:
 // 24x24 viewBox, fill none, stroke currentColor, strokeWidth 2, round caps.
 import React from "react";
+import { rem } from "../../lib/cssUnits.js";
 import { ICON_NODES } from "./nodes.js";
 
 export function LucideIcon({ name, size = 16, strokeWidth = 2, className, style }) {
@@ -8,8 +9,8 @@ export function LucideIcon({ name, size = 16, strokeWidth = 2, className, style 
   if (!nodes) return null;
   return (
     <svg
-      width={size}
-      height={size}
+      width={rem(size)}
+      height={rem(size)}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

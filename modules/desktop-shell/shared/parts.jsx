@@ -19,26 +19,40 @@ export function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-export function DragHandle({ onDrag, onEnd }) {
+export function DragHandle({ onStart, onDrag, onEnd }) {
   return (
     <div
-      className="group relative z-20 w-0 shrink-0 cursor-col-resize bg-transparent"
+      className="drag-handle group relative z-20 w-0 shrink-0 cursor-col-resize bg-transparent"
       onMouseDown={(event) => {
         event.preventDefault();
+        onStart?.(event);
         const startX = event.clientX;
-        const move = (nextEvent) => onDrag(nextEvent.clientX - startX);
+        let latestDelta = 0;
+        let frame = null;
+        const flush = () => {
+          frame = null;
+          onDrag(latestDelta);
+        };
+        const move = (nextEvent) => {
+          latestDelta = nextEvent.clientX - startX;
+          if (frame == null) frame = window.requestAnimationFrame(flush);
+        };
         const up = () => {
           window.removeEventListener("mousemove", move);
           window.removeEventListener("mouseup", up);
-          onEnd?.();
+          if (frame != null) {
+            window.cancelAnimationFrame(frame);
+            flush();
+          }
+          onEnd?.(latestDelta);
         };
         window.addEventListener("mousemove", move);
         window.addEventListener("mouseup", up);
       }}
     >
-      <div className="absolute inset-y-0 -left-2 w-[17px]" />
+      <div className="drag-handle-hit absolute inset-y-0 -left-2 w-[1.0625rem]" />
       <div
-        className="absolute inset-y-0 left-0 w-px opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+        className="drag-handle-line absolute inset-y-0 left-0 w-[0.0625rem] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
         style={{
           background: "linear-gradient(to bottom, transparent, color-mix(in oklab, var(--fg) 25%, transparent), transparent)",
         }}
@@ -47,20 +61,189 @@ export function DragHandle({ onDrag, onEnd }) {
   );
 }
 
-export function SidebarColumn() {
-  const ui = useStore((state) => state.ui);
+const DEFAULT_RIGHT_PANEL_RATIO = 0.28;
+const MIN_RIGHT_PANEL_RATIO = 0.18;
+const MAX_RIGHT_PANEL_RATIO = 0.6;
+
+function normalizedRightPanelRatio(value) {
+  const ratio = Number(value);
+  return clamp(
+    Number.isFinite(ratio) ? ratio : DEFAULT_RIGHT_PANEL_RATIO,
+    MIN_RIGHT_PANEL_RATIO,
+    MAX_RIGHT_PANEL_RATIO,
+  );
+}
+
+export function rightPanelResponsiveStyle(ratio) {
+  return {
+    "--right-panel-size": `${normalizedRightPanelRatio(ratio) * 100}vw`,
+  };
+}
+
+// Mid-drag panel collapse, mirroring the reference app: once the dragged size
+// drops below half the panel minimum, the panel plays its close animation
+// while the drag is still active (children freeze at the rendered width so
+// they fade instead of reflowing). Dragging back above the threshold reverses
+// the animation; releasing below it commits the close.
+const PANEL_COLLAPSE_TRANSITION = "max-width 180ms cubic-bezier(0.2,0,0.13,1), opacity 150ms ease";
+
+function beginPanelCollapse(panel) {
+  const width = panel.getBoundingClientRect().width;
+  for (const child of panel.children) {
+    child.style.width = `${width}px`;
+    child.style.minWidth = `${width}px`;
+  }
+  panel.style.overflow = "hidden";
+  panel.style.transition = PANEL_COLLAPSE_TRANSITION;
+  panel.style.minWidth = "0";
+  panel.style.maxWidth = "0";
+  panel.style.opacity = "0";
+}
+
+function revertPanelCollapse(panel) {
+  panel.style.minWidth = "";
+  panel.style.maxWidth = "";
+  panel.style.opacity = "";
+  for (const child of panel.children) {
+    child.style.width = "";
+    child.style.minWidth = "";
+  }
+}
+
+function resetPanelCollapse(panel) {
+  panel.style.transition = "";
+  panel.style.overflow = "";
+  revertPanelCollapse(panel);
+}
+
+export function RightPanelDragHandle({ panelRefs }) {
+  const ratio = useStore((state) => state.ui.rightPanelRatio);
   const setUi = useStore((state) => state.setUi);
-  if (!ui.sidebarOpen) return null;
+  const baseRatio = useRef(normalizedRightPanelRatio(ratio));
+  const pendingRatio = useRef(normalizedRightPanelRatio(ratio));
+  const collapsing = useRef(false);
+  pendingRatio.current = normalizedRightPanelRatio(ratio);
+  const forEachPanel = (fn) => {
+    for (const ref of panelRefs) {
+      if (ref.current) fn(ref.current);
+    }
+  };
+
+  return (
+    <DragHandle
+      onStart={() => {
+        forEachPanel(resetPanelCollapse);
+        const panel = panelRefs.find((ref) => ref.current)?.current;
+        const renderedRatio = panel
+          ? panel.getBoundingClientRect().width / Math.max(1, window.innerWidth)
+          : ratio;
+        baseRatio.current = normalizedRightPanelRatio(renderedRatio);
+        pendingRatio.current = baseRatio.current;
+        collapsing.current = false;
+      }}
+      onDrag={(delta) => {
+        const rawRatio = baseRatio.current - delta / Math.max(1, window.innerWidth);
+        const shouldCollapse = rawRatio < MIN_RIGHT_PANEL_RATIO / 2;
+        if (shouldCollapse !== collapsing.current) {
+          collapsing.current = shouldCollapse;
+          forEachPanel(shouldCollapse ? beginPanelCollapse : revertPanelCollapse);
+        }
+        if (collapsing.current) return;
+        const next = normalizedRightPanelRatio(rawRatio);
+        pendingRatio.current = next;
+        for (const ref of panelRefs) {
+          ref.current?.style.setProperty("--right-panel-size", `${next * 100}vw`);
+        }
+      }}
+      onEnd={(delta) => {
+        if (collapsing.current) {
+          collapsing.current = false;
+          setUi({ rightOpen: false });
+          return;
+        }
+        forEachPanel(resetPanelCollapse);
+        if (delta) setUi({ rightPanelRatio: pendingRatio.current });
+      }}
+    />
+  );
+}
+
+const DEFAULT_SIDEBAR_RATIO = 0.16;
+const MIN_SIDEBAR_RATIO = 0.11;
+const MAX_SIDEBAR_RATIO = 0.3;
+
+function normalizedSidebarRatio(value) {
+  const ratio = Number(value);
+  return clamp(
+    Number.isFinite(ratio) ? ratio : DEFAULT_SIDEBAR_RATIO,
+    MIN_SIDEBAR_RATIO,
+    MAX_SIDEBAR_RATIO,
+  );
+}
+
+export function sidebarResponsiveStyle(ratio) {
+  return {
+    "--sidebar-size": `${normalizedSidebarRatio(ratio) * 100}vw`,
+  };
+}
+
+export function SidebarColumn() {
+  const sidebarOpen = useStore((state) => state.ui.sidebarOpen);
+  const sidebarRatio = useStore((state) => state.ui.sidebarRatio);
+  const setUi = useStore((state) => state.setUi);
+  const panelRef = useRef(null);
+  const baseRatio = useRef(normalizedSidebarRatio(sidebarRatio));
+  const pendingRatio = useRef(normalizedSidebarRatio(sidebarRatio));
+  const collapsing = useRef(false);
+  pendingRatio.current = normalizedSidebarRatio(sidebarRatio);
+  if (!sidebarOpen) return null;
   return (
     <>
-      <div className="slide-in-left shrink-0" style={{ width: ui.sidebarWidth }}>
+      <div
+        ref={panelRef}
+        className="sidebar-frame slide-in-left shrink-0"
+        style={sidebarResponsiveStyle(sidebarRatio)}
+      >
         <Sidebar />
       </div>
       <DragHandle
+        onStart={() => {
+          if (panelRef.current) resetPanelCollapse(panelRef.current);
+          const renderedRatio = panelRef.current
+            ? panelRef.current.getBoundingClientRect().width / Math.max(1, window.innerWidth)
+            : sidebarRatio;
+          baseRatio.current = normalizedSidebarRatio(renderedRatio);
+          pendingRatio.current = baseRatio.current;
+          collapsing.current = false;
+        }}
         onDrag={(delta) => {
-          const width = ui.sidebarWidth + delta;
-          if (width < 170) setUi({ sidebarOpen: false });
-          else setUi({ sidebarWidth: clamp(width, 220, 520) });
+          const rawRatio = baseRatio.current + delta / Math.max(1, window.innerWidth);
+          const shouldCollapse = rawRatio < MIN_SIDEBAR_RATIO / 2;
+          if (shouldCollapse !== collapsing.current) {
+            collapsing.current = shouldCollapse;
+            if (panelRef.current) {
+              if (shouldCollapse) {
+                beginPanelCollapse(panelRef.current);
+              } else {
+                revertPanelCollapse(panelRef.current);
+              }
+            }
+          }
+          if (collapsing.current) return;
+          const next = normalizedSidebarRatio(rawRatio);
+          pendingRatio.current = next;
+          panelRef.current?.style.setProperty("--sidebar-size", `${next * 100}vw`);
+        }}
+        onEnd={(delta) => {
+          if (collapsing.current) {
+            collapsing.current = false;
+            setUi({ sidebarOpen: false });
+            return;
+          }
+          if (panelRef.current) resetPanelCollapse(panelRef.current);
+          if (delta) {
+            setUi({ sidebarRatio: pendingRatio.current });
+          }
         }}
       />
     </>
@@ -79,10 +262,10 @@ export function CollapsedSidebar({ header }) {
       />
       <div
         className={cx(
-          "absolute inset-y-0 left-0 z-40 transition-transform duration-200 ease-[cubic-bezier(0.2,0,0.13,1)]",
+          "sidebar-frame absolute inset-y-0 left-0 z-40 transition-transform duration-200 ease-[cubic-bezier(0.2,0,0.13,1)]",
           ui.sidebarPeek ? "translate-x-0" : "-translate-x-full",
         )}
-        style={{ width: ui.sidebarWidth }}
+        style={sidebarResponsiveStyle(ui.sidebarRatio)}
         onMouseLeave={() => setUi({ sidebarPeek: false })}
       >
         <div
@@ -94,28 +277,6 @@ export function CollapsedSidebar({ header }) {
         </div>
       </div>
     </>
-  );
-}
-
-export function RightPanelDragHandle() {
-  const ui = useStore((state) => state.ui);
-  const setUi = useStore((state) => state.setUi);
-  return (
-    <DragHandle
-      onDrag={(delta) => setUi({
-        rightWidth: clamp(
-          ui.rightWidth - delta,
-          320,
-          Math.max(340, window.innerWidth - 420),
-        ),
-      })}
-      onEnd={() => {
-        const state = useStore.getState();
-        const sidebar = state.ui.sidebarOpen ? state.ui.sidebarWidth + 8 : 0;
-        const max = Math.max(320, window.innerWidth - sidebar - 380);
-        if (state.ui.rightWidth > max) state.setUi({ rightWidth: max });
-      }}
-    />
   );
 }
 
@@ -145,7 +306,7 @@ export function PluginsHeaderTabs() {
           key={id}
           onClick={() => setUi({ pluginsTab: id })}
           className={cx(
-            "border-b-2 pb-1 text-[13px]",
+            "border-b-2 pb-1 text-[0.8125rem]",
             tab === id
               ? "border-(--fg) font-medium text-(--fg)"
               : "border-transparent text-(--fg-tertiary) hover:text-(--fg)",
@@ -192,12 +353,12 @@ export function NavHeaderActions({ view }) {
         <IconButton
           icon={<IconRefresh />}
           title="Refresh sites"
-          className="!rounded-[12.5px] !text-(--fg-tertiary)"
+          className="!rounded-[0.78125rem] !text-(--fg-tertiary)"
           onClick={() => window.dispatchEvent(new CustomEvent("sites:reload"))}
         />
         <button
           type="button"
-          className="flex h-7 items-center rounded-[12.5px] border border-(--border) bg-(--fg) px-2 text-[14px] leading-[18px] text-(--surface) hover:opacity-80"
+          className="flex h-7 items-center rounded-[0.78125rem] border border-(--border) bg-(--fg) px-2 text-[0.875rem] leading-[1.125rem] text-(--surface) hover:opacity-80"
           onClick={createSite}
         >
           Create

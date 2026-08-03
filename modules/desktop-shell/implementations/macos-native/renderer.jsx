@@ -1,6 +1,5 @@
-import React from "react";
+import React, { useRef } from "react";
 import { useStore } from "@app/store.js";
-import { cx } from "@app/lib/cx.js";
 import * as api from "@app/api.js";
 import {
   Conversation,
@@ -28,38 +27,38 @@ import {
   NavHeaderActions,
   RightPanelDragHandle,
   SidebarColumn,
+  rightPanelResponsiveStyle,
+  sidebarResponsiveStyle,
 } from "../../shared/parts.jsx";
 import "./styles.css";
 
 export default function DesktopShell({ overlays }) {
   const ui = useStore((state) => state.ui);
   const rightVisible = ui.navView === "chats" && ui.rightOpen;
+  const rightPanelRef = useRef(null);
+  const rightPanelHeaderRef = useRef(null);
   return (
     <div className="app-shell-root desktop-shell-macos relative h-full w-full overflow-hidden">
       <div className="flex h-full w-full">
         <SidebarColumn />
-        <div
-          className={cx(
-            "flex min-w-0 flex-1 flex-col bg-(--surface) pt-[46px]",
-            rightVisible && ui.rightExpanded && "hidden",
-          )}
-        >
+        <div className="flex min-w-0 flex-1 flex-col bg-(--surface) pt-[2.875rem]">
           {ui.navView === "chats" ? <Conversation /> : <NavViews />}
           {ui.bottomOpen && (
-            <div className="slide-in-up h-[280px] shrink-0 border-t border-(--border-light)">
+            <div className="slide-in-up h-[17.5rem] shrink-0 border-t border-(--border-light)">
               <BottomPanel />
             </div>
           )}
         </div>
         {rightVisible && (
           <>
-            {!ui.rightExpanded && <RightPanelDragHandle />}
+            {!ui.rightExpanded && (
+              <RightPanelDragHandle panelRefs={[rightPanelRef, rightPanelHeaderRef]} />
+            )}
             <div
-              className={cx(
-                "pointer-events-none slide-in-right shrink-0 border-l border-(--border)",
-                ui.rightExpanded && "min-w-0 flex-1",
-              )}
-              style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
+              ref={rightPanelRef}
+              className="right-panel-frame pointer-events-none slide-in-right min-w-0 border-l border-(--border)"
+              data-expanded={ui.rightExpanded ? "true" : "false"}
+              style={rightPanelResponsiveStyle(ui.rightPanelRatio)}
             >
               <React.Suspense fallback={null}>
                 <LazyRightPanel />
@@ -68,7 +67,7 @@ export default function DesktopShell({ overlays }) {
           </>
         )}
       </div>
-      <MacHeader />
+      <MacHeader rightPanelHeaderRef={rightPanelHeaderRef} />
       <CollapsedSidebar header={<MacPeekHeader />} />
       {overlays}
     </div>
@@ -100,7 +99,7 @@ function NavigationButtons() {
         icon={<IconHeaderBack />}
         size={16}
         title="Back"
-        className="!rounded-[12.5px] !text-(--fg-tertiary)"
+        className="!rounded-[0.78125rem] !text-(--fg-tertiary)"
         disabled={!navBack.length}
         onClick={goBack}
       />
@@ -108,7 +107,7 @@ function NavigationButtons() {
         icon={<IconHeaderForward />}
         size={16}
         title="Forward"
-        className="!rounded-[12.5px] !text-(--fg-tertiary)"
+        className="!rounded-[0.78125rem] !text-(--fg-tertiary)"
         disabled={!navForward.length}
         onClick={goForward}
       />
@@ -116,13 +115,13 @@ function NavigationButtons() {
   );
 }
 
-function MacHeader() {
+function MacHeader({ rightPanelHeaderRef }) {
   const ui = useStore((state) => state.ui);
   const setUi = useStore((state) => state.setUi);
   const dragHandlers = useMacWindowDrag();
   return (
     <div
-      className="mac-window-drag-surface app-no-drag absolute inset-x-0 top-0 z-40 flex h-[46px] items-center gap-1 pr-3 pl-[88px]"
+      className="mac-window-drag-surface app-no-drag absolute inset-x-0 top-0 z-40 flex h-[2.875rem] items-center gap-1 pr-3 pl-[5.5rem]"
       {...dragHandlers}
     >
       <IconButton
@@ -134,23 +133,25 @@ function MacHeader() {
       <NavigationButtons />
       {!ui.sidebarOpen && <HeaderNewChatButton />}
       {ui.sidebarOpen && (
-        <div className="shrink-0" style={{ width: Math.max(0, ui.sidebarWidth - 180) }} />
+        <div
+          className="sidebar-header-spacer shrink-0"
+          style={sidebarResponsiveStyle(ui.sidebarRatio)}
+        />
       )}
       {ui.navView === "chats" ? (
         <>
-          <div className={cx("min-w-0", ui.rightOpen && ui.rightExpanded ? "w-0" : "flex-1")}>
-            {!(ui.rightOpen && ui.rightExpanded) && <ConversationHeaderContent />}
+          <div className="min-w-0 flex-1">
+            <ConversationHeaderContent />
           </div>
           {ui.rightOpen ? (
             <>
-              {!ui.rightExpanded && <HeaderContextButtons />}
+              <HeaderContextButtons />
               <div className="w-2 shrink-0" />
               <div
-                className={cx(
-                  "app-drag flex h-full shrink-0 items-center",
-                  ui.rightExpanded && "min-w-0 flex-1",
-                )}
-                style={ui.rightExpanded ? undefined : { width: ui.rightWidth }}
+                ref={rightPanelHeaderRef}
+                className="right-panel-frame app-drag flex h-full min-w-0 items-center"
+                data-expanded={ui.rightExpanded ? "true" : "false"}
+                style={rightPanelResponsiveStyle(ui.rightPanelRatio)}
               >
                 <div className="h-full min-w-0 flex-1">
                   <React.Suspense fallback={null}>
@@ -179,13 +180,12 @@ function MacHeader() {
     </div>
   );
 }
-
 function MacPeekHeader() {
   const setUi = useStore((state) => state.setUi);
   const dragHandlers = useMacWindowDrag();
   return (
     <div
-      className="mac-window-drag-surface app-no-drag absolute inset-x-0 top-0 z-10 flex h-[46px] items-center gap-1.5 pl-[84px]"
+      className="mac-window-drag-surface app-no-drag absolute inset-x-0 top-0 z-10 flex h-[2.875rem] items-center gap-1.5 pl-[5.25rem]"
       {...dragHandlers}
     >
       <IconButton

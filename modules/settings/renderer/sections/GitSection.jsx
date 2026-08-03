@@ -20,7 +20,7 @@ export default function GitSection() {
     <Card>
       <Row title="Branch prefix" desc="Prefix used when ChatGPT creates new branches">
         <input
-          className="h-8 w-[180px] rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[13px] outline-none placeholder:text-(--fg-faint) focus:border-(--accent)"
+          className="h-8 w-[11.25rem] rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[0.8125rem] outline-none placeholder:text-(--fg-faint) focus:border-(--accent)"
           placeholder="e.g. codex/"
           value={prefix}
           onChange={(e) => setPrefix(e.target.value)}
@@ -83,7 +83,7 @@ function InstructionsCard({ title, desc, storageKey }) {
   return (
     <Card title={title}>
       <div className="px-4 py-3">
-        <div className="text-[12px] text-(--fg-tertiary)">{desc}</div>
+        <div className="text-[0.75rem] text-(--fg-tertiary)">{desc}</div>
         <textarea
           value={value}
           onChange={(e) => {
@@ -92,7 +92,7 @@ function InstructionsCard({ title, desc, storageKey }) {
           }}
           rows={5}
           spellCheck={false}
-          className="mt-2 w-full resize-y rounded-lg border border-(--border-light) bg-(--surface) p-2.5 font-mono text-[12px] leading-relaxed outline-none focus:border-(--border-heavy)"
+          className="mt-2 w-full resize-y rounded-lg border border-(--border-light) bg-(--surface) p-2.5 font-mono text-[0.75rem] leading-relaxed outline-none focus:border-(--border-heavy)"
         />
         <div className="mt-2 flex justify-end">
           <button
@@ -101,7 +101,7 @@ function InstructionsCard({ title, desc, storageKey }) {
               lsSet(storageKey, value);
               setSaved(true);
             }}
-            className="flex h-7 items-center rounded-lg border border-(--border) px-3 text-[13px] hover:bg-(--surface-hover) disabled:opacity-40"
+            className="flex h-7 items-center rounded-lg border border-(--border) px-3 text-[0.8125rem] hover:bg-(--surface-hover) disabled:opacity-40"
           >
             Save
           </button>

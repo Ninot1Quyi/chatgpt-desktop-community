@@ -2,6 +2,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "../lib/cx.js";
+import { cssPixelsToRem, rem } from "../lib/cssUnits.js";
 import { useStore } from "../store.js";
 import { useT } from "../i18n.jsx";
 import { IconX } from "./icons.jsx";
@@ -30,7 +31,7 @@ export function ActivityDisclosure({ open, children }) {
     element.style.pointerEvents = open ? "auto" : "none";
 
     if (open) {
-      element.style.height = "0px";
+      element.style.height = "0rem";
       element.style.opacity = "0";
       frame.current = requestAnimationFrame(() => {
         element.style.height = `${element.scrollHeight}px`;
@@ -45,7 +46,7 @@ export function ActivityDisclosure({ open, children }) {
       element.style.height = `${element.getBoundingClientRect().height}px`;
       element.style.opacity = "1";
       frame.current = requestAnimationFrame(() => {
-        element.style.height = "0px";
+        element.style.height = "0rem";
         element.style.opacity = "0";
       });
       timer.current = setTimeout(() => setRendered(false), duration);
@@ -129,18 +130,18 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
     <div
       ref={ref}
       role="menu"
-      className="popover-in fixed z-50 overflow-hidden rounded-[15px] p-1 backdrop-blur-sm"
+      className="popover-in fixed z-50 overflow-hidden rounded-[0.9375rem] p-1 backdrop-blur-sm"
       style={{
-        left: pos.left,
-        top: pos.top,
-        width,
+        left: cssPixelsToRem(pos.left),
+        top: cssPixelsToRem(pos.top),
+        width: rem(width),
         background: "color-mix(in srgb, var(--surface-raised) 90%, transparent)",
-        boxShadow: "rgba(26, 28, 31, 0.08) 0 0 0 0.5px, rgba(26, 28, 31, 0.08) 0 0 0 0.5px, rgba(0, 0, 0, 0.12) 0 8px 16px -4px",
+        boxShadow: "rgba(26, 28, 31, 0.08) 0 0 0 0.03125rem, rgba(26, 28, 31, 0.08) 0 0 0 0.03125rem, rgba(0, 0, 0, 0.12) 0 0.5rem 1rem -0.25rem",
       }}
     >
       {items.map((it, i) =>
         it.sep ? (
-          <div key={i} className="my-1 h-px bg-(--border-light)" />
+          <div key={i} className="my-1 h-[0.0625rem] bg-(--border-light)" />
         ) : it.header ? (
           <div key={i} className="px-3 pt-2 pb-1 text-xs font-medium text-(--fg-tertiary)">{t(it.header)}</div>
         ) : it.children ? (
@@ -152,8 +153,8 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
             onMouseEnter={(e) => openSub(it, e)}
             onMouseLeave={closeSubSoon}
             className={cx(
-              "flex w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
-              it.tall ? "min-h-14 py-2" : "h-[28.57px]",
+              "flex w-full items-center gap-2 rounded-[0.78125rem] px-2 text-left text-[0.8125rem] leading-[1.160625rem] font-normal outline-none",
+              it.tall ? "min-h-14 py-2" : "h-[1.785625rem]",
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
@@ -169,8 +170,8 @@ export function Menu({ open, anchor, items, onClose, width = 220, align = "start
             onClick={() => { it.onSelect?.(); if (!it.keepOpen) onClose(); }}
             onMouseEnter={closeSubSoon}
             className={cx(
-              "flex w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
-              it.tall ? "min-h-14 py-2" : "h-[28.57px]",
+              "flex w-full items-center gap-2 rounded-[0.78125rem] px-2 text-left text-[0.8125rem] leading-[1.160625rem] font-normal outline-none",
+              it.tall ? "min-h-14 py-2" : "h-[1.785625rem]",
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
@@ -199,20 +200,20 @@ function SubMenu({ rect, items, onClose, onEnter, onLeave }) {
   return (
     <div
       role="menu"
-      className="popover-in fixed z-50 overflow-hidden rounded-[15px] p-1 backdrop-blur-xl"
+      className="popover-in fixed z-50 overflow-hidden rounded-[0.9375rem] p-1 backdrop-blur-xl"
       style={{
-        left,
-        top,
-        width,
+        left: cssPixelsToRem(left),
+        top: cssPixelsToRem(top),
+        width: rem(width),
         background: "color-mix(in srgb, var(--surface-raised) 90%, transparent)",
-        boxShadow: "rgba(26, 28, 31, 0.08) 0 0 0 0.5px, rgba(26, 28, 31, 0.08) 0 0 0 0.5px, rgba(0, 0, 0, 0.12) 0 8px 16px -4px",
+        boxShadow: "rgba(26, 28, 31, 0.08) 0 0 0 0.03125rem, rgba(26, 28, 31, 0.08) 0 0 0 0.03125rem, rgba(0, 0, 0, 0.12) 0 0.5rem 1rem -0.25rem",
       }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
       {items.map((it, i) =>
         it.sep ? (
-          <div key={i} className="my-1 h-px bg-(--border-light)" />
+          <div key={i} className="my-1 h-[0.0625rem] bg-(--border-light)" />
         ) : (
           <button
             key={it.id ?? i}
@@ -220,7 +221,7 @@ function SubMenu({ rect, items, onClose, onEnter, onLeave }) {
             disabled={it.disabled}
             onClick={() => { it.onSelect?.(); onClose(); }}
             className={cx(
-              "flex h-[28.57px] w-full items-center gap-2 rounded-[12.5px] px-2 text-left text-[13px] leading-[18.57px] font-normal outline-none",
+              "flex h-[1.785625rem] w-full items-center gap-2 rounded-[0.78125rem] px-2 text-left text-[0.8125rem] leading-[1.160625rem] font-normal outline-none",
               it.danger ? "text-(--danger)" : "text-(--fg)",
               it.disabled ? "opacity-40" : "hover:bg-(--surface-hover)"
             )}
@@ -255,9 +256,13 @@ export function Dialog({ open, title, children, onClose, width = 420 }) {
     >
       <div
         className="fade-in rounded-2xl border border-(--border) bg-(--surface-raised) p-5"
-        style={{ width, boxShadow: "var(--shadow-menu)" }}
+        style={{
+          width: rem(width),
+          maxWidth: "calc(100vw - 2rem)",
+          boxShadow: "var(--shadow-menu)",
+        }}
       >
-        {title && <div className="mb-3 text-[15px] font-semibold">{t(title)}</div>}
+        {title && <div className="mb-3 text-[0.9375rem] font-semibold">{t(title)}</div>}
         {children}
       </div>
     </div>,
@@ -278,14 +283,14 @@ export function Toasts() {
         <div
           key={t.id}
           className={cx(
-            "fade-in flex items-center gap-3 rounded-xl border px-4 py-2.5 text-[13px]",
+            "fade-in flex items-center gap-3 rounded-xl border px-4 py-2.5 text-[0.8125rem]",
             "border-(--border) bg-(--surface-raised)",
             t.kind === "error" && "border-(--danger) text-(--danger)",
             t.kind === "warn" && "border-(--warning) text-(--warning)"
           )}
           style={{ boxShadow: "var(--shadow-menu)" }}
         >
-          <span className="max-w-[420px] truncate">{translateText(t.message)}</span>
+          <span className="max-w-[26.25rem] truncate">{translateText(t.message)}</span>
           {t.action && (
             <button
               className="shrink-0 font-medium text-(--accent) hover:underline"
@@ -336,7 +341,7 @@ export function IconButton({ icon, title, onClick, active, danger, className, si
 
 export function Spinner({ size = 14, className }) {
   return (
-    <svg className={cx("animate-spin", className)} width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <svg className={cx("animate-spin", className)} width={rem(size)} height={rem(size)} viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
       <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
     </svg>

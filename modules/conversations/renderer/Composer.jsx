@@ -7,6 +7,7 @@ import * as api from "@app/api.js";
 import { cx } from "@app/lib/cx.js";
 import { useT } from "@app/i18n.jsx";
 import { basename } from "@app/lib/time.js";
+import { cssPixelsToRem, rem } from "@app/lib/cssUnits.js";
 import { Menu } from "@app/components/ui.jsx";
 import { usePanelStore } from "@modules/workspace-panels/state";
 import {
@@ -260,13 +261,13 @@ export default function Composer({ centered = false, quick = false }) {
     setMenu(null);
   };
 
-  // Match the original editor's 44px minimum while allowing multiline growth.
+  // Match the original editor's 2.75rem minimum while allowing multiline growth.
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = "auto";
     const h = Math.max(44, Math.min(ta.scrollHeight, 200));
-    ta.style.height = h + "px";
+    ta.style.height = cssPixelsToRem(h);
     ta.style.overflowY = ta.scrollHeight > 200 ? "auto" : "hidden";
   }, [text]);
 
@@ -618,12 +619,12 @@ export default function Composer({ centered = false, quick = false }) {
             rows={1}
             value={text}
             placeholder={t("Message ChatGPT")}
-            className="min-w-0 flex-1 resize-none bg-transparent px-1 py-1 text-[14px] leading-6 text-(--fg) outline-none placeholder:text-(--fg-faint)"
+            className="min-w-0 flex-1 resize-none bg-transparent px-1 py-1 text-[0.875rem] leading-6 text-(--fg) outline-none placeholder:text-(--fg-faint)"
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKeyDown}
             onPaste={onPasteFiles}
           />
-          <span className="shrink-0 px-1 text-[13px] text-(--fg-tertiary)">{t("Instant")}</span>
+          <span className="shrink-0 px-1 text-[0.8125rem] text-(--fg-tertiary)">{t("Instant")}</span>
           <VoiceButton />
           {running && !canSend ? (
             <button
@@ -667,7 +668,7 @@ export default function Composer({ centered = false, quick = false }) {
       }}
     >
       {dragOver && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[25px] border-2 border-dashed border-(--accent) bg-(--accent-soft) text-[13px] font-medium text-(--accent)">
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[1.5625rem] border-2 border-dashed border-(--accent) bg-(--accent-soft) text-[0.8125rem] font-medium text-(--accent)">
           {t("Drop to attach")}
         </div>
       )}
@@ -695,18 +696,18 @@ export default function Composer({ centered = false, quick = false }) {
       {!activeThreadId && <HomeContextBar />}
 
       <div
-        className="relative rounded-[25px] bg-(--input-bg) p-2 font-normal backdrop-blur-lg"
+        className="relative rounded-[1.5625rem] bg-(--input-bg) p-2 font-normal backdrop-blur-lg"
         style={{ boxShadow: "var(--shadow-composer)" }}
       >
         {images.length > 0 && (
-          <div className="hide-scrollbar h-[82px] w-full overflow-x-auto p-px">
+          <div className="hide-scrollbar h-[5.125rem] w-full overflow-x-auto p-[0.0625rem]">
             <div className="flex min-w-max items-end gap-2">
             {images.map((p, i) => (
               <div
                 key={i}
-                className="relative size-20 shrink-0 rounded-[17px] border border-(--border-heavy)"
+                className="relative size-20 shrink-0 rounded-[1.0625rem] border border-(--border-heavy)"
               >
-                <span className="absolute inset-0 overflow-hidden rounded-[17px]">
+                <span className="absolute inset-0 overflow-hidden rounded-[1.0625rem]">
                   <img src={api.localFileUrl(p)} alt="" className="size-full object-cover" />
                 </span>
                 <button
@@ -723,17 +724,17 @@ export default function Composer({ centered = false, quick = false }) {
         )}
 
         {files.length > 0 && (
-          <div className="hide-scrollbar w-full overflow-x-auto p-px pb-1">
+          <div className="hide-scrollbar w-full overflow-x-auto p-[0.0625rem] pb-1">
             <div className="flex min-w-max items-center gap-2">
             {files.map((p, i) => (
               <div
                 key={i}
-                className="relative flex items-center gap-2 rounded-[12px] border border-(--border) bg-(--surface) py-2 pr-2 pl-2.5"
+                className="relative flex items-center gap-2 rounded-[0.75rem] border border-(--border) bg-(--surface) py-2 pr-2 pl-2.5"
               >
                 <IconFile size={16} className="shrink-0 text-(--fg-tertiary)" />
                 <div className="flex min-w-0 flex-col">
-                  <span className="max-w-[200px] truncate text-[13px] leading-4">{basename(p)}</span>
-                  <span className="text-[11px] leading-4 text-(--fg-tertiary)">
+                  <span className="max-w-[12.5rem] truncate text-[0.8125rem] leading-4">{basename(p)}</span>
+                  <span className="text-[0.6875rem] leading-4 text-(--fg-tertiary)">
                     {(p.includes(".") ? p.split(".").pop() : "file").toUpperCase()}
                   </span>
                 </div>
@@ -796,7 +797,7 @@ export default function Composer({ centered = false, quick = false }) {
           <div
             className={cx(
               "absolute bottom-full left-0 z-30 mb-2 overflow-hidden rounded-xl border border-(--border) bg-(--dropdown-bg) py-1",
-              menu.kind === "skill" || menu.kind === "slash" ? "right-0 max-h-[320px] overflow-y-auto" : "w-[340px]"
+              menu.kind === "skill" || menu.kind === "slash" ? "right-0 max-h-[20rem] overflow-y-auto" : "w-[21.25rem]"
             )}
             style={{ boxShadow: "var(--shadow-menu)" }}
           >
@@ -910,7 +911,7 @@ export default function Composer({ centered = false, quick = false }) {
                   <button
                     key={f.path}
                     className={cx(
-                      "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px]",
+                      "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[0.8125rem]",
                       i === menuIdx ? "bg-(--surface-active)" : "hover:bg-(--surface-hover)"
                     )}
                     onMouseEnter={() => setMenuIdx(i)}
@@ -927,7 +928,7 @@ export default function Composer({ centered = false, quick = false }) {
 
         <div className="mx-1 mt-1.5 mb-1 flex min-h-11 items-start gap-2">
           {mentions.some((mention) => mention.kind === "site") && (
-            <span className="mt-px flex shrink-0 items-center gap-1.5 py-0 text-[14px] leading-5 font-medium text-(--accent)">
+            <span className="mt-[0.0625rem] flex shrink-0 items-center gap-1.5 py-0 text-[0.875rem] leading-5 font-medium text-(--accent)">
               <IconNavSites size={16} />
               {t("Sites")}
             </span>
@@ -937,7 +938,7 @@ export default function Composer({ centered = false, quick = false }) {
             rows={1}
             value={text}
             placeholder={t(useStore((s) => s.mode) === "chatgpt" ? "Message ChatGPT" : "Do anything")}
-            className="block min-h-11 min-w-0 flex-1 resize-none bg-transparent p-0 text-[14px] leading-5 font-[445] text-(--fg) outline-none placeholder:text-(--fg-faint)"
+            className="block min-h-11 min-w-0 flex-1 resize-none bg-transparent p-0 text-[0.875rem] leading-5 font-[445] text-(--fg) outline-none placeholder:text-(--fg-faint)"
             onChange={(e) => { setText(e.target.value); detectMenu(e.target.value, e.target.selectionStart); }}
             onKeyDown={onKeyDown}
             onClick={(e) => detectMenu(e.target.value, e.target.selectionStart)}
@@ -945,7 +946,7 @@ export default function Composer({ centered = false, quick = false }) {
           />
         </div>
 
-        <div className="flex items-center gap-[5px]">
+        <div className="flex items-center gap-[0.3125rem]">
           <AttachButton
             onPickImages={() => imageFileRef.current?.click()}
             onPickFiles={() => anyFileRef.current?.click()}
@@ -953,7 +954,7 @@ export default function Composer({ centered = false, quick = false }) {
             browserTab={browserTab}
           />
           <PermissionChip />
-          <div className="h-4 w-px bg-(--border-light)" />
+          <div className="h-4 w-[0.0625rem] bg-(--border-light)" />
           <PlanChip />
           <div className="ms-auto flex min-w-0 items-center justify-end">
             <ModelChip />
@@ -1078,10 +1079,10 @@ function HomeContextBar() {
   const q = query.trim().toLowerCase();
   const filtered = q ? projects.filter((p) => p.name.toLowerCase().includes(q)) : projects;
 
-  const chipCls = "flex h-7 items-center gap-1.5 rounded-full px-2 text-[13px] leading-[18px] text-(--fg-secondary)";
+  const chipCls = "flex h-7 items-center gap-1.5 rounded-full px-2 text-[0.8125rem] leading-[1.125rem] text-(--fg-secondary)";
   const iconCls = "opacity-70";
   return (
-    <div className="relative z-0 mx-[13px] -mb-[18px] flex items-center gap-2 rounded-t-[20px] bg-(--surface-under) px-1.5 pt-1.5 pb-[27px] dark:bg-(--surface-fog)">
+    <div className="relative z-0 mx-[0.8125rem] -mb-[1.125rem] flex items-center gap-2 rounded-t-[1.25rem] bg-(--surface-under) px-1.5 pt-1.5 pb-[1.6875rem] dark:bg-(--surface-fog)">
       <div ref={wrapRef} className="relative">
         <div className="group/projchip relative inline-flex min-w-0 rounded-full">
           <button
@@ -1090,7 +1091,7 @@ function HomeContextBar() {
             className={cx(chipCls, "hover:bg-(--surface-hover)")}
           >
             <IconFolder size={13} className={cx(iconCls, project && "group-hover/projchip:invisible")} />
-            <span className="max-w-[220px] truncate">{project ? project.name : t("Select project")}</span>
+            <span className="max-w-[13.75rem] truncate">{project ? project.name : t("Select project")}</span>
           </button>
           {project && (
             // official behavior: hovering the chip covers the folder icon with a
@@ -1121,14 +1122,14 @@ function HomeContextBar() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("Search projects")}
-                className="w-full bg-transparent text-[13px] outline-none placeholder:text-(--fg-faint)"
+                className="w-full bg-transparent text-[0.8125rem] outline-none placeholder:text-(--fg-faint)"
               />
             </div>
-            <div className="max-h-[280px] overflow-y-auto p-1">
+            <div className="max-h-[17.5rem] overflow-y-auto p-1">
               {filtered.map((p) => (
                 <div key={p.id} className="group/projrow relative">
                   <button
-                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 pr-7 text-left text-[13px] hover:bg-(--surface-hover)"
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 pr-7 text-left text-[0.8125rem] hover:bg-(--surface-hover)"
                     onClick={() => { useStore.getState().setCwd(p.path); setOpen(false); }}
                   >
                     <IconFolder size={14} className="shrink-0 text-(--fg-tertiary)" />
@@ -1149,7 +1150,7 @@ function HomeContextBar() {
             </div>
             <div className="border-t border-(--border-light) p-1">
               <button
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] hover:bg-(--surface-hover)"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[0.8125rem] hover:bg-(--surface-hover)"
                 onClick={() => { setOpen(false); pickCwd(); }}
               >
                 <LucideIcon name="Plus" size={14} className="shrink-0 text-(--fg-tertiary)" />
@@ -1168,7 +1169,7 @@ function HomeContextBar() {
           {branch && (
             <span className={chipCls}>
               <IconBranch size={13} className={iconCls} />
-              <span className="max-w-[180px] truncate">{branch}</span>
+              <span className="max-w-[11.25rem] truncate">{branch}</span>
             </span>
           )}
         </>
@@ -1285,7 +1286,7 @@ function AttachButton({ onPickImages, onPickFiles, onInsertText, browserTab }) {
         ref={ref}
         title={translateText("Add files and more")}
         onClick={() => setOpen(true)}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-transparent text-[13px] leading-[18px] font-[445] text-(--fg) hover:bg-(--surface-hover)"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-transparent text-[0.8125rem] leading-[1.125rem] font-[445] text-(--fg) hover:bg-(--surface-hover)"
       >
         <IconComposerPlus className="size-4" />
       </button>
@@ -1324,7 +1325,7 @@ function PermissionChip() {
         ref={ref}
         onClick={() => setOpen(true)}
         className={cx(
-          "flex h-7 shrink-0 items-center gap-1 rounded-full border border-transparent px-1.5 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary) hover:bg-(--surface-hover)"
+          "flex h-7 shrink-0 items-center gap-1 rounded-full border border-transparent px-1.5 text-[0.8125rem] leading-[1.125rem] font-[445] text-(--fg-tertiary) hover:bg-(--surface-hover)"
         )}
       >
         <FullAccessIcon size={16} className={full ? "text-(--warning)" : "text-(--fg-tertiary)"} />
@@ -1351,7 +1352,7 @@ function PermissionChip() {
             >
               <span className={cx("mt-0.5 shrink-0", o.warn ? "text-(--warning)" : "text-(--fg-tertiary)")}>{o.icon}</span>
               <span className="min-w-0 flex-1">
-                <span className={cx("block text-[13px]", o.warn && "text-(--warning)")}>{t(o.label)}</span>
+                <span className={cx("block text-[0.8125rem]", o.warn && "text-(--warning)")}>{t(o.label)}</span>
                 <span className="block text-xs leading-4 text-(--fg-tertiary)">{t(o.desc)}</span>
               </span>
               {permission === o.id && <IconCheck size={14} className="mt-0.5 shrink-0 text-(--accent)" />}
@@ -1365,7 +1366,7 @@ function PermissionChip() {
 
 function FullAccessIcon({ size = 16, className }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
+    <svg width={rem(size)} height={rem(size)} viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
       <path fillRule="evenodd" clipRule="evenodd" d="M9.06543 1.95123C9.66107 1.69076 10.3389 1.69071 10.9346 1.95123L15.9346 4.13873C16.7832 4.51008 17.3311 5.34917 17.3311 6.27545V10.5528C17.3309 14.6017 14.0489 17.8847 10 17.8848C5.95108 17.8846 2.66813 14.6017 2.66797 10.5528V6.27545C2.66797 5.34924 3.21695 4.51012 4.06543 4.13873L9.06543 1.95123ZM10.4014 3.16998C10.1456 3.05814 9.85444 3.05819 9.59863 3.16998L4.59863 5.35748C4.23427 5.51708 3.99805 5.87764 3.99805 6.27545V10.5528C3.99821 13.8671 6.68563 16.5546 10 16.5547C13.3144 16.5546 16.0008 13.8671 16.001 10.5528V6.27545C16.001 5.87756 15.7658 5.51703 15.4014 5.35748L10.4014 3.16998Z" fill="currentColor" />
       <path d="M10.8883 13.1116C10.8883 13.6025 10.4903 14.0005 9.99936 14.0005C9.50844 14.0005 9.11047 13.6025 9.11047 13.1116C9.11047 12.6207 9.50844 12.2227 9.99936 12.2227C10.4903 12.2227 10.8883 12.6207 10.8883 13.1116Z" fill="currentColor" />
       <path d="M10.5169 10.8949L11.1135 7.31519C11.2283 6.62672 10.6974 6 9.99941 6C9.30145 6 8.77053 6.62672 8.88528 7.31519L9.4819 10.8949C9.52406 11.1479 9.74294 11.3333 9.99941 11.3333C10.2559 11.3333 10.4748 11.1479 10.5169 10.8949Z" fill="currentColor" />
@@ -1401,7 +1402,12 @@ function RichPopover({ anchor, onClose, width = 320, children }) {
     <div
       ref={ref}
       className="popover-in fixed z-50 overflow-hidden rounded-xl border border-(--border) bg-(--dropdown-bg) py-1"
-      style={{ left: pos.left, top: pos.top, width, boxShadow: "var(--shadow-menu)" }}
+      style={{
+        left: cssPixelsToRem(pos.left),
+        top: cssPixelsToRem(pos.top),
+        width: rem(width),
+        boxShadow: "var(--shadow-menu)",
+      }}
     >
       {children}
     </div>,
@@ -1517,9 +1523,13 @@ function ModelChip() {
         aria-haspopup="menu"
         aria-expanded={open}
         data-state={open ? "open" : "closed"}
-        className="composer-model-button flex h-7 min-w-0 items-center justify-center gap-1 rounded-full border border-transparent py-0 pl-2 pr-2.5 text-[13px] leading-[18px] font-[445]"
+        className="composer-model-button flex h-7 min-w-0 items-center justify-center gap-1 rounded-full border border-transparent py-0 pl-2 pr-2.5 text-[0.8125rem] leading-[1.125rem] font-[445]"
         style={{
-          width: open ? 225.15625 : closedWidth ?? undefined,
+          width: open
+            ? rem(225.15625)
+            : closedWidth == null
+              ? undefined
+              : cssPixelsToRem(closedWidth),
           transition: "width 320ms cubic-bezier(.23,1,.32,1)",
         }}
       >
@@ -1594,19 +1604,28 @@ function ModelMenu({ anchor, onClose, models, modelGroups, runtime, current, mod
   const fast = serviceTier === "priority";
 
   return createPortal(
-    <div ref={ref} className="fixed z-50" style={{ left: pos?.left ?? -9999, bottom: pos?.bottom ?? -9999, width: W, visibility: pos ? "visible" : "hidden" }}>
+    <div
+      ref={ref}
+      className="fixed z-50"
+      style={{
+        left: cssPixelsToRem(pos?.left ?? -9999),
+        bottom: cssPixelsToRem(pos?.bottom ?? -9999),
+        width: rem(W),
+        visibility: pos ? "visible" : "hidden",
+      }}
+    >
       <div
         role="menu"
-        className="model-menu-in relative z-50 overflow-hidden rounded-[15px] p-1"
+        className="model-menu-in relative z-50 overflow-hidden rounded-[0.9375rem] p-1"
         style={{
-          height: advanced ? 134 : 84,
+          height: rem(advanced ? 134 : 84),
           transition: "height 300ms cubic-bezier(.23,1,.32,1)",
         }}
       >
         <div
           className="absolute inset-x-1 top-1"
           style={{
-            transform: advanced ? "none" : "translateY(-90px)",
+            transform: advanced ? "none" : "translateY(-5.625rem)",
             transition: "transform 300ms cubic-bezier(.23,1,.32,1)",
           }}
         >
@@ -1615,17 +1634,17 @@ function ModelMenu({ anchor, onClose, models, modelGroups, runtime, current, mod
             <MenuRow label="Speed" value={fast ? "Fast" : "Standard"} onEnter={openFly("speed")} onLeave={scheduleHide} />
         </div>
         <div
-          className={cx("absolute left-1 flex items-center", advanced && "before:absolute before:-top-1 before:left-2 before:right-2 before:h-px before:bg-(--border-light)")}
+          className={cx("absolute left-1 flex items-center", advanced && "before:absolute before:-top-1 before:left-2 before:right-2 before:h-[0.0625rem] before:bg-(--border-light)")}
           style={{
-            top: 97.7109375,
-            transform: advanced ? "none" : "translateY(-94px)",
+            top: rem(97.7109375),
+            transform: advanced ? "none" : "translateY(-5.875rem)",
             transition: "transform 300ms cubic-bezier(.23,1,.32,1)",
           }}
         >
           <button
             role="menuitem"
             data-model-picker-view-toggle="true"
-            className="flex h-8 flex-col rounded-lg p-1 text-left text-[13px] leading-[18.5714px] font-[445] text-(--fg-tertiary) hover:bg-(--sidebar-row-active)"
+            className="flex h-8 flex-col rounded-lg p-1 text-left text-[0.8125rem] leading-[1.1607125rem] font-[445] text-(--fg-tertiary) hover:bg-(--sidebar-row-active)"
             onClick={() => setAdvanced(!advanced)}
             aria-expanded={advanced}
           >
@@ -1641,7 +1660,7 @@ function ModelMenu({ anchor, onClose, models, modelGroups, runtime, current, mod
             </span>
           </button>
         </div>
-        {!advanced && <IconModelPower className="model-power-icon absolute top-[11.7109375px] right-3 size-4 text-(--fg-tertiary)" />}
+        {!advanced && <IconModelPower className="model-power-icon absolute top-[0.7319336rem] right-3 size-4 text-(--fg-tertiary)" />}
         {!advanced && <EffortSlider efforts={efforts} effLabel={effLabel} onPick={(e) => setEffort(e)} />}
       </div>
       {fly && (
@@ -1659,7 +1678,7 @@ function ModelMenu({ anchor, onClose, models, modelGroups, runtime, current, mod
             <>
               {modelGroups.map((group) => (
                 <div key={group.id}>
-                  <div className="flex items-center justify-between px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-(--fg-faint)">
+                  <div className="flex items-center justify-between px-2 pb-1 pt-2 text-[0.6875rem] font-medium uppercase tracking-wide text-(--fg-faint)">
                     <span>{group.label}</span>
                   </div>
                   {group.models.filter((m) => !m.hidden).map((m) => (
@@ -1676,7 +1695,7 @@ function ModelMenu({ anchor, onClose, models, modelGroups, runtime, current, mod
           )}
           {fly.kind === "effort" && (
             <>
-              <div className="px-2 py-1 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary)">{t("Effort")}</div>
+              <div className="px-2 py-1 text-[0.8125rem] leading-[1.125rem] font-[445] text-(--fg-tertiary)">{t("Effort")}</div>
               {efforts.map((e) => {
                 const ultra = e.reasoningEffort === "ultra";
                 return (
@@ -1693,7 +1712,7 @@ function ModelMenu({ anchor, onClose, models, modelGroups, runtime, current, mod
           )}
           {fly.kind === "speed" && (
             <>
-              <div className="px-2 py-1 text-[13px] leading-[18px] font-[445] text-(--fg-tertiary)">{t("Speed")}</div>
+              <div className="px-2 py-1 text-[0.8125rem] leading-[1.125rem] font-[445] text-(--fg-tertiary)">{t("Speed")}</div>
               <FlyOption label="Standard" desc="Default speed" checked={!serviceTier} onClick={pick(() => setServiceTier(null))} />
               {hasFast && (
                 <FlyOption label="Fast" desc="1.5x speed, more usage" checked={serviceTier === "priority"} onClick={pick(() => setServiceTier("priority"))} />
@@ -1725,8 +1744,12 @@ function FlyPanel({ kind, anchorTop, containerTop, containerLeft, containerWidth
     <div
       ref={ref}
       role="menu"
-      className="model-flyout absolute z-50 max-h-[min(420px,calc(100vh-16px))] overflow-y-auto rounded-[15px] p-1"
-      style={{ left, top, width }}
+      className="model-flyout absolute z-50 max-h-[min(26.25rem,calc(100vh-1rem))] overflow-y-auto rounded-[0.9375rem] p-1"
+      style={{
+        left: cssPixelsToRem(left),
+        top: cssPixelsToRem(top),
+        width: rem(width),
+      }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
@@ -1771,7 +1794,7 @@ function EffortSlider({ efforts, effLabel, onPick }) {
   return (
     <div
       data-model-picker-power-slider=""
-      className="absolute top-[39.7109375px] right-[6px] left-[6px] flex h-8 items-center px-1.5"
+      className="absolute top-[2.4819336rem] right-[0.375rem] left-[0.375rem] flex h-8 items-center px-1.5"
       tabIndex={0}
       onKeyDown={onKey}
     >
@@ -1780,10 +1803,10 @@ function EffortSlider({ efforts, effLabel, onPick }) {
         className="relative flex h-7 flex-1 cursor-pointer items-center"
         onMouseDown={startDrag}
       >
-        <div className="absolute inset-x-0 top-0.5 h-6 overflow-hidden rounded-full bg-(--surface-active) shadow-[inset_0_0_0_.5px_color-mix(in_srgb,var(--fg)_8%,transparent)]">
+        <div className="absolute inset-x-0 top-0.5 h-6 overflow-hidden rounded-full bg-(--surface-active) shadow-[inset_0_0_0_0.03125rem_color-mix(in_srgb,var(--fg)_8%,transparent)]">
           <div
             className="absolute inset-y-0 left-0 rounded-l-full bg-[#0169cc]"
-            style={{ width: `calc(${frac * 100}% + ${(0.5 - frac) * 26}px)` }}
+            style={{ width: `calc(${frac * 100}% + ${rem((0.5 - frac) * 26)})` }}
           />
         </div>
         <div className="pointer-events-none absolute inset-0">
@@ -1792,15 +1815,15 @@ function EffortSlider({ efforts, effLabel, onPick }) {
               key={lv}
               className="absolute top-1/2 block size-1 -translate-x-1/2 -translate-y-1/2 rounded-full"
               style={{
-                left: `calc(${levels.length > 1 ? i * 100 / (levels.length - 1) : 0}% + ${(0.5 - (levels.length > 1 ? i / (levels.length - 1) : 0)) * 26}px)`,
+                left: `calc(${levels.length > 1 ? i * 100 / (levels.length - 1) : 0}% + ${rem((0.5 - (levels.length > 1 ? i / (levels.length - 1) : 0)) * 26)})`,
                 background: i <= powerIdx ? "rgb(255 255 255 / .3)" : "color-mix(in srgb, var(--fg) 25%, transparent)",
               }}
             />
           ))}
         </div>
         <div
-          className="pointer-events-none absolute top-1/2 size-8 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_2px_rgba(0,0,0,.1)]"
-          style={{ left: `calc(${frac * 100}% + ${(0.5 - frac) * 26}px)` }}
+          className="pointer-events-none absolute top-1/2 size-8 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_0.125rem_rgba(0,0,0,.1)]"
+          style={{ left: `calc(${frac * 100}% + ${rem((0.5 - frac) * 26)})` }}
         />
       </div>
     </div>
@@ -1813,7 +1836,7 @@ function MenuRow({ label, value, onEnter, onLeave }) {
     <button
       role="menuitem"
       data-model-menu-row={label.toLowerCase()}
-      className="flex w-full items-center justify-between rounded-[12.5px] px-2 py-[5px] text-left text-[13px] leading-[18.5714px] font-[445] hover:bg-(--sidebar-row-active)"
+      className="flex w-full items-center justify-between rounded-[0.78125rem] px-2 py-[0.3125rem] text-left text-[0.8125rem] leading-[1.1607125rem] font-[445] hover:bg-(--sidebar-row-active)"
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
       onClick={onEnter}
@@ -1830,7 +1853,7 @@ function MenuRow({ label, value, onEnter, onLeave }) {
 function FlyOption({ label, desc, checked, onClick }) {
   const t = useT();
   return (
-    <button role="menuitem" data-model-fly-option={label} data-checked={checked || undefined} className="flex w-full items-center gap-2 rounded-[12.5px] px-2 py-[5px] text-left text-[13px] leading-[18.5714px] font-[445] hover:bg-(--sidebar-row-active)" onClick={onClick}>
+    <button role="menuitem" data-model-fly-option={label} data-checked={checked || undefined} className="flex w-full items-center gap-2 rounded-[0.78125rem] px-2 py-[0.3125rem] text-left text-[0.8125rem] leading-[1.1607125rem] font-[445] hover:bg-(--sidebar-row-active)" onClick={onClick}>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-(--fg)">{t(label)}</span>
         {desc && <span className="block truncate text-(--fg-tertiary)">{t(desc)}</span>}
@@ -1953,7 +1976,7 @@ function VoiceButton() {
       title={state === "active" ? "Stop voice" : "Start voice"}
       onClick={start}
       className={cx(
-        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] leading-[18px] font-[445]",
+        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.8125rem] leading-[1.125rem] font-[445]",
         state === "active" ? "animate-pulse text-(--danger)" : "text-(--fg-tertiary) hover:bg-(--surface-hover)"
       )}
     >

@@ -38,7 +38,7 @@ export default function EnvironmentPanel({ cwd, hasGit }) {
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-6 pb-4">
         {/* header */}
         <div className="flex h-7 items-center justify-between pl-3 pr-1">
-          <span className="text-[13px] font-medium text-(--fg-tertiary)">Environment</span>
+          <span className="text-[0.8125rem] font-medium text-(--fg-tertiary)">Environment</span>
           <EnvPlusMenu />
         </div>
 
@@ -49,7 +49,7 @@ export default function EnvironmentPanel({ cwd, hasGit }) {
               icon={<IconLayers size={15} />}
               label="Changes"
               trailing={
-                <span className="flex items-center gap-2 text-[12px]">
+                <span className="flex items-center gap-2 text-[0.75rem]">
                   {git.adds != null && <span className="text-(--success)">+{git.adds.toLocaleString()}</span>}
                   {git.dels != null && <span className="text-(--danger)">−{git.dels.toLocaleString()}</span>}
                   <IconChevronDownS size={13} className="text-(--fg-tertiary)" />
@@ -106,7 +106,7 @@ export default function EnvironmentPanel({ cwd, hasGit }) {
         {sources.length > 0 && (
           <>
             <div className="flex h-7 items-center justify-between pl-3 pr-1 pt-6">
-              <span className="text-[13px] font-medium text-(--fg-tertiary)">Sources</span>
+              <span className="text-[0.8125rem] font-medium text-(--fg-tertiary)">Sources</span>
               <button
                 title="Add source"
                 className="flex h-6 w-6 items-center justify-center rounded-md text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
@@ -142,7 +142,7 @@ export default function EnvironmentPanel({ cwd, hasGit }) {
 
 // ---------------------------------------------------------------------------
 function SectionLabel({ children }) {
-  return <div className="pl-3 pt-6 pb-1 text-[13px] font-medium text-(--fg-tertiary)">{children}</div>;
+  return <div className="pl-3 pt-6 pb-1 text-[0.8125rem] font-medium text-(--fg-tertiary)">{children}</div>;
 }
 
 function Row({ icon, label, trailing, dimmed, title, onClick, btnRef }) {
@@ -152,7 +152,7 @@ function Row({ icon, label, trailing, dimmed, title, onClick, btnRef }) {
       ref={btnRef}
       title={typeof label === "string" ? title || label : title}
       onClick={onClick}
-      className={`flex h-[30px] w-full items-center gap-2.5 rounded-md pl-3 pr-2 text-left text-[13px] ${
+      className={`flex h-[1.875rem] w-full items-center gap-2.5 rounded-md pl-3 pr-2 text-left text-[0.8125rem] ${
         dimmed ? "text-(--fg-faint)" : "text-(--fg)"
       } ${onClick ? "hover:bg-(--surface-hover)" : ""}`}
     >

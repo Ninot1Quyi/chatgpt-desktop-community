@@ -80,7 +80,7 @@ export class DiagnosticsBoundary extends React.Component {
     if (!this.state.error) return this.props.children;
     return (
       <div className="flex h-full w-full items-center justify-center bg-(--surface) px-6 text-(--fg)">
-        <div className="w-full max-w-[560px] rounded-2xl border border-(--border) bg-(--surface-raised) p-6 text-center">
+        <div className="w-full max-w-[35rem] rounded-2xl border border-(--border) bg-(--surface-raised) p-6 text-center">
           <h1 className="text-lg font-semibold">ChatGPT Desktop Community could not render</h1>
           <p className="mt-2 text-sm text-(--fg-tertiary)">
             The error was written to the diagnostic log. Open the logs folder and

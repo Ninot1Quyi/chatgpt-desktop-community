@@ -15,7 +15,7 @@ export default function WinWindowControls() {
     return api.onMaximizeChanged((v) => setMaximized(!!v));
   }, []);
 
-  const btn = "app-no-drag flex h-[30px] w-[40px] items-center justify-center text-(--fg-secondary) transition-colors";
+  const btn = "app-no-drag flex h-[1.875rem] w-[2.5rem] items-center justify-center text-(--fg-secondary) transition-colors";
   return (
     <div className="flex shrink-0 items-center">
       <button

@@ -184,11 +184,11 @@ export default function ConnectionsSection() {
 
       <Card title="Devices that can control this computer">
         {clients == null ? (
-          <div className="px-4 py-4 text-[12px] text-(--fg-faint)">Loading…</div>
+          <div className="px-4 py-4 text-[0.75rem] text-(--fg-faint)">Loading…</div>
         ) : !envId ? (
-          <div className="px-4 py-4 text-[12px] text-(--fg-faint)">Remote control has not provided an environment yet.</div>
+          <div className="px-4 py-4 text-[0.75rem] text-(--fg-faint)">Remote control has not provided an environment yet.</div>
         ) : clients.length === 0 ? (
-          <div className="px-4 py-4 text-[12px] text-(--fg-faint)">No devices are currently allowed to control this computer.</div>
+          <div className="px-4 py-4 text-[0.75rem] text-(--fg-faint)">No devices are currently allowed to control this computer.</div>
         ) : (
           clients.map((c, i) => (
             <Row

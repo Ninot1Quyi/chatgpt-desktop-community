@@ -16,6 +16,11 @@ import {
   matchAccel as winMatchAccel,
 } from "../modules/shortcuts/implementations/control-key/index.mjs";
 
+const read = (relativePath) => readFileSync(
+  new URL(`../${relativePath}`, import.meta.url),
+  "utf8",
+).replace(/\r\n/g, "\n");
+
 test("right-panel actions keep the reference order and platform labels", () => {
   assert.deepEqual(PANEL_ACTION_ORDER, [
     "review",
@@ -75,6 +80,46 @@ test("dark center and right-panel surfaces keep the measured reference colors", 
   assert.match(theme, /\.dark\s*\{[\s\S]*?--keybinding-bg:\s*rgb\(252 252 252 \/ 0\.065\);/);
 });
 
+test("right panel header keeps a draggable blank region outside controls and tabs", () => {
+  const source = read("modules/workspace-panels/renderer/RightPanel.jsx");
+  assert.match(source, /className="app-drag pointer-events-auto flex h-full min-w-0 items-center"/);
+  assert.match(source, /className="app-no-drag hide-scrollbar[^\"]*\bshrink\b/);
+  assert.doesNotMatch(source, /className="app-no-drag hide-scrollbar flex h-full min-w-0 flex-1/);
+  assert.match(source, /data-testid="right-panel-header-drag-region"/);
+  assert.match(source, /className="app-drag h-full min-w-4 flex-1"/);
+  assert.ok(
+    source.indexOf('data-testid="right-panel-header-drag-region"')
+      < source.indexOf("icon={expanded ? <IconCompress /> : <IconExpand />}"),
+  );
+});
+
+test("right panel keeps dragging while storing only a responsive width ratio", () => {
+  const styles = read("modules/desktop-shell/shared/styles.css");
+  const parts = read("modules/desktop-shell/shared/parts.jsx");
+  const store = read("renderer/src/store.js");
+  assert.match(styles, /width: clamp\(20rem, var\(--right-panel-size, 28vw\), 48rem\)/);
+  assert.match(styles, /width: clamp\(28rem, 52vw, 48rem\)/);
+  assert.match(styles, /flex: 0 1 auto/);
+  assert.match(parts, /export function RightPanelDragHandle/);
+  assert.match(parts, /window\.requestAnimationFrame\(flush\)/);
+  assert.match(parts, /getBoundingClientRect\(\)\.width \/ Math\.max\(1, window\.innerWidth\)/);
+  assert.match(parts, /"--right-panel-size": `\$\{normalizedRightPanelRatio\(ratio\) \* 100\}vw`/);
+  assert.match(store, /rightPanelRatio: stored\("ui\.rightPanelRatio", 0\.28\)/);
+  assert.doesNotMatch(store, /rightWidth/);
+
+  for (const shell of [
+    "modules/desktop-shell/implementations/windows-frameless/renderer.jsx",
+    "modules/desktop-shell/implementations/macos-native/renderer.jsx",
+  ]) {
+    const source = read(shell);
+    assert.match(source, /className="right-panel-frame/);
+    assert.match(source, /data-expanded=\{ui\.rightExpanded \? "true" : "false"\}/);
+    assert.match(source, /RightPanelDragHandle/);
+    assert.match(source, /rightPanelResponsiveStyle\(ui\.rightPanelRatio\)/);
+     assert.doesNotMatch(source, /ui\.rightExpanded && "min-w-0 flex-1"/);
+   }
+});
+
 test("mac right-panel header keeps blank title-bar space draggable", () => {
   const panel = readFileSync(
     new URL("../modules/workspace-panels/renderer/RightPanel.jsx", import.meta.url),
@@ -98,7 +143,7 @@ test("mac right-panel header keeps blank title-bar space draggable", () => {
   );
   assert.match(panel, /className="app-drag pointer-events-auto flex h-full min-w-0 items-center"/);
   assert.match(panel, /className="app-drag h-full min-w-4 flex-1"/);
-  assert.match(panel, /className="right-panel-root pointer-events-none h-full w-full pt-\[46px\]"/);
+  assert.match(panel, /className="right-panel-root pointer-events-none h-full w-full pt-\[2\.875rem\]"/);
   assert.match(panel, /\{tabs\.length > 0 && \(/);
   assert.match(panel, /tabRef\.current\?\.scrollIntoView\(\{ block: "nearest", inline: "nearest" \}\);/);
   assert.match(panel, /ref=\{plusRef\}[\s\S]*?className="app-no-drag /);
@@ -111,10 +156,10 @@ test("mac right-panel header keeps blank title-bar space draggable", () => {
   assert.match(sharedStyles, /\.app-no-drag\s*\{\s*-webkit-app-region:\s*no-drag;/);
   assert.match(
     macShell,
-    /pointer-events-none slide-in-right shrink-0 border-l border-\(--border\)/,
+    /right-panel-frame pointer-events-none slide-in-right/,
   );
-  assert.match(macShell, /items-center gap-1 pr-3 pl-\[88px\]/);
-  assert.match(conversation, /className="app-no-drag flex h-7 w-\[52px\]/);
+  assert.match(macShell, /items-center gap-1 pr-3 pl-\[5\.5rem\]/);
+  assert.match(conversation, /className="app-no-drag flex h-7 w-\[3\.25rem\]/);
   assert.match(
     conversation,
     /IconHeaderSidebar style=\{\{ transform: "rotate\(180deg\)" \}\}/,
@@ -178,7 +223,7 @@ test("functional right panels retain the measured reference structure", () => {
   assert.match(browser, /label: "Zoom out"/);
   assert.doesNotMatch(browser, /<ZoomControl/);
 
-  assert.match(files, /useState\(243\)/);
+  assert.match(files, /useState\(0\.46\)/);
   assert.match(files, /<IconListFiles size=\{18\}/);
   assert.doesNotMatch(files, /filter\(\(e\) => !e\.fileName\.startsWith\("\."\)\)/);
 });

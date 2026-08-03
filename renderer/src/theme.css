@@ -31,11 +31,11 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-openai-sans: "OpenAI Sans", var(--font-sans);
   --font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  --text-xs: 12px;
-  --text-sm: 13px;
-  --text-base: 14px;
-  --text-lg: 16px;
-  --text-xl: 28px;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.75rem;
 }
 
 /* ---- design tokens (light) ---- */
@@ -80,9 +80,9 @@
   --diff-del-fg: #ba2623;
   --diff-surface: color-mix(in srgb, #ffffff 94%, #1a1c1f);
   --code-bg: rgb(0 0 0 / 0.05);
-  --shadow-menu: 0 0 0 0.5px var(--border-heavy), 0 3px 7.5px #0000000a, 0 0 20px #0000000d;
-  --shadow-composer: 0 0 0 0.5px rgb(26 28 31 / 0.118), 0 3px 7.5px rgb(0 0 0 / 0.04), 0 0 20px rgb(0 0 0 / 0.05);
-  --elevation-sidebar: 0 0 0 0.5px rgb(0 0 0 / 0.08), 0 3px 7.5px #00000008, 0 0 16px #00000005;
+  --shadow-menu: 0 0 0 0.03125rem var(--border-heavy), 0 0.1875rem 0.46875rem #0000000a, 0 0 1.25rem #0000000d;
+  --shadow-composer: 0 0 0 0.03125rem rgb(26 28 31 / 0.118), 0 0.1875rem 0.46875rem rgb(0 0 0 / 0.04), 0 0 1.25rem rgb(0 0 0 / 0.05);
+  --elevation-sidebar: 0 0 0 0.03125rem rgb(0 0 0 / 0.08), 0 0.1875rem 0.46875rem #00000008, 0 0 1rem #00000005;
 }
 
 
@@ -128,20 +128,20 @@
   --diff-del-fg: #ff6764;
   --diff-surface: color-mix(in srgb, #111111 94%, #fcfcfc);
   --code-bg: rgb(252 252 252 / 0.06);
-  --shadow-menu: 0 0 0 0.5px var(--border-heavy), 0 3px 7.5px #0000000a, 0 0 20px #0000000d;
+  --shadow-menu: 0 0 0 0.03125rem var(--border-heavy), 0 0.1875rem 0.46875rem #0000000a, 0 0 1.25rem #0000000d;
   --shadow-composer: var(--shadow-menu);
-  --elevation-sidebar: 0 0 0 0.5px rgb(252 252 252 / 0.156), 0 3px 7.5px #00000008, 0 0 16px #00000005;
+  --elevation-sidebar: 0 0 0 0.03125rem rgb(252 252 252 / 0.156), 0 0.1875rem 0.46875rem #00000008, 0 0 1rem #00000005;
 }
 
 
 /* ---- shared metrics ---- */
 :root {
-  --height-toolbar: 46px;
+  --height-toolbar: 2.875rem;
   --thread-content-max-width: 48rem;
-  --padding-toolbar: 16px;
-  --sidebar-width-target: 275px;
-  --radius-composer: 25px;
-  --conversation-item-gap: 16px;
+  --padding-toolbar: 1rem;
+  --sidebar-width-target: 17.1875rem;
+  --radius-composer: 1.5625rem;
+  --conversation-item-gap: 1rem;
 }
 
 html,
@@ -152,7 +152,7 @@ body,
   background: var(--surface-under);
   color: var(--fg);
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: 100%;
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
 }
@@ -162,12 +162,12 @@ body,
   scrollbar-color: rgb(128 128 128 / 0.35) transparent;
 }
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 0.5rem;
+  height: 0.5rem;
 }
 *::-webkit-scrollbar-thumb {
   background: rgb(128 128 128 / 0.35);
-  border-radius: 4px;
+  border-radius: 0.25rem;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
@@ -182,9 +182,9 @@ body,
 }
 
 /* popover open: the reference client's enter motion — 150ms
-   cubic-bezier(.19,1,.22,1), translateY(-4px) scale(.98) → identity */
+   cubic-bezier(.19,1,.22,1), translateY(-0.25rem) scale(.98) → identity */
 @keyframes popover-in-kf {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  from { opacity: 0; transform: translateY(-0.25rem) scale(0.98); }
   to { opacity: 1; transform: none; }
 }
 .popover-in {
