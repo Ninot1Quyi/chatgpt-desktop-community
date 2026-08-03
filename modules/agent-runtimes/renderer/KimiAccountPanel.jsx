@@ -173,6 +173,7 @@ export function KimiAccountPanel({
   const profileStatus = account?.profileStatus || "not_connected";
   const profileError = account?.errors?.profile;
   const usage = account?.usage;
+  const metadata = usage?.metadata;
   const usageError = account?.errors?.usage || error;
   const rows = [usage?.summary, ...(usage?.limits || [])].filter(Boolean);
   const parallel = usage?.parallel;
