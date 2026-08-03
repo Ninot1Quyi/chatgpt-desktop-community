@@ -139,17 +139,17 @@ export default function VoiceSection() {
 
       <Card title="Dictation dictionary">
         <div className="px-4 py-3.5">
-          <div className="text-[12px] text-(--fg-tertiary)">Words or phrases dictation should recognize</div>
+          <div className="text-[0.75rem] text-(--fg-tertiary)">Words or phrases dictation should recognize</div>
           <div className="mt-2 flex gap-2">
             <input
-              className="h-8 min-w-0 flex-1 rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[13px] outline-none placeholder:text-(--fg-faint) focus:border-(--accent)"
+              className="h-8 min-w-0 flex-1 rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[0.8125rem] outline-none placeholder:text-(--fg-faint) focus:border-(--accent)"
               placeholder="Add entry"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addEntry()}
             />
             <button
-              className="h-8 shrink-0 rounded-lg border border-(--border) px-3 text-[13px] hover:bg-(--surface-hover) disabled:opacity-50"
+              className="h-8 shrink-0 rounded-lg border border-(--border) px-3 text-[0.8125rem] hover:bg-(--surface-hover) disabled:opacity-50"
               disabled={!draft.trim()}
               onClick={addEntry}
             >
@@ -161,7 +161,7 @@ export default function VoiceSection() {
               {dictionary.map((w, i) => (
                 <span
                   key={`${w}-${i}`}
-                  className="flex items-center gap-1 rounded-full border border-(--border-light) bg-(--surface) px-2 py-0.5 text-[12px]"
+                  className="flex items-center gap-1 rounded-full border border-(--border-light) bg-(--surface) px-2 py-0.5 text-[0.75rem]"
                 >
                   {w}
                   <button
@@ -183,12 +183,12 @@ export default function VoiceSection() {
 
       <Card title="Dictation history">
         {history.length === 0 ? (
-          <div className="px-4 py-6 text-center text-[12px] text-(--fg-faint)">No dictation history yet.</div>
+          <div className="px-4 py-6 text-center text-[0.75rem] text-(--fg-faint)">No dictation history yet.</div>
         ) : (
           history.map((h, i) => (
             <div key={i} className="flex items-baseline gap-3 px-4 py-2.5">
-              <span className="shrink-0 text-[12px] text-(--fg-tertiary)">{h.when}</span>
-              <span className="min-w-0 truncate text-[13px]">{h.text}</span>
+              <span className="shrink-0 text-[0.75rem] text-(--fg-tertiary)">{h.when}</span>
+              <span className="min-w-0 truncate text-[0.8125rem]">{h.text}</span>
             </div>
           ))
         )}

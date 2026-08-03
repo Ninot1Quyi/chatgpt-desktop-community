@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@app/store.js";
 import * as api from "@app/api.js";
 import { cx } from "@app/lib/cx.js";
+import { rem } from "@app/lib/cssUnits.js";
 import { basename } from "@app/lib/time.js";
 import { useT } from "@app/i18n.jsx";
 import { Spinner, Menu } from "@app/components/ui.jsx";
@@ -93,18 +94,18 @@ function SitesView() {
   return (
     <PageShell title="Sites">
       <div className="flex min-h-full w-full flex-col">
-        <div className="mx-auto w-full max-w-[768px] px-5 pt-5">
+        <div className="mx-auto w-full max-w-[48rem] px-5 pt-5">
           <div className="flex items-start justify-between gap-4 px-2">
             <div className="flex min-w-0 flex-col gap-2">
-              <h1 className="text-[28px] leading-[33.6px] font-normal text-(--fg)">{t("Sites")}</h1>
-              <div className="text-[16px] leading-6 text-(--fg-secondary)">
+              <h1 className="text-[1.75rem] leading-[2.1rem] font-normal text-(--fg)">{t("Sites")}</h1>
+              <div className="text-[1rem] leading-6 text-(--fg-secondary)">
                 {t("Turn your ideas into live websites.")}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mx-auto flex w-full max-w-[768px] items-center gap-2 px-5 pt-5 pb-2">
+        <div className="mx-auto flex w-full max-w-[48rem] items-center gap-2 px-5 pt-5 pb-2">
           <label className="app-no-drag flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-(--border-heavy) bg-(--input-bg) px-2.5">
             <IconSearch size={16} className="shrink-0 text-(--fg-tertiary)" />
             <input
@@ -113,25 +114,25 @@ function SitesView() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("Search sites")}
-              className="min-w-0 flex-1 bg-transparent text-[14px] leading-[18px] text-(--fg) outline-none placeholder:text-(--fg-faint)"
+              className="min-w-0 flex-1 bg-transparent text-[0.875rem] leading-[1.125rem] text-(--fg) outline-none placeholder:text-(--fg-faint)"
             />
           </label>
         </div>
 
-        <div className="mx-auto flex min-h-0 w-full max-w-[768px] flex-1 flex-col px-5 pt-6 pb-5">
-          <div className="mx-auto flex min-h-[420px] w-full max-w-[728px] flex-col items-center justify-center px-3 py-6">
+        <div className="mx-auto flex min-h-0 w-full max-w-[48rem] flex-1 flex-col px-5 pt-6 pb-5">
+          <div className="mx-auto flex min-h-[26.25rem] w-full max-w-[45.5rem] flex-col items-center justify-center px-3 py-6">
             <div className="flex w-full max-w-xl flex-col items-center justify-center gap-3 text-center">
               <div className="pointer-events-none flex items-center justify-center text-(--fg-secondary)">
                 <IconNavSites size={32} />
               </div>
               <div className="flex flex-col items-center gap-2">
-                <div className="text-[16px] leading-6 font-medium text-(--fg)">{t("No sites yet")}</div>
+                <div className="text-[1rem] leading-6 font-medium text-(--fg)">{t("No sites yet")}</div>
               </div>
               <div className="flex w-full flex-wrap items-center justify-center gap-2">
                 {visibleSitesPlugin && (
                   <button
                     type="button"
-                    className="app-no-drag flex h-8 items-center gap-2 rounded-[12.5px] border border-(--border) bg-(--surface-under) px-3 text-[14px] leading-[18px] text-(--fg) hover:bg-(--surface-hover)"
+                    className="app-no-drag flex h-8 items-center gap-2 rounded-[0.78125rem] border border-(--border) bg-(--surface-under) px-3 text-[0.875rem] leading-[1.125rem] text-(--fg) hover:bg-(--surface-hover)"
                     onClick={openSitesPlugin}
                   >
                     <PluginIcon plugin={sitesPlugin} size={18} />
@@ -140,14 +141,14 @@ function SitesView() {
                 )}
                 <button
                   type="button"
-                  className="app-no-drag flex h-8 items-center rounded-[12.5px] border border-(--border) bg-(--surface-hover) px-4 text-[14px] leading-[18px] text-(--fg) hover:bg-(--surface-active)"
+                  className="app-no-drag flex h-8 items-center rounded-[0.78125rem] border border-(--border) bg-(--surface-hover) px-4 text-[0.875rem] leading-[1.125rem] text-(--fg) hover:bg-(--surface-active)"
                   onClick={createSiteDraft}
                 >
                   {t("Create new site")}
                 </button>
               </div>
               {error && (
-                <div className="max-w-md text-[12px] leading-5 text-(--fg-faint)">
+                <div className="max-w-md text-[0.75rem] leading-5 text-(--fg-faint)">
                   {t("Sites plugin status unavailable: {error}", { error })}
                 </div>
               )}
@@ -181,7 +182,7 @@ function SimpleView({ title, desc }) {
   return (
     <PageShell title={title}>
       <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-        <div className="text-[14px] text-(--fg-tertiary)">{desc}</div>
+        <div className="text-[0.875rem] text-(--fg-tertiary)">{desc}</div>
       </div>
     </PageShell>
   );
@@ -365,7 +366,7 @@ function PullRequestsView() {
   return (
     <div className="flex h-full min-w-0 flex-1 border-t border-(--border-light)">
       {/* Left column: filters + list */}
-      <div className="flex w-[400px] shrink-0 flex-col border-r border-(--border-light)">
+      <div className="flex w-[25rem] shrink-0 flex-col border-r border-(--border-light)">
         <div className="shrink-0 px-3 pt-3">
           <div className="flex items-center gap-4 px-1">
             {[["all", "All"], ["reviewing", "Reviewing"], ["authored", "Authored"]].map(([id, label]) => (
@@ -373,7 +374,7 @@ function PullRequestsView() {
                 key={id}
                 onClick={() => setTab(id)}
                 className={cx(
-                  "text-[13px]",
+                  "text-[0.8125rem]",
                   tab === id ? "font-medium text-(--fg)" : "text-(--fg-tertiary) hover:text-(--fg)"
                 )}
               >
@@ -411,7 +412,7 @@ function PullRequestsView() {
             <PrListSkeleton />
           ) : sections.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
-              <div className="text-[13px] text-(--fg-tertiary)">
+              <div className="text-[0.8125rem] text-(--fg-tertiary)">
                 {prs.length === 0 ? t("No pull requests found") : t("No pull requests match your filters")}
               </div>
               {prs.length === 0 && (
@@ -426,7 +427,7 @@ function PullRequestsView() {
             sections.map(([kind, list]) => (
               <div key={kind}>
                 {kind !== "results" && (
-                  <div className="px-2 pt-3 pb-1 text-[11px] font-medium text-(--fg-tertiary)">
+                  <div className="px-2 pt-3 pb-1 text-[0.6875rem] font-medium text-(--fg-tertiary)">
                     {t(kind === "review_requested" ? "Review requested" : kind === "reviewed" ? "Previously reviewed" : "Authored")}
                   </div>
                 )}
@@ -444,7 +445,7 @@ function PullRequestsView() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline gap-2">
-                        <span className="min-w-0 flex-1 truncate text-[13px]">{pr.title}</span>
+                        <span className="min-w-0 flex-1 truncate text-[0.8125rem]">{pr.title}</span>
                         <span className="shrink-0 text-xs text-(--fg-tertiary)">{shortAge(pr.updatedAt)}</span>
                       </span>
                       <span className="mt-0.5 flex items-center gap-2 text-xs text-(--fg-tertiary)">
@@ -486,7 +487,7 @@ function PullRequestsView() {
         {selected ? (
           <PrDetail pr={selected} />
         ) : (
-          <div className="flex h-full items-center justify-center text-[13px] text-(--fg-tertiary)">
+          <div className="flex h-full items-center justify-center text-[0.8125rem] text-(--fg-tertiary)">
             {t("Select pull request to view")}
           </div>
         )}
@@ -529,7 +530,7 @@ function PrStatusChip({ state, isDraft }) {
     : s === "OPEN" ? ["Open", "bg-(--diff-add-bg) text-(--diff-add-fg)"]
     : s === "MERGED" ? ["Merged", "bg-(--accent-soft) text-(--purple)"]
     : ["Closed", "bg-(--danger-soft) text-(--danger)"];
-  return <span className={cx("shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium", cls)}>{label}</span>;
+  return <span className={cx("shrink-0 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-medium", cls)}>{label}</span>;
 }
 
 // Right-hand detail pane for the selected PR.
@@ -547,25 +548,25 @@ function PrDetail({ pr }) {
 
   return (
     <div className="mx-auto max-w-[46rem] px-6 py-5">
-      <div className="text-[16px] font-semibold leading-snug">{pr.title}</div>
+      <div className="text-[1rem] font-semibold leading-snug">{pr.title}</div>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-(--fg-tertiary)">
         <PrStatusChip state={pr.state} isDraft={pr.isDraft} />
         <span className="font-mono">#{pr.number}</span>
       </div>
 
       <div className="mt-4 flex flex-col gap-1.5">
-        <div className="flex items-center gap-2 text-[13px] text-(--fg-secondary)">
+        <div className="flex items-center gap-2 text-[0.8125rem] text-(--fg-secondary)">
           <LucideIcon name="GitBranch" size={13} className="shrink-0 text-(--fg-tertiary)" />
           <span className="min-w-0 truncate font-mono text-xs" title={pr.headRefName}>{pr.headRefName}</span>
           <LucideIcon name="ArrowRight" size={12} className="shrink-0 text-(--fg-faint)" />
           <span className="min-w-0 truncate font-mono text-xs">{pr.baseRefName || "main"}</span>
         </div>
-        <div className="flex items-center gap-2 text-[13px] text-(--fg-secondary)" title={pr.repo}>
+        <div className="flex items-center gap-2 text-[0.8125rem] text-(--fg-secondary)" title={pr.repo}>
           <LucideIcon name="Folder" size={13} className="shrink-0 text-(--fg-tertiary)" />
           <span className="min-w-0 truncate">{basename(pr.repo)}</span>
         </div>
         {pr.author?.login && (
-          <div className="flex items-center gap-2 text-[13px] text-(--fg-secondary)">
+          <div className="flex items-center gap-2 text-[0.8125rem] text-(--fg-secondary)">
             <LucideIcon name="User" size={13} className="shrink-0 text-(--fg-tertiary)" />
             <span className="min-w-0 truncate">{pr.author.login}</span>
           </div>
@@ -591,8 +592,8 @@ function PrDetail({ pr }) {
 
       {body && (
         <div className="mt-5 border-t border-(--border-light) pt-4">
-          <div className="text-[11px] font-medium text-(--fg-tertiary)">Description</div>
-          <div className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-(--fg-secondary)">
+          <div className="text-[0.6875rem] font-medium text-(--fg-tertiary)">Description</div>
+          <div className="mt-2 whitespace-pre-wrap text-[0.8125rem] leading-relaxed text-(--fg-secondary)">
             {preview}
             {truncated ? "\n…" : ""}
           </div>
@@ -682,8 +683,8 @@ function ScheduledView() {
     <PageShell title="Scheduled">
       {/* Header */}
       <div className="px-6 pt-5">
-        <div className="text-[28px] font-normal">{t("Scheduled tasks")}</div>
-        <div className="mt-1 text-[16px] leading-6 text-(--fg-secondary)">
+        <div className="text-[1.75rem] font-normal">{t("Scheduled tasks")}</div>
+        <div className="mt-1 text-[1rem] leading-6 text-(--fg-secondary)">
           {t("Ask ChatGPT to schedule tasks, set reminders, or monitor for updates")}
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -704,7 +705,7 @@ function ScheduledView() {
                 key={id}
                 onClick={() => setTab(id)}
                 className={cx(
-                  "text-[13px]",
+                  "text-[0.8125rem]",
                   tab === id ? "font-medium text-(--fg)" : "text-(--fg-tertiary) hover:text-(--fg)"
                 )}
               >
@@ -720,9 +721,9 @@ function ScheduledView() {
         {items === null && !error && (
           <div className="flex justify-center py-10 text-(--fg-tertiary)"><Spinner /></div>
         )}
-        {error && <div className="px-6 py-10 text-center text-[13px] text-(--fg-tertiary)">{error}</div>}
+        {error && <div className="px-6 py-10 text-center text-[0.8125rem] text-(--fg-tertiary)">{error}</div>}
         {items && filtered.length === 0 && (
-          <div className="px-6 py-10 text-center text-[13px] text-(--fg-tertiary)">
+          <div className="px-6 py-10 text-center text-[0.8125rem] text-(--fg-tertiary)">
             {items.length === 0 ? t("No scheduled tasks yet") : t("No tasks match your filters")}
           </div>
         )}
@@ -732,12 +733,12 @@ function ScheduledView() {
               <LucideIcon name="Clock" size={14} />
             </span>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-medium">{a.name}</div>
+              <div className="truncate text-[0.8125rem] font-medium">{a.name}</div>
               <div className="mt-0.5 truncate text-xs text-(--fg-tertiary)">{a.schedule || t("No schedule")}</div>
             </div>
             {/* The reference page shows a status chip only in the Paused filter. */}
             {tab === "paused" && (
-              <span className="shrink-0 rounded-full bg-(--surface-active) px-2 py-0.5 text-[11px] font-medium text-(--fg-tertiary)">
+              <span className="shrink-0 rounded-full bg-(--surface-active) px-2 py-0.5 text-[0.6875rem] font-medium text-(--fg-tertiary)">
                 {t("Paused")}
               </span>
             )}
@@ -746,7 +747,7 @@ function ScheduledView() {
       </div>
 
       {/* Suggestions */}
-      <div className="px-6 pt-4 text-[11px] font-medium text-(--fg-tertiary)">{t("Suggestions")}</div>
+      <div className="px-6 pt-4 text-[0.6875rem] font-medium text-(--fg-tertiary)">{t("Suggestions")}</div>
       <div className="mt-2 flex flex-col gap-2 px-6 pb-8">
         {SCHEDULED_SUGGESTIONS.map((s) => (
           <button
@@ -759,7 +760,7 @@ function ScheduledView() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-[13px] font-medium">{t(s.name)}</span>
+                <span className="text-[0.8125rem] font-medium">{t(s.name)}</span>
                 <span className="text-xs text-(--fg-tertiary)">{t(s.schedule)}</span>
               </span>
               <span className="mt-0.5 block text-xs leading-relaxed text-(--fg-tertiary)">{t(s.desc)}</span>
@@ -929,8 +930,8 @@ function PluginsView() {
       <div className="mx-auto w-full max-w-[48rem] px-5 pt-6">
       {/* Header */}
       <div>
-        <h1 className="text-[28px] font-normal text-(--fg)">{t(tab === "plugins" ? "Plugins" : "Skills")}</h1>
-        <div className="mt-1 text-[16px] leading-6 text-(--fg-secondary)">
+        <h1 className="text-[1.75rem] font-normal text-(--fg)">{t(tab === "plugins" ? "Plugins" : "Skills")}</h1>
+        <div className="mt-1 text-[1rem] leading-6 text-(--fg-secondary)">
           {t(tab === "plugins" ? "Work with ChatGPT across your favorite tools" : "Extend ChatGPT with task-specific skills")}
         </div>
         <div className="mt-3 flex h-8 items-center gap-2 rounded-full border border-(--border-light) bg-(--input-bg) px-2.5">
@@ -940,7 +941,7 @@ function PluginsView() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t(tab === "plugins" ? "Search plugins" : "Search skills")}
             spellCheck={false}
-            className="min-w-0 flex-1 bg-transparent text-sm leading-[18px] outline-none placeholder:text-(--fg-faint)"
+            className="min-w-0 flex-1 bg-transparent text-sm leading-[1.125rem] outline-none placeholder:text-(--fg-faint)"
           />
         </div>
       </div>
@@ -995,7 +996,7 @@ function PluginCard({ plugin, onOverflow, onOpenDetail }) {
     >
       <PluginIcon plugin={plugin} size={28} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-medium">{t(name)}</span>
+        <span className="block truncate text-[0.8125rem] font-medium">{t(name)}</span>
         <span className="block truncate text-xs text-(--fg-tertiary)" title={t(description)}>
           {t(description)}
         </span>
@@ -1050,7 +1051,7 @@ export function PluginIcon({ plugin, size }) {
         src={src}
         alt=""
         className="shrink-0 rounded-lg object-cover"
-        style={{ width: size, height: size }}
+        style={{ width: rem(size), height: rem(size) }}
         onError={() => {
           // local icon file missing → try the CDN proxy next, then letter
           if (iconPath && logoUrl) {
@@ -1064,7 +1065,10 @@ export function PluginIcon({ plugin, size }) {
     );
   }
   return (
-    <span className="flex shrink-0 items-center justify-center rounded-lg" style={{ width: size, height: size }}>
+    <span
+      className="flex shrink-0 items-center justify-center rounded-lg"
+      style={{ width: rem(size), height: rem(size) }}
+    >
       <IconPluginFallback size={size} />
     </span>
   );
@@ -1169,12 +1173,12 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
   if (plugins === null && !error) {
     return <div className="flex justify-center py-10 text-(--fg-tertiary)"><Spinner /></div>;
   }
-  if (error) return <div className="py-10 text-center text-[13px] text-(--fg-tertiary)">{error}</div>;
+  if (error) return <div className="py-10 text-center text-[0.8125rem] text-(--fg-tertiary)">{error}</div>;
   return (
     <>
           {/* Installed */}
           <div className="flex items-center justify-between pt-4">
-            <span className="text-[11px] font-medium text-(--fg-tertiary)">{t("Installed")}</span>
+            <span className="text-[0.6875rem] font-medium text-(--fg-tertiary)">{t("Installed")}</span>
             <button
               title={t("Manage plugins")}
               className="flex h-5 w-5 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
@@ -1256,12 +1260,12 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
             </div>
             {!seeAllFeatured && !q && featured.length > FEATURED_VISIBLE && (
               <button
-                className="mt-2 flex items-center gap-2 rounded-lg px-1 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--fg)/5"
+                className="mt-2 flex items-center gap-2 rounded-lg px-1 py-1.5 text-[0.8125rem] text-(--fg-secondary) hover:bg-(--fg)/5"
                 onClick={() => setSeeAllFeatured(true)}
               >
                 <span className="flex -space-x-1">
                   {featured.slice(FEATURED_VISIBLE, FEATURED_VISIBLE + 3).map((p) => (
-                    <span key={p.id} className="flex size-4 items-center justify-center overflow-hidden rounded-[4px] border border-(--border-light) bg-(--surface)">
+                    <span key={p.id} className="flex size-4 items-center justify-center overflow-hidden rounded-[0.25rem] border border-(--border-light) bg-(--surface)">
                       <PluginIcon plugin={p} size={13} />
                     </span>
                   ))}
@@ -1274,7 +1278,7 @@ function PluginsBody({ query, plugins, setPlugins, error, scope, setScope, setOv
             )}
             {seeAllFeatured && !q && featured.length > FEATURED_VISIBLE && (
               <button
-                className="mt-2 flex items-center rounded-lg px-1 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--fg)/5"
+                className="mt-2 flex items-center rounded-lg px-1 py-1.5 text-[0.8125rem] text-(--fg-secondary) hover:bg-(--fg)/5"
                 onClick={() => setSeeAllFeatured(false)}
               >
                 {t("Show less")}
@@ -1334,7 +1338,7 @@ function SectionHeader({ title, className }) {
   const t = useT();
   return (
     <div className={cx("flex items-center justify-between gap-3 border-b border-(--border-light) pr-0.5 pb-2 pl-2", className)}>
-      <h2 className="flex min-h-7 items-center gap-1.5 text-[16px] font-medium leading-6">{t(title)}</h2>
+      <h2 className="flex min-h-7 items-center gap-1.5 text-[1rem] font-medium leading-6">{t(title)}</h2>
     </div>
   );
 }
@@ -1421,7 +1425,7 @@ function SkillCard({ skill, onOpen }) {
       tabIndex={0}
       onClick={() => onOpen(skill)}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen(skill)}
-      className="group flex cursor-pointer flex-col justify-center gap-2.5 rounded-[20px] p-2.5 hover:bg-(--fg)/5"
+      className="group flex cursor-pointer flex-col justify-center gap-2.5 rounded-[1.25rem] p-2.5 hover:bg-(--fg)/5"
     >
       <div className="flex items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--surface)">
@@ -1612,14 +1616,14 @@ function SkillsView({ query }) {
   if (groups === null && !error) {
     return <div className="flex justify-center py-10 text-(--fg-tertiary)"><Spinner /></div>;
   }
-  if (error) return <div className="py-10 text-center text-[13px] text-(--fg-tertiary)">{error}</div>;
+  if (error) return <div className="py-10 text-center text-[0.8125rem] text-(--fg-tertiary)">{error}</div>;
 
   return (
     <>
       {/* Installed */}
       <section className="mt-8 flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3 border-b border-(--border-light) pr-0.5 pb-2 pl-2">
-          <h2 className="flex min-h-7 items-center gap-1.5 text-[16px] font-medium leading-6">Installed</h2>
+          <h2 className="flex min-h-7 items-center gap-1.5 text-[1rem] font-medium leading-6">Installed</h2>
         </div>
         {installedFiltered.length === 0 ? (
           <div className="text-xs text-(--fg-faint)">{query ? "No skills match your search" : "No skills installed yet"}</div>
@@ -1643,7 +1647,7 @@ function SkillsView({ query }) {
               aria-pressed={pill === p.id}
               onClick={() => { setPill(p.id); setExpandScope(false); }}
               className={cx(
-                "flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-transparent px-2 text-sm leading-[18px] whitespace-nowrap select-none",
+                "flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-transparent px-2 text-sm leading-[1.125rem] whitespace-nowrap select-none",
                 pill === p.id
                   ? "bg-(--fg)/5 text-(--fg) hover:bg-(--fg)/10"
                   : "text-(--fg-tertiary) hover:bg-(--surface-hover)"
@@ -1749,7 +1753,7 @@ function SkillDetailDialog({ skill, onClose, onChanged }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         role="dialog"
-        className="flex h-[720px] max-h-full w-[600px] max-w-full flex-col overflow-hidden rounded-3xl bg-(--dropdown-bg)/90 shadow-lg ring-[0.5px] ring-(--border) backdrop-blur-xl"
+        className="flex h-[45rem] max-h-full w-[37.5rem] max-w-full flex-col overflow-hidden rounded-3xl bg-(--dropdown-bg)/90 shadow-lg ring-[0.03125rem] ring-(--border) backdrop-blur-xl"
       >
         <div className="flex h-full min-h-0 flex-col gap-0 px-5 py-5">
           {/* header row */}
@@ -1771,7 +1775,7 @@ function SkillDetailDialog({ skill, onClose, onChanged }) {
                     <span
                       className={cx(
                         "h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
-                        enabled ? "translate-x-[14px]" : "translate-x-[2px]"
+                        enabled ? "translate-x-[0.875rem]" : "translate-x-[0.125rem]"
                       )}
                     />
                   </span>
@@ -1795,7 +1799,7 @@ function SkillDetailDialog({ skill, onClose, onChanged }) {
               </div>
             </div>
             <div className="mt-3 flex flex-col items-start gap-1 self-stretch">
-              <div className="flex min-w-0 items-center gap-2 text-[16px] font-semibold text-(--fg)">
+              <div className="flex min-w-0 items-center gap-2 text-[1rem] font-semibold text-(--fg)">
                 <div className="min-w-0 truncate">{skillName(skill)}</div>
                 <div className="shrink-0 font-normal text-(--fg-secondary)">Skill</div>
               </div>
@@ -1821,14 +1825,14 @@ function SkillDetailDialog({ skill, onClose, onChanged }) {
             <button
               type="button"
               onClick={uninstall}
-              className="flex h-7 cursor-pointer items-center gap-1 rounded-lg border border-transparent bg-(--danger)/10 px-2 text-sm leading-[18px] text-(--danger) hover:bg-(--danger)/20"
+              className="flex h-7 cursor-pointer items-center gap-1 rounded-lg border border-transparent bg-(--danger)/10 px-2 text-sm leading-[1.125rem] text-(--danger) hover:bg-(--danger)/20"
             >
               Uninstall
             </button>
             <button
               type="button"
               onClick={tryNow}
-              className="flex h-7 cursor-pointer items-center gap-1 rounded-lg border border-transparent bg-(--fg) px-2 text-sm leading-[18px] text-(--dropdown-bg) hover:bg-(--fg)/80"
+              className="flex h-7 cursor-pointer items-center gap-1 rounded-lg border border-transparent bg-(--fg) px-2 text-sm leading-[1.125rem] text-(--dropdown-bg) hover:bg-(--fg)/80"
             >
               <IconTryChat size={14} />
               Try now
@@ -2127,7 +2131,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
             <PluginIcon plugin={activePlugin} size={56} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h1 className="truncate text-[22px] font-semibold">{localizedPluginName}</h1>
+                <h1 className="truncate text-[1.375rem] font-semibold">{localizedPluginName}</h1>
                 {activePlugin._marketplace === "personal" && <span className="shrink-0 text-sm text-(--fg-tertiary)">{t("Personal")}</span>}
               </div>
               <div className="mt-0.5 text-sm text-(--fg-secondary)">{t(iface.shortDescription || "")}</div>
@@ -2177,9 +2181,9 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                       {meta?.icon(20, "shrink-0")}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[13px] font-medium">{target.label}</div>
+                      <div className="text-[0.8125rem] font-medium">{target.label}</div>
                       <div
-                        className="truncate text-[12px] text-(--fg-tertiary)"
+                        className="truncate text-[0.75rem] text-(--fg-tertiary)"
                         title={t(target.reason || target.description || "")}
                       >
                         {t(target.reason || target.description || "Checking compatibility…")}
@@ -2188,19 +2192,19 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                     {targetsLoading && !target.description && !target.reason ? (
                       <span className="px-2 text-(--fg-tertiary)"><Spinner /></span>
                     ) : target.installed ? (
-                      <span className="shrink-0 rounded-full bg-(--success)/15 px-2.5 py-1 text-[11px] font-medium text-(--success)">
+                      <span className="shrink-0 rounded-full bg-(--success)/15 px-2.5 py-1 text-[0.6875rem] font-medium text-(--success)">
                         {t("Installed")}
                       </span>
                     ) : target.available ? (
                       <button
                         onClick={() => installFor(target.id)}
                         disabled={targetBusy || installAllBusy}
-                        className="h-7 shrink-0 rounded-lg border border-(--border) bg-(--surface) px-3 text-[12px] hover:bg-(--surface-hover) disabled:opacity-40"
+                        className="h-7 shrink-0 rounded-lg border border-(--border) bg-(--surface) px-3 text-[0.75rem] hover:bg-(--surface-hover) disabled:opacity-40"
                       >
                         {t(targetBusy ? "Installing…" : "Install")}
                       </button>
                     ) : (
-                      <span className="shrink-0 px-1 text-[11px] text-(--fg-faint)">
+                      <span className="shrink-0 px-1 text-[0.6875rem] text-(--fg-faint)">
                         {t("Unavailable")}
                       </span>
                     )}
@@ -2215,8 +2219,8 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
             </div>
             <div className="flex items-center justify-between gap-4 border-t border-(--border-light) bg-(--surface) px-4 py-3">
               <div>
-                <div className="text-[13px] font-medium">{t("All compatible providers")}</div>
-                <div className="text-[12px] text-(--fg-tertiary)">
+                <div className="text-[0.8125rem] font-medium">{t("All compatible providers")}</div>
+                <div className="text-[0.75rem] text-(--fg-tertiary)">
                   {t("Install this plugin everywhere a compatible package is available.")}
                 </div>
               </div>
@@ -2228,7 +2232,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                   pendingTargets.length === 0 ||
                   busyTargets.size > 0
                 }
-                className="h-8 shrink-0 rounded-lg bg-(--fg) px-3.5 text-[12px] font-medium text-(--dropdown-bg) hover:bg-(--fg)/80 disabled:opacity-40"
+                className="h-8 shrink-0 rounded-lg bg-(--fg) px-3.5 text-[0.75rem] font-medium text-(--dropdown-bg) hover:bg-(--fg)/80 disabled:opacity-40"
               >
                 {installAllBusy
                   ? t("Installing…")
@@ -2252,7 +2256,7 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                       { kind: "skill", name: slug, displayName: localizedPluginName, path: "", icon: iface.composerIcon || iface.logo || null },
                     ])
                   }
-                  className="flex items-center gap-2.5 rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-left text-[13px] hover:bg-(--fg)/5"
+                  className="flex items-center gap-2.5 rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-left text-[0.8125rem] hover:bg-(--fg)/5"
                 >
                   <span className="flex size-6 shrink-0 items-center justify-center">
                     <PluginIcon plugin={activePlugin} size={18} />
@@ -2280,10 +2284,10 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                     {detail.apps.map((a) => (
                       <div key={a.id || a.name} className="flex items-center gap-3 px-4 py-3">
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13px] font-medium">{t(appDisplayName(a))}</div>
-                          {a.description && <div className="line-clamp-2 text-[12px] text-(--fg-tertiary)">{t(a.description)}</div>}
+                          <div className="truncate text-[0.8125rem] font-medium">{t(appDisplayName(a))}</div>
+                          {a.description && <div className="line-clamp-2 text-[0.75rem] text-(--fg-tertiary)">{t(a.description)}</div>}
                         </div>
-                        <span className="shrink-0 rounded-full bg-(--success)/15 px-2 py-0.5 text-[11px] font-medium text-(--success)">{t("Connected")}</span>
+                        <span className="shrink-0 rounded-full bg-(--success)/15 px-2 py-0.5 text-[0.6875rem] font-medium text-(--success)">{t("Connected")}</span>
                       </div>
                     ))}
                   </div>
@@ -2303,8 +2307,8 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
                           )}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13px] font-medium">{t(s.interface?.displayName || s.name)}</div>
-                          <div className="truncate text-[12px] text-(--fg-tertiary)">
+                          <div className="truncate text-[0.8125rem] font-medium">{t(s.interface?.displayName || s.name)}</div>
+                          <div className="truncate text-[0.75rem] text-(--fg-tertiary)">
                             {t(s.interface?.shortDescription || s.shortDescription || s.description || "")}
                           </div>
                         </div>
@@ -2331,8 +2335,8 @@ export function PluginDetailView({ plugin, onBack, onChanged }) {
               .filter(([, v]) => v)
               .map(([k, v]) => (
                 <div key={k} className="flex items-center justify-between gap-4 px-4 py-2.5">
-                  <span className="text-[13px] text-(--fg-secondary)">{t(k)}</span>
-                  <span className="truncate text-[13px]">{v}</span>
+                  <span className="text-[0.8125rem] text-(--fg-secondary)">{t(k)}</span>
+                  <span className="truncate text-[0.8125rem]">{v}</span>
                 </div>
               ))}
           </div>

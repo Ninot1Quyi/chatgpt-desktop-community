@@ -127,14 +127,14 @@ export default function ProfileSection() {
     <>
       {/* identity header */}
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-(--surface-active) text-[16px] font-medium">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-(--surface-active) text-[1rem] font-medium">
           {profile?.photo ? (
             <img src={profile.photo} alt="" className="h-full w-full object-cover" />
           ) : (
             (profile?.name || "?").slice(0, 1)
           )}
         </div>
-        <div className="flex items-baseline gap-1.5 text-[15px]">
+        <div className="flex items-baseline gap-1.5 text-[0.9375rem]">
           <span className="font-medium">{profile?.name || "—"}</span>
           {profile?.username && <span className="text-(--fg-tertiary)">@{profile.username}</span>}
           {plan && (
@@ -146,7 +146,7 @@ export default function ProfileSection() {
         </div>
         <div className="ml-auto flex items-center gap-1.5">
           <button
-            className="flex h-7 items-center rounded-lg border border-(--border) px-2.5 text-[12px] hover:bg-(--surface-hover)"
+            className="flex h-7 items-center rounded-lg border border-(--border) px-2.5 text-[0.75rem] hover:bg-(--surface-hover)"
             onClick={() => {
               navigator.clipboard?.writeText(`https://chatgpt.com/u/${profile?.username || ""}`).catch(() => {});
               useStore.getState().toast("Profile link copied");
@@ -155,13 +155,13 @@ export default function ProfileSection() {
             Share
           </button>
           <button
-            className="flex h-7 items-center rounded-lg border border-(--border) px-2.5 text-[12px] hover:bg-(--surface-hover)"
+            className="flex h-7 items-center rounded-lg border border-(--border) px-2.5 text-[0.75rem] hover:bg-(--surface-hover)"
             onClick={() => useStore.getState().toast("Profile is private", "info")}
           >
             Private
           </button>
           <button
-            className="flex h-7 items-center rounded-lg border border-(--border) px-2.5 text-[12px] hover:bg-(--surface-hover)"
+            className="flex h-7 items-center rounded-lg border border-(--border) px-2.5 text-[0.75rem] hover:bg-(--surface-hover)"
             onClick={() => api.openExternal("https://chatgpt.com/#settings/Profile")}
           >
             Edit
@@ -173,8 +173,8 @@ export default function ProfileSection() {
       <div className="mb-6 grid grid-cols-3 gap-2">
         {stats.map(([value, label]) => (
           <div key={label} className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5">
-            <div className="text-[18px] font-semibold">{value}</div>
-            <div className="mt-0.5 text-[11px] text-(--fg-tertiary)">{label}</div>
+            <div className="text-[1.125rem] font-semibold">{value}</div>
+            <div className="mt-0.5 text-[0.6875rem] text-(--fg-tertiary)">{label}</div>
           </div>
         ))}
       </div>
@@ -198,12 +198,12 @@ export default function ProfileSection() {
               <Spinner />
             </div>
           ) : usageError ? (
-            <div className="py-6 text-center text-[12px] text-(--fg-tertiary)">
+            <div className="py-6 text-center text-[0.75rem] text-(--fg-tertiary)">
               Usage data is not available: {usageError}
             </div>
           ) : (
             <>
-              <div className="flex h-[120px] items-end gap-1.5">
+              <div className="flex h-[7.5rem] items-end gap-1.5">
                 {series.map((m) => (
                   <div key={m.key} className="flex min-w-0 flex-1 flex-col items-center justify-end self-stretch">
                     <div
@@ -216,21 +216,21 @@ export default function ProfileSection() {
               </div>
               <div className="mt-1 flex gap-1.5">
                 {series.map((m) => (
-                  <div key={m.key} className="min-w-0 flex-1 text-center text-[10px] text-(--fg-faint)">
+                  <div key={m.key} className="min-w-0 flex-1 text-center text-[0.625rem] text-(--fg-faint)">
                     {m.label}
                   </div>
                 ))}
               </div>
               <div className="mt-4 rounded-xl border border-(--border-light)">
-                <div className="flex items-center justify-between px-3 py-2 text-[11px] text-(--fg-tertiary)">
+                <div className="flex items-center justify-between px-3 py-2 text-[0.6875rem] text-(--fg-tertiary)">
                   <span>Recent daily records</span>
                   <span>Tokens</span>
                 </div>
                 {rows.length === 0 ? (
-                  <div className="px-3 py-2 text-[12px] text-(--fg-faint)">No token records yet.</div>
+                  <div className="px-3 py-2 text-[0.75rem] text-(--fg-faint)">No token records yet.</div>
                 ) : (
                   rows.map((row) => (
-                    <div key={row.key} className="flex items-center justify-between border-t border-(--border-light) px-3 py-2 text-[12px]">
+                    <div key={row.key} className="flex items-center justify-between border-t border-(--border-light) px-3 py-2 text-[0.75rem]">
                       <span className="text-(--fg-secondary)">{row.label}</span>
                       <span className="font-medium">{fmtTokens(row.tokens)}</span>
                     </div>
@@ -250,8 +250,8 @@ export default function ProfileSection() {
           ["Total chats", chatCount != null ? chatCount : "—"],
         ].map(([label, value]) => (
           <div key={label} className="flex items-center justify-between px-4 py-3">
-            <span className="text-[13px] text-(--fg-secondary)">{label}</span>
-            <span className="text-[13px] font-medium">{value}</span>
+            <span className="text-[0.8125rem] text-(--fg-secondary)">{label}</span>
+            <span className="text-[0.8125rem] font-medium">{value}</span>
           </div>
         ))}
       </Card>

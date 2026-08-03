@@ -53,7 +53,7 @@ export default function EnvironmentsSection() {
 
   return (
     <>
-      <div className="-mt-3 mb-4 text-[13px] text-(--fg-tertiary)">
+      <div className="-mt-3 mb-4 text-[0.8125rem] text-(--fg-tertiary)">
         Local environments tell ChatGPT how to set up worktrees for a project.{" "}
         <button className="text-(--accent) hover:underline" onClick={() => api.openExternal("https://developers.openai.com/codex/environments")}>
           Learn more
@@ -80,14 +80,14 @@ export default function EnvironmentsSection() {
       </div>
 
       <Card title="Local projects">
-        {projects.length === 0 && <div className="px-4 py-4 text-[12px] text-(--fg-faint)">{local.length ? "No projects match your search" : "No local projects."}</div>}
+        {projects.length === 0 && <div className="px-4 py-4 text-[0.75rem] text-(--fg-faint)">{local.length ? "No projects match your search" : "No local projects."}</div>}
         {projects.map((p, i) => {
           const root = p.rootPaths?.[0];
           return (
             <div key={p.id || root || i} className="flex items-center gap-3 px-4 py-2.5">
               <IconFolder size={15} className="shrink-0 text-(--fg-tertiary)" />
-              <div className="min-w-0 flex-1 truncate text-[13px]">{p.name || root?.split("/").pop() || "Project"}</div>
-              {owners[root] && <div className="shrink-0 truncate text-[12px] text-(--fg-tertiary)">{owners[root]}</div>}
+              <div className="min-w-0 flex-1 truncate text-[0.8125rem]">{p.name || root?.split("/").pop() || "Project"}</div>
+              {owners[root] && <div className="shrink-0 truncate text-[0.75rem] text-(--fg-tertiary)">{owners[root]}</div>}
             </div>
           );
         })}
@@ -97,8 +97,8 @@ export default function EnvironmentsSection() {
           {remote.map((p, i) => (
             <div key={p.id || i} className="flex items-center gap-3 px-4 py-2.5">
               <LucideIcon name="Server" size={15} className="shrink-0 text-(--fg-tertiary)" />
-              <div className="min-w-0 flex-1 truncate text-[13px]">{p.name || p.hostId || "Remote project"}</div>
-              {p.hostId && <div className="shrink-0 truncate text-[12px] text-(--fg-tertiary)">{p.hostId}</div>}
+              <div className="min-w-0 flex-1 truncate text-[0.8125rem]">{p.name || p.hostId || "Remote project"}</div>
+              {p.hostId && <div className="shrink-0 truncate text-[0.75rem] text-(--fg-tertiary)">{p.hostId}</div>}
             </div>
           ))}
         </Card>

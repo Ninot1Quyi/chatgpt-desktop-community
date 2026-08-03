@@ -82,9 +82,16 @@ export function planLabel(planType) {
 }
 
 const threadPlanKey = (threadId) => `thread.plan.${threadId}`;
-const DEFAULT_SIDEBAR_WIDTH = /Windows/i.test(globalThis.navigator?.userAgent || "") ? 240 : 321;
-
 let toastSeq = 0;
+
+function storedSidebarRatio() {
+  const ratio = Number(stored("ui.sidebarRatio", Number.NaN));
+  if (Number.isFinite(ratio)) return ratio;
+  const legacyWidth = Number(stored("ui.sidebarWidth", Number.NaN));
+  if (!Number.isFinite(legacyWidth)) return 0.16;
+  const viewportWidth = Number(globalThis.innerWidth) || 1500;
+  return legacyWidth / viewportWidth;
+}
 
 export const useStore = create((set, get) => ({
   // ---- connection ----
@@ -94,6 +101,7 @@ export const useStore = create((set, get) => ({
   binaryCandidates: [],
   backendError: null,
   appInfo: null,
+  updateStatus: null,
   account: null,
   accountChecked: false,
   requiresOpenaiAuth: false,
@@ -107,10 +115,10 @@ export const useStore = create((set, get) => ({
   // ---- ui ----
   ui: {
     sidebarOpen: stored("ui.sidebarOpen", true),
-    sidebarWidth: stored("ui.sidebarWidth", DEFAULT_SIDEBAR_WIDTH),
+    sidebarRatio: storedSidebarRatio(),
     rightOpen: stored("ui.rightOpen", false),
     rightTab: stored("ui.rightTab", "review"),
-    rightWidth: stored("ui.rightWidth", Math.round((globalThis.innerWidth || 1280) * 0.316)),
+    rightPanelRatio: stored("ui.rightPanelRatio", 0.28),
     rightExpanded: stored("ui.rightExpanded", false),
     terminalLocation: stored("ui.terminalLocation", "bottom"),
     suggestedPrompts: stored("ui.suggestedPrompts", true),
@@ -159,8 +167,15 @@ export const useStore = create((set, get) => ({
           try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
         }
         const uiPatch = {};
-        for (const k of ["sidebarOpen", "sidebarWidth", "rightOpen", "rightTab", "rightWidth", "rightExpanded", "terminalLocation", "suggestedPrompts", "theme", "language"]) {
+        for (const k of ["sidebarOpen", "sidebarRatio", "rightOpen", "rightTab", "rightPanelRatio", "rightExpanded", "terminalLocation", "suggestedPrompts", "theme", "language"]) {
           if (`ui.${k}` in prefs) uiPatch[k] = prefs[`ui.${k}`];
+        }
+        if (
+          !("ui.sidebarRatio" in prefs)
+          && Number.isFinite(Number(prefs["ui.sidebarWidth"]))
+        ) {
+          uiPatch.sidebarRatio = Number(prefs["ui.sidebarWidth"])
+            / (Number(globalThis.innerWidth) || 1500);
         }
         set((s) => ({
           runtime: "composer.runtime" in prefs ? prefs["composer.runtime"] : s.runtime,
@@ -207,12 +222,27 @@ export const useStore = create((set, get) => ({
     api.onServerRequest((req) => get().handleServerRequest(req));
     api.onAgentRuntimeEvent?.((event) => get().handleAgentRuntimeEvent(event));
     api.onThemeUpdated(() => get().applyTheme());
-    // App updates: surface a toast when a new version is ready to install.
-    api.onUpdateStatus?.((s) => {
-      if (s?.status === "downloaded") {
+    // Keep one renderer-side snapshot for every update surface. The main
+    // process already caches the latest status, so late renderer loads hydrate
+    // once and then follow broadcasts without each view making its own request.
+    let receivedLiveUpdateStatus = false;
+    const applyUpdateStatus = (s) => {
+      if (!s) return;
+      const previous = get().updateStatus;
+      set({ updateStatus: s });
+      if (s.status === "downloaded" && previous?.status !== "downloaded") {
         get().toast(`Version ${s.version || ""} downloaded — restart to update (Settings → Updates)`);
       }
+    };
+    api.onUpdateStatus?.((s) => {
+      receivedLiveUpdateStatus = true;
+      applyUpdateStatus(s);
     });
+    api.getUpdateStatus?.()
+      .then((s) => {
+        if (!receivedLiveUpdateStatus) applyUpdateStatus(s);
+      })
+      .catch(() => {});
     // Shared Codex state is read only for project metadata and assignments.
     // Pins are migrated once, then owned by the community client prefs file.
     const applyGlobalState = (value) => {
@@ -283,7 +313,11 @@ export const useStore = create((set, get) => ({
           ? desktopConfig.appearanceDarkChromeTheme
           : desktopConfig.appearanceLightChromeTheme,
       );
-      const account = await get().refreshAccountAndModels(true);
+      // Startup should use the app-server's cached account state. Forcing a
+      // credential refresh here makes the entire renderer wait on the network
+      // before it can leave the account-check screen. Explicit sign-in
+      // completion still requests a forced refresh below.
+      const account = await get().refreshAccountAndModels(false);
       if (account || !get().requiresOpenaiAuth) {
         api.profileRead().then((p) => p && set({ profile: p })).catch(() => {});
         await get().loadThreads();
@@ -2012,7 +2046,7 @@ export const useStore = create((set, get) => ({
     }
     set((s) => {
       const ui = { ...s.ui, ...patch };
-      for (const k of ["sidebarOpen", "sidebarWidth", "rightOpen", "rightTab", "rightWidth", "rightExpanded", "terminalLocation", "suggestedPrompts", "theme", "language"]) {
+      for (const k of ["sidebarOpen", "sidebarRatio", "rightOpen", "rightTab", "rightPanelRatio", "rightExpanded", "terminalLocation", "suggestedPrompts", "theme", "language"]) {
         if (k in patch) persist(`ui.${k}`, ui[k]);
       }
       return { ui };

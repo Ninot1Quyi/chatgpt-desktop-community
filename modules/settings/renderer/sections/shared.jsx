@@ -24,7 +24,7 @@ export function Card({ title, children }) {
   const t = useT();
   return (
     <section className="mb-6">
-      {title && <h2 className="mb-2 px-1 text-[13px] font-medium text-(--fg-secondary)">{t(title)}</h2>}
+      {title && <h2 className="mb-2 px-1 text-[0.8125rem] font-medium text-(--fg-secondary)">{t(title)}</h2>}
       <div className="divide-y divide-(--border-light) rounded-2xl border border-(--border-light) bg-(--surface-under)">
         {children}
       </div>
@@ -37,8 +37,8 @@ export function Row({ title, desc, children }) {
   return (
     <div className="flex items-center justify-between gap-6 px-4 py-3.5">
       <div className="min-w-0">
-        <div className="text-[13px]">{t(title)}</div>
-        {desc && <div className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-(--fg-tertiary)">{t(desc)}</div>}
+        <div className="text-[0.8125rem]">{t(title)}</div>
+        {desc && <div className="mt-0.5 line-clamp-2 text-[0.75rem] leading-5 text-(--fg-tertiary)">{t(desc)}</div>}
       </div>
       {children && <div className="shrink-0">{children}</div>}
     </div>
@@ -77,7 +77,7 @@ export function Dropdown({ value, options, onChange, disabled }) {
       <button
         ref={btnRef}
         className={cx(
-          "flex h-7 items-center gap-1.5 rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[12px] text-(--fg-secondary)",
+          "flex h-7 items-center gap-1.5 rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[0.75rem] text-(--fg-secondary)",
           disabled ? "cursor-default opacity-50" : "hover:bg-(--surface-hover)"
         )}
         onClick={() => !disabled && setOpen(!open)}
@@ -110,7 +110,7 @@ export function Segmented({ value, options, onChange }) {
         <button
           key={id}
           className={cx(
-            "rounded-md px-2.5 py-1 text-[12px]",
+            "rounded-md px-2.5 py-1 text-[0.75rem]",
             value === id ? "bg-(--surface-active) font-medium" : "text-(--fg-secondary) hover:text-(--fg)"
           )}
           onClick={() => onChange(id)}
@@ -128,7 +128,7 @@ export function Btn({ children, onClick, danger, disabled }) {
   return (
     <button
       className={cx(
-        "rounded-lg border px-3 py-1.5 text-[13px]",
+        "rounded-lg border px-3 py-1.5 text-[0.8125rem]",
         danger
           ? "border-(--danger) text-(--danger) hover:bg-(--danger-soft)"
           : "border-(--border) hover:bg-(--surface-hover)",

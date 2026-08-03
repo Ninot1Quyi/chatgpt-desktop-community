@@ -47,8 +47,8 @@ function HookGroup({ label, count, hooks, open, onToggle }) {
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-(--surface-hover)"
         onClick={onToggle}
       >
-        <span className="min-w-0 truncate text-[13px]">{label}</span>
-        <span className="flex shrink-0 items-center gap-1.5 text-[12px] text-(--fg-tertiary)">
+        <span className="min-w-0 truncate text-[0.8125rem]">{label}</span>
+        <span className="flex shrink-0 items-center gap-1.5 text-[0.75rem] text-(--fg-tertiary)">
           {count} hook{count === 1 ? "" : "s"}
           {open ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
         </span>
@@ -57,8 +57,8 @@ function HookGroup({ label, count, hooks, open, onToggle }) {
         <div className="border-t border-(--border-light) bg-(--surface) px-4 py-2">
           {hooks.map((h) => (
             <div key={h.key} className="flex items-baseline justify-between gap-3 py-1">
-              <span className="font-mono text-[12px] text-(--fg-secondary)">{h.eventName}</span>
-              <span className="truncate font-mono text-[11px] text-(--fg-faint)" title={h.command}>
+              <span className="font-mono text-[0.75rem] text-(--fg-secondary)">{h.eventName}</span>
+              <span className="truncate font-mono text-[0.6875rem] text-(--fg-faint)" title={h.command}>
                 {h.command?.replace(/^"|"$/g, "")}
               </span>
             </div>
@@ -88,7 +88,7 @@ export default function HooksSection() {
     };
   }, [gs]);
 
-  if (error) return <div className="text-[13px] text-(--fg-tertiary)">Hooks are not available: {error}</div>;
+  if (error) return <div className="text-[0.8125rem] text-(--fg-tertiary)">Hooks are not available: {error}</div>;
   if (!groups)
     return (
       <div className="flex justify-center py-6 text-(--fg-tertiary)">
@@ -100,7 +100,7 @@ export default function HooksSection() {
   let idx = 0;
   return (
     <>
-      <div className="-mt-3 mb-4 text-[13px] text-(--fg-tertiary)">
+      <div className="-mt-3 mb-4 text-[0.8125rem] text-(--fg-tertiary)">
         Manage lifecycle hooks from config and enabled plugins.{" "}
         <button className="text-(--accent) hover:underline" onClick={() => api.openExternal("https://developers.openai.com/codex/hooks")}>
           Learn more
@@ -126,7 +126,7 @@ export default function HooksSection() {
         </Card>
       )}
       {groups.user.length === 0 && groups.plugins.length === 0 && groups.projects.length === 0 && (
-        <div className="px-1 text-[13px] text-(--fg-tertiary)">No hooks configured.</div>
+        <div className="px-1 text-[0.8125rem] text-(--fg-tertiary)">No hooks configured.</div>
       )}
     </>
   );

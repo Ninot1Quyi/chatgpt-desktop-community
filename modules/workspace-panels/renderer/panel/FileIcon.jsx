@@ -3,6 +3,7 @@
 // reference palette (currentColor). Drop-in replaceable: overwrite any SVG
 // in ../../assets/file-icons/ and the loader picks it up automatically.
 import React from "react";
+import { rem } from "@app/lib/cssUnits.js";
 import { iconColorFor, iconTokenFor } from "./fileIconMap.js";
 
 // Bundled icon set (Vite raw-imports every svg in the renderer asset dir).
@@ -23,10 +24,17 @@ export function FileIcon({ name, size = 14, theme = "dark", style, className }) 
   return (
     <span
       className={className}
-      style={{ color, width: size, height: size, display: "inline-flex", flexShrink: 0, ...style }}
+      style={{
+        color,
+        width: rem(size),
+        height: rem(size),
+        display: "inline-flex",
+        flexShrink: 0,
+        ...style,
+      }}
       dangerouslySetInnerHTML={{
         __html: svg
-          .replace("<svg", `<svg width="${size}" height="${size}"`)
+          .replace("<svg", '<svg width="100%" height="100%"')
           .replace(/>\s+</g, "><"),
       }}
     />

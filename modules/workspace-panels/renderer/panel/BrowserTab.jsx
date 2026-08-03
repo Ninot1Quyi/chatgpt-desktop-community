@@ -2,6 +2,7 @@
 // annotate mode (numbered pins + notes → screenshot into the composer).
 import React, { useEffect, useRef, useState } from "react";
 import { cx } from "@app/lib/cx.js";
+import { cssPixelsToRem } from "@app/lib/cssUnits.js";
 import { openExternal, captureWebview, saveTempFile } from "@app/api.js";
 import { useStore } from "@app/store.js";
 import { Menu } from "@app/components/ui.jsx";
@@ -26,7 +27,7 @@ export default function BrowserTab() {
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState("");
   const [annotate, setAnnotate] = useState(false);
-  const [pins, setPins] = useState([]); // {x, y, note} in CSS px of the view area
+  const [pins, setPins] = useState([]); // {x, y, note} in view-area CSS coordinates
   const [draftPin, setDraftPin] = useState(null); // {x, y, note} being edited
   const [busy, setBusy] = useState(false);
   const [zoom, setZoom] = useState(100);
@@ -148,8 +149,8 @@ export default function BrowserTab() {
   return (
     <div className="flex h-full flex-col">
       {/* address bar */}
-      <div className="flex h-[39px] shrink-0 items-center border-b border-(--border-light) px-2">
-        <div className="flex items-center gap-px">
+      <div className="flex h-[2.4375rem] shrink-0 items-center border-b border-(--border-light) px-2">
+        <div className="flex items-center gap-[0.0625rem]">
         <NavBtn title="Back" disabled={!canBack} onClick={() => wvRef.current?.goBack()}>
           <IconChevronLeft size={14} />
         </NavBtn>
@@ -160,10 +161,10 @@ export default function BrowserTab() {
           {loading ? <IconX size={13} /> : <IconRefresh size={13} />}
         </NavBtn>
         </div>
-        <div className="ml-2 flex h-7 min-w-0 flex-1 items-center overflow-hidden rounded-[10px] ring-1 ring-inset ring-(--border)">
+        <div className="ml-2 flex h-7 min-w-0 flex-1 items-center overflow-hidden rounded-[0.625rem] ring-1 ring-inset ring-(--border)">
           <input
             id="browser-address-input"
-            className="h-7 min-w-0 flex-1 bg-transparent px-2 text-[13px] outline-none placeholder:text-(--fg-tertiary)"
+            className="h-7 min-w-0 flex-1 bg-transparent px-2 text-[0.8125rem] outline-none placeholder:text-(--fg-tertiary)"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") navigate(input); }}
@@ -225,8 +226,8 @@ export default function BrowserTab() {
           <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
             <IconGlobe size={28} className="text-(--fg-tertiary)" />
             <div>
-              <div className="mx-auto w-fit text-[16px] leading-6 font-medium">Start browsing</div>
-              <div className="mt-2 text-[13px] leading-[18.57px] font-[445] text-(--fg-tertiary)">Enter a URL to open a page</div>
+              <div className="mx-auto w-fit text-[1rem] leading-6 font-medium">Start browsing</div>
+              <div className="mt-2 text-[0.8125rem] leading-[1.160625rem] font-[445] text-(--fg-tertiary)">Enter a URL to open a page</div>
             </div>
           </div>
         ) : (
@@ -246,7 +247,11 @@ export default function BrowserTab() {
                 {draftPin && (
                   <div
                     className="absolute z-20 w-56 rounded-xl border border-(--border) bg-(--surface-raised) p-2"
-                    style={{ left: Math.min(draftPin.x + 10, 200), top: draftPin.y + 10, boxShadow: "var(--shadow-menu)" }}
+                    style={{
+                      left: cssPixelsToRem(Math.min(draftPin.x + 10, 200)),
+                      top: cssPixelsToRem(draftPin.y + 10),
+                      boxShadow: "var(--shadow-menu)",
+                    }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="mb-1 text-xs font-medium text-(--fg-secondary)">Note {pins.length + 1}</div>
@@ -281,12 +286,15 @@ export default function BrowserTab() {
 
 function Pin({ n, x, y, onRemove }) {
   return (
-    <div className="group absolute" style={{ left: x - 11, top: y - 11 }}>
-      <div className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-(--accent) text-[11px] font-semibold text-white" style={{ boxShadow: "0 1px 4px rgb(0 0 0 / 0.4)" }}>
+    <div
+      className="group absolute"
+      style={{ left: cssPixelsToRem(x - 11), top: cssPixelsToRem(y - 11) }}
+    >
+      <div className="flex h-[1.375rem] w-[1.375rem] items-center justify-center rounded-full bg-(--accent) text-[0.6875rem] font-semibold text-white" style={{ boxShadow: "0 0.0625rem 0.25rem rgb(0 0 0 / 0.4)" }}>
         {n}
       </div>
       <button
-        className="absolute -top-1.5 -right-1.5 hidden h-3.5 w-3.5 items-center justify-center rounded-full bg-(--danger) text-[9px] text-white group-hover:flex"
+        className="absolute -top-1.5 -right-1.5 hidden h-3.5 w-3.5 items-center justify-center rounded-full bg-(--danger) text-[0.5625rem] text-white group-hover:flex"
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
       >
         ×
@@ -316,7 +324,7 @@ async function compositePins(dataUrl, pins, wv) {
     ctx.fillStyle = "#339cff";
     ctx.fill();
     ctx.fillStyle = "#fff";
-    ctx.font = `600 ${Math.round(13 * scaleX)}px -apple-system, sans-serif`;
+    ctx.font = `600 ${cssPixelsToRem(Math.round(13 * scaleX))} -apple-system, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(String(i + 1), cx, cy + 1);

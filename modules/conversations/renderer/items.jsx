@@ -2,6 +2,7 @@
 // widget and the inline approval cards shown above the composer.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "@app/lib/cx.js";
+import { rem } from "@app/lib/cssUnits.js";
 import * as api from "@app/api.js";
 import { localFileUrl, showItemInFolder } from "@app/api.js";
 import { countDiff, diffFileName, parseUnifiedDiff } from "@app/lib/diff.js";
@@ -71,7 +72,7 @@ function ContextCompaction({ item, streaming }) {
     || (streaming && item.status !== "completed" && item.status !== "failed");
   if (!pending) return <Divider label="Context compacted" />;
   return (
-    <div className="flex items-center gap-2 text-[12px] text-(--fg-tertiary)">
+    <div className="flex items-center gap-2 text-[0.75rem] text-(--fg-tertiary)">
       <Spinner size={12} />
       <span>Compacting context…</span>
     </div>
@@ -147,7 +148,7 @@ function UserMessage({ item }) {
           autoFocus
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          className="w-full max-w-[77%] resize-none rounded-[20px] border border-(--border) bg-(--bubble-user) px-3.5 py-2.5 text-[14px] leading-6 outline-none focus:border-(--border-heavy)"
+          className="w-full max-w-[77%] resize-none rounded-[1.25rem] border border-(--border) bg-(--bubble-user) px-3.5 py-2.5 text-[0.875rem] leading-6 outline-none focus:border-(--border-heavy)"
           rows={Math.min(12, Math.max(2, draft.split("\n").length))}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); resend(); } }}
         />
@@ -182,13 +183,13 @@ function UserMessage({ item }) {
                 <button
                   key={i}
                   type="button"
-                  className="flex size-20 items-center justify-center rounded-[12.5px] border border-(--border-heavy) outline-none hover:border-(--border-heavy) focus-visible:ring-2 focus-visible:ring-(--accent)"
+                  className="flex size-20 items-center justify-center rounded-[0.78125rem] border border-(--border-heavy) outline-none hover:border-(--border-heavy) focus-visible:ring-2 focus-visible:ring-(--accent)"
                   aria-label={`Open ${alt}`}
                   onClick={() => setViewerImage({ src, alt })}
                 >
                   <img
                     src={src}
-                    className="h-full w-full rounded-[10px] object-cover"
+                    className="h-full w-full rounded-[0.625rem] object-cover"
                     alt=""
                   />
                 </button>
@@ -198,7 +199,7 @@ function UserMessage({ item }) {
         </div>
       )}
       {(full || mentions.length > 0) && <div className="flex w-full flex-col items-end justify-end gap-1">
-        <div className="max-w-[77%] rounded-[20px] bg-(--bubble-user) px-3 py-2">
+        <div className="max-w-[77%] rounded-[1.25rem] bg-(--bubble-user) px-3 py-2">
           {mentions.length === 1 ? (
             <span className="mr-1 inline-block rounded-md bg-(--accent-soft) px-1.5 py-0.5 text-xs text-(--accent)">
               @{mentions[0].name}
@@ -206,9 +207,9 @@ function UserMessage({ item }) {
           ) : mentions.length > 1 ? (
             <MentionSummary mentions={mentions} />
           ) : null}
-          {full && <div className="text-[14px] leading-[22px] whitespace-pre-wrap break-words">{full}</div>}
+          {full && <div className="text-[0.875rem] leading-[1.375rem] whitespace-pre-wrap break-words">{full}</div>}
         </div>
-        <div className="flex h-[26px] items-center gap-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100">
+        <div className="flex h-[1.625rem] items-center gap-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100">
           <HoverAction title="Copy" onClick={copy} icon={copied ? <IconCheck size={13} /> : <IconCopy size={13} />} />
           {!readOnly && (
             <HoverAction title="Edit" onClick={() => { setDraft(full); setEditing(true); }} icon={<IconPencil size={13} />} />
@@ -225,8 +226,8 @@ function HookPrompt({ item }) {
   if (!text) return null;
   return (
     <div className="flex w-full flex-col items-end justify-end gap-1">
-      <div className="max-w-[77%] rounded-[20px] bg-(--bubble-user) px-3 py-2">
-        <div className="text-[14px] leading-[22px] whitespace-pre-wrap break-words">{text}</div>
+      <div className="max-w-[77%] rounded-[1.25rem] bg-(--bubble-user) px-3 py-2">
+        <div className="text-[0.875rem] leading-[1.375rem] whitespace-pre-wrap break-words">{text}</div>
       </div>
       <div className="text-xs leading-5 text-(--fg-tertiary)">Hook feedback</div>
     </div>
@@ -259,7 +260,7 @@ function HoverAction({ icon, title, onClick }) {
 // ---------------------------------------------------------------------------
 function AgentMessage({ item, streaming, showThinking }) {
   if (!item.text) {
-    return streaming && showThinking ? <span className="shimmer-text text-[14px]">Thinking</span> : null;
+    return streaming && showThinking ? <span className="shimmer-text text-[0.875rem]">Thinking</span> : null;
   }
   return (
     <div className="min-w-0">
@@ -283,7 +284,7 @@ function MentionSummary({ mentions }) {
       {open && (
         <span className="mt-1 flex flex-col gap-0.5">
           {mentions.map((c, i) => (
-            <span key={i} className="block truncate font-mono text-[11px] text-(--fg-tertiary)" title={c.path}>
+            <span key={i} className="block truncate font-mono text-[0.6875rem] text-(--fg-tertiary)" title={c.path}>
               @{c.name}
             </span>
           ))}
@@ -406,7 +407,7 @@ function ActionIcon({ icon, title, onClick, disabled }) {
       onClick={onClick}
       disabled={disabled}
       className={cx(
-        "flex h-[26px] w-[26px] items-center justify-center rounded-md text-(--fg-tertiary)",
+        "flex h-[1.625rem] w-[1.625rem] items-center justify-center rounded-md text-(--fg-tertiary)",
         disabled ? "opacity-40" : "hover:bg-(--surface-hover) hover:text-(--fg)"
       )}
     >
@@ -427,7 +428,7 @@ function Reasoning({ item, streaming }) {
       <button
         type="button"
         aria-expanded={open}
-        className="inline-flex items-center gap-1 rounded-md border border-transparent text-left text-[14px] leading-[21px] font-[445] text-(--conversation-body) hover:bg-(--surface-hover) hover:text-(--fg)"
+        className="inline-flex items-center gap-1 rounded-md border border-transparent text-left text-[0.875rem] leading-[1.3125rem] font-[445] text-(--conversation-body) hover:bg-(--surface-hover) hover:text-(--fg)"
         onClick={() => setOpen(!open)}
       >
         {streaming ? (
@@ -443,7 +444,7 @@ function Reasoning({ item, streaming }) {
         )}
       </button>
       {open && text && (
-        <div className="mt-1.5 border-l border-(--border) pl-3 text-[14px] leading-[21px] font-[445] whitespace-pre-wrap text-(--conversation-body)">
+        <div className="mt-1.5 border-l border-(--border) pl-3 text-[0.875rem] leading-[1.3125rem] font-[445] whitespace-pre-wrap text-(--conversation-body)">
           {text}
         </div>
       )}
@@ -457,7 +458,7 @@ function Reasoning({ item, streaming }) {
 function PlanText({ item }) {
   if (!item.text) return null;
   return (
-    <div className="rounded-[12.5px] border border-(--border-light) bg-(--surface-under) px-3.5 py-2.5">
+    <div className="rounded-[0.78125rem] border border-(--border-light) bg-(--surface-under) px-3.5 py-2.5">
       <div className="mb-1 text-xs text-(--fg-tertiary)">Plan</div>
       <Markdown>{item.text}</Markdown>
     </div>
@@ -479,7 +480,7 @@ function CommandCard({ item, streaming }) {
         type="button"
         aria-expanded={open}
         data-activity-icon={activity.kind}
-        className="group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[14px] leading-[21px] font-[445] text-(--conversation-body) hover:text-(--fg)"
+        className="group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[0.875rem] leading-[1.3125rem] font-[445] text-(--conversation-body) hover:text-(--fg)"
         onClick={() => setOpen(!open)}
       >
         <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
@@ -492,11 +493,11 @@ function CommandCard({ item, streaming }) {
               : <IconRunCommand size={16} className="activity-run-command shrink-0" />}
           <span className="min-w-0 truncate">{activity.label}</span>
           {running ? <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />
-            : failed && <span className="shrink-0 text-[11px] text-(--danger)">
+            : failed && <span className="shrink-0 text-[0.6875rem] text-(--danger)">
               {item.status === "declined" ? "declined" : `exit ${item.exitCode ?? "!"}`}
             </span>}
           {item.durationMs != null && (
-            <span className="shrink-0 text-[11px] text-(--fg-faint)">{formatDuration(item.durationMs)}</span>
+            <span className="shrink-0 text-[0.6875rem] text-(--fg-faint)">{formatDuration(item.durationMs)}</span>
           )}
         </span>
         <IconGoalChevron
@@ -530,7 +531,7 @@ const FILE_ROWS_COLLAPSED = 3;
 
 function EditedFilesIcon({ size = 24, className }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden="true">
+    <svg width={rem(size)} height={rem(size)} viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden="true">
       <path d="M12.084 12.668a.666.666 0 0 1 0 1.33H7.917a.665.665 0 1 1 0-1.33h4.167ZM10 5.585c.367 0 .665.298.665.665v1.418h1.419a.666.666 0 0 1 0 1.33h-1.419v1.419a.666.666 0 0 1-1.33 0V8.998H7.917a.665.665 0 0 1 0-1.33h1.418V6.25c0-.367.298-.665.665-.665Z" />
       <path fillRule="evenodd" d="M12.667 2.668c.689 0 1.246 0 1.696.036.458.038.865.117 1.242.309a3.163 3.163 0 0 1 1.382 1.383c.192.377.272.783.309 1.24.037.45.036 1.008.036 1.697v5.333c0 .689 0 1.246-.036 1.696-.037.458-.117.865-.309 1.242a3.166 3.166 0 0 1-1.382 1.382c-.377.192-.784.271-1.242.309-.45.037-1.007.036-1.696.036H7.334c-.689 0-1.246 0-1.696-.036-.458-.038-.864-.117-1.24-.309a3.166 3.166 0 0 1-1.384-1.383c-.192-.376-.271-.783-.309-1.24-.037-.45-.036-1.008-.036-1.697V7.333c0-.689 0-1.246.036-1.696.038-.458.117-.864.309-1.24a3.17 3.17 0 0 1 1.383-1.384c.377-.192.783-.272 1.24-.309.45-.037 1.008-.036 1.697-.036h5.333Zm-5.333 1.33c-.71 0-1.204.001-1.588.032-.375.03-.587.088-.745.168A1.836 1.836 0 0 0 4.199 5c-.08.158-.137.37-.168.745C4 6.13 4 6.622 4 7.333v5.333c0 .71.001 1.204.032 1.588.03.375.088.587.168.745.176.345.457.627.802.803.158.08.37.137.745.168.384.031.877.031 1.588.031h5.333c.71 0 1.204 0 1.588-.031.375-.031.587-.088.745-.168a1.84 1.84 0 0 0 .803-.803c.08-.158.137-.37.168-.745.031-.383.031-.877.031-1.588V7.333c0-.71 0-1.204-.031-1.588-.031-.375-.088-.587-.168-.745A1.838 1.838 0 0 0 15 4.198c-.158-.08-.37-.137-.745-.168-.384-.031-.877-.032-1.588-.032H7.334Z" clipRule="evenodd" />
     </svg>
@@ -602,19 +603,19 @@ function DocumentCard({ change }) {
   const ext = (name.split(".").pop() || "").toUpperCase();
   const openIn = () => openFileInPanel(change.path);
   return (
-    <div className="flex items-center gap-3 rounded-[12.5px] border border-(--border-light) bg-(--surface-under) py-2.5 pr-2 pl-3">
+    <div className="flex items-center gap-3 rounded-[0.78125rem] border border-(--border-light) bg-(--surface-under) py-2.5 pr-2 pl-3">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-(--surface-active) text-(--fg-secondary)">
         <IconFile size={16} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] text-(--fg)" title={change.path}>{name}</span>
+        <span className="block truncate text-[0.8125rem] text-(--fg)" title={change.path}>{name}</span>
         <span className="block text-xs text-(--fg-tertiary)">Document · {ext}</span>
       </span>
       <div className="flex h-7 shrink-0 items-stretch overflow-hidden rounded-full border border-(--border)">
         <button className="flex items-center gap-1 px-2.5 text-xs text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)" onClick={openIn}>
           Open in
         </button>
-        <div className="w-px bg-(--border-light)" />
+        <div className="w-[0.0625rem] bg-(--border-light)" />
         <button ref={btnRef} className="px-1.5 text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)" onClick={() => setMenuOpen(true)} title="Open options">
           <IconChevronDown size={11} />
         </button>
@@ -682,18 +683,18 @@ function EditedGroupCard({ item, changes, turnDiff = false }) {
   if (changes.length === 1 && !turnDiff) {
     const change = changes[0];
     return (
-      <div className="group/edit flex min-w-0 items-center gap-1.5 text-[14px] leading-[21px] [color:color-mix(in_srgb,var(--fg)_60%,transparent)]">
+      <div className="group/edit flex min-w-0 items-center gap-1.5 text-[0.875rem] leading-[1.3125rem] [color:color-mix(in_srgb,var(--fg)_60%,transparent)]">
         <IconEditFiles size={16} className="shrink-0" />
         <span className="min-w-0 truncate">
           {running ? "Editing" : "Edited"}{" "}
           <button
-            className="underline decoration-dotted decoration-[0.5px] underline-offset-2 hover:text-(--fg)"
+            className="underline decoration-dotted decoration-[0.03125rem] underline-offset-2 hover:text-(--fg)"
             onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
           >
             {basename(change.path)}
           </button>
         </span>
-        <span className="flex shrink-0 gap-1 text-[13px] leading-[19.5px]">
+        <span className="flex shrink-0 gap-1 text-[0.8125rem] leading-[1.21875rem]">
           <span className="group-hover/edit:text-(--diff-add-fg)">+{totals.add}</span>
           <span className="group-hover/edit:text-(--diff-del-fg)">-{totals.del}</span>
         </span>
@@ -704,11 +705,11 @@ function EditedGroupCard({ item, changes, turnDiff = false }) {
 
   return (
     <div className={cx(
-      "overflow-hidden rounded-[12.5px] bg-[rgb(255_255_255/0.5)] dark:bg-[rgb(38_38_38/0.5)]",
+      "overflow-hidden rounded-[0.78125rem] bg-[rgb(255_255_255/0.5)] dark:bg-[rgb(38_38_38/0.5)]",
       turnDiff && "mb-2",
     )}>
       {/* header */}
-      <div className="group/turn-diff-header relative flex min-h-[64.5px] items-center gap-2.5 px-3 py-3 text-[14px] leading-[21px]">
+      <div className="group/turn-diff-header relative flex min-h-[4.03125rem] items-center gap-2.5 px-3 py-3 text-[0.875rem] leading-[1.3125rem]">
         {turnDiff && (
           <button
             aria-label="Review changed files"
@@ -720,13 +721,13 @@ function EditedGroupCard({ item, changes, turnDiff = false }) {
           <EditedFilesIcon size={24} />
         </span>
         <div className="relative z-10 min-w-0 flex-1">
-          <div className="truncate text-[14px] leading-[21px] font-medium">{title}</div>
-          <div className="turn-diff-default-subtitle flex gap-1 text-[13px] leading-[19.5px] group-hover/turn-diff-header:hidden">
+          <div className="truncate text-[0.875rem] leading-[1.3125rem] font-medium">{title}</div>
+          <div className="turn-diff-default-subtitle flex gap-1 text-[0.8125rem] leading-[1.21875rem] group-hover/turn-diff-header:hidden">
             <span className="text-(--diff-add-fg)">+{totals.add}</span>{" "}
             <span className="text-(--diff-del-fg)">-{totals.del}</span>
           </div>
           {turnDiff && (
-            <div className="hidden items-center gap-1 text-[13px] leading-[19.5px] text-(--fg-secondary) group-hover/turn-diff-header:flex">
+            <div className="hidden items-center gap-1 text-[0.8125rem] leading-[1.21875rem] text-(--fg-secondary) group-hover/turn-diff-header:flex">
               Review changes <IconChevronRight size={11} />
             </div>
           )}
@@ -735,13 +736,13 @@ function EditedGroupCard({ item, changes, turnDiff = false }) {
           <div className="relative z-10 flex shrink-0 items-center gap-2">
             <button
               ref={undoBtnRef}
-              className="app-no-drag flex h-7 items-center gap-1 rounded-[12.5px] px-[9px] text-[14px] leading-[18px] font-[445] text-(--fg) hover:bg-(--surface-hover)"
+              className="app-no-drag flex h-7 items-center gap-1 rounded-[0.78125rem] px-[0.5625rem] text-[0.875rem] leading-[1.125rem] font-[445] text-(--fg) hover:bg-(--surface-hover)"
               onClick={() => setUndoOpen(true)}
             >
               Undo <IconUndo size={14} />
             </button>
             <button
-              className="app-no-drag flex h-7 items-center rounded-[12.5px] border border-(--border) bg-black/[0.03] px-2 text-[14px] leading-[18px] font-[445] text-(--fg) hover:bg-black/[0.08] dark:bg-white/[0.03] dark:hover:bg-white/[0.08]"
+              className="app-no-drag flex h-7 items-center rounded-[0.78125rem] border border-(--border) bg-black/[0.03] px-2 text-[0.875rem] leading-[1.125rem] font-[445] text-(--fg) hover:bg-black/[0.08] dark:bg-white/[0.03] dark:hover:bg-white/[0.08]"
               onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
             >
               Review
@@ -762,13 +763,13 @@ function EditedGroupCard({ item, changes, turnDiff = false }) {
             return (
               <button
                 key={i}
-                className="flex h-9 w-full items-center gap-2 bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 text-left text-[14px] leading-[21px] hover:bg-(--surface-hover)"
+                className="flex h-9 w-full items-center gap-2 bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] px-3 py-1 text-left text-[0.875rem] leading-[1.3125rem] hover:bg-(--surface-hover)"
                 title={c.path}
                 onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
               >
                 <span className="min-w-0 flex-1 truncate">
-                  <span className="inline-flex h-[21px] items-center text-(--fg-secondary)">{dir}</span>
-                  <span className="inline-flex h-[21px] items-center">{name}</span>
+                  <span className="inline-flex h-[1.3125rem] items-center text-(--fg-secondary)">{dir}</span>
+                  <span className="inline-flex h-[1.3125rem] items-center">{name}</span>
                 </span>
                 <span className="flex shrink-0 gap-1">
                   <span className="text-(--diff-add-fg)">+{add}</span>
@@ -779,7 +780,7 @@ function EditedGroupCard({ item, changes, turnDiff = false }) {
           })}
           {changes.length > FILE_ROWS_COLLAPSED && (
             <button
-              className="flex h-9 w-full items-center gap-1 px-3 py-1 text-[14px] leading-[21px] hover:bg-(--surface-hover)"
+              className="flex h-9 w-full items-center gap-1 px-3 py-1 text-[0.875rem] leading-[1.3125rem] hover:bg-(--surface-hover)"
               onClick={() => setShowAll(!showAll)}
             >
               {showAll ? "Show less" : `Show ${changes.length - FILE_ROWS_COLLAPSED} more file${changes.length - FILE_ROWS_COLLAPSED === 1 ? "" : "s"}`}
@@ -800,13 +801,13 @@ function EditedGroupCard({ item, changes, turnDiff = false }) {
         ]}
       />
       <Dialog open={confirmRevert} title="Revert file changes?" onClose={() => setConfirmRevert(false)}>
-        <div className="text-[13px] text-(--fg-secondary)">
+        <div className="text-[0.8125rem] text-(--fg-secondary)">
           This discards the changes made to {changes.length} file{changes.length === 1 ? "" : "s"} in this turn
           (new files are deleted, modified files are restored from git). This cannot be undone.
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <button className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={() => setConfirmRevert(false)}>Cancel</button>
-          <button className="rounded-lg bg-(--danger) px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90" onClick={doRevert}>Revert</button>
+          <button className="rounded-lg px-3 py-1.5 text-[0.8125rem] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={() => setConfirmRevert(false)}>Cancel</button>
+          <button className="rounded-lg bg-(--danger) px-3 py-1.5 text-[0.8125rem] font-medium text-white hover:opacity-90" onClick={doRevert}>Revert</button>
         </div>
       </Dialog>
     </div>
@@ -821,7 +822,7 @@ function KindBadge({ kind }) {
     update: ["M", "text-(--warning)"],
   };
   const [label, cls] = map[t] || map.update;
-  return <span className={cx("w-4 shrink-0 text-center font-mono text-[11px] font-semibold", cls)}>{label}</span>;
+  return <span className={cx("w-4 shrink-0 text-center font-mono text-[0.6875rem] font-semibold", cls)}>{label}</span>;
 }
 
 // "Used Kdev Pipeline integration" style labels for MCP tool calls.
@@ -861,19 +862,19 @@ function ToolCallRow({ item }) {
         type="button"
         aria-expanded={open}
         data-activity-icon={nodeRepl ? "run-command" : "tool"}
-        className="group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[14px] leading-[21px] font-[445] text-(--conversation-body) hover:text-(--fg)"
+        className="group/activity-header inline-flex min-w-0 max-w-full cursor-pointer self-start items-center gap-1 text-left text-[0.875rem] leading-[1.3125rem] font-[445] text-(--conversation-body) hover:text-(--fg)"
         onClick={() => setOpen(!open)}
       >
         <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
           {nodeRepl
             ? <IconRunCommand size={16} className="activity-run-command shrink-0" />
             : sourceLogo && !logoFailed
-              ? <img src={sourceLogo} alt="" className="size-4 shrink-0 rounded-[2px] object-contain" onError={() => setLogoFailed(true)} />
+              ? <img src={sourceLogo} alt="" className="size-4 shrink-0 rounded-[0.125rem] object-contain" onError={() => setLogoFailed(true)} />
               : <IconMcpSource size={16} className="activity-mcp-source shrink-0" />}
           <span className="min-w-0 truncate">{name}</span>
           {running ? <Spinner size={12} className="shrink-0 text-(--fg-tertiary)" />
-            : failed ? <span className="shrink-0 text-[11px] text-(--danger)">failed</span>
-            : item.durationMs != null && <span className="shrink-0 text-[11px] text-(--fg-faint)">{formatDuration(item.durationMs)}</span>}
+            : failed ? <span className="shrink-0 text-[0.6875rem] text-(--danger)">failed</span>
+            : item.durationMs != null && <span className="shrink-0 text-[0.6875rem] text-(--fg-faint)">{formatDuration(item.durationMs)}</span>}
         </span>
         <IconGoalChevron
           size={14}
@@ -884,8 +885,8 @@ function ToolCallRow({ item }) {
         />
       </button>
       <ActivityDisclosure open={open}>
-        <div className="ml-[34px] min-w-0 py-1">
-          {item.namespace && <div className="mb-1 text-[11px] text-(--fg-faint)">Namespace: {item.namespace}</div>}
+        <div className="ml-[2.125rem] min-w-0 py-1">
+          {item.namespace && <div className="mb-1 text-[0.6875rem] text-(--fg-faint)">Namespace: {item.namespace}</div>}
           {item.progressMessage && <div className="mb-1 text-xs text-(--fg-tertiary)">{item.progressMessage}</div>}
           {detail && detail !== "{}" && (
             <pre className="max-h-48 overflow-auto font-mono text-xs whitespace-pre-wrap break-all text-(--fg-secondary)">{detail}</pre>
@@ -919,7 +920,7 @@ function toolOutputDetail(item) {
 // ---------------------------------------------------------------------------
 function WebSearchRow({ item }) {
   return (
-    <div className="flex items-center gap-2 text-[13px] text-(--fg-tertiary)">
+    <div className="flex items-center gap-2 text-[0.8125rem] text-(--fg-tertiary)">
       <IconWebSearch size={16} className="activity-web-search shrink-0" />
       <span className="truncate">Searched the web for <span className="text-(--fg-secondary)">{item.query}</span></span>
     </div>
@@ -972,7 +973,7 @@ function ImageGeneration({ item }) {
           </button>
         </div>
       ) : running ? (
-        <span className="shimmer-text text-[14px]">Generating image</span>
+        <span className="shimmer-text text-[0.875rem]">Generating image</span>
       ) : (
         <Subtle icon={<IconImage size={13} />} text="Image generated" />
       )}
@@ -1091,7 +1092,7 @@ function CollabRow({ item }) {
   const label = labels[item.tool] || (item.status === "inProgress" ? "Working with agents" : "Worked with agents");
   const done = item.status !== "inProgress";
   return (
-    <div className="flex items-center gap-1.5 text-[13px] text-(--fg-secondary)">
+    <div className="flex items-center gap-1.5 text-[0.8125rem] text-(--fg-secondary)">
       <IconSparkle size={13} className={cx("shrink-0", done ? "text-(--fg-tertiary)" : "text-(--accent)")} />
       <span className="truncate">{label}</span>
       {item.status === "inProgress" && <Spinner size={11} className="shrink-0 text-(--fg-tertiary)" />}
@@ -1109,7 +1110,7 @@ function SubAgentActivityRow({ item }) {
     const status = { started: "started working", interacted: "updated", interrupted: "finished" }[item.kind] || "updated";
     const name = base.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).replace(/(\d{4})\d+/, "$1…");
     return (
-      <div className="flex items-center gap-1.5 text-[13px] text-(--fg-secondary)">
+      <div className="flex items-center gap-1.5 text-[0.8125rem] text-(--fg-secondary)">
         <IconSparkle size={13} className="shrink-0 text-(--warning)" />
         <span className="min-w-0 truncate">
           <span className="text-(--fg)">{name}</span>{" "}
@@ -1124,7 +1125,7 @@ function SubAgentActivityRow({ item }) {
     interrupted: "Closed an agent",
   };
   return (
-    <div className="flex items-center gap-1.5 text-[13px] text-(--fg-secondary)">
+    <div className="flex items-center gap-1.5 text-[0.8125rem] text-(--fg-secondary)">
       <IconSparkle size={13} className="shrink-0 text-(--fg-tertiary)" />
       <span className="truncate">{labels[item.kind] || "Agent activity"}</span>
     </div>
@@ -1142,7 +1143,7 @@ function Subtle({ icon, text }) {
 
 function Divider({ label }) {
   return (
-    <div className="inline-flex h-[21px] min-w-0 max-w-full self-start items-center gap-1.5 text-[14px] leading-[21px] text-(--conversation-body)">
+    <div className="inline-flex h-[1.3125rem] min-w-0 max-w-full self-start items-center gap-1.5 text-[0.875rem] leading-[1.3125rem] text-(--conversation-body)">
       <IconContextCompaction size={16} className="activity-context-compaction shrink-0" />
       <span className="min-w-0 truncate">{label}</span>
     </div>
@@ -1166,7 +1167,7 @@ export function PlanWidget({ plan }) {
   const deleted = diffFiles.reduce((sum, file) => sum + file.deleted, 0);
   return (
     <div
-      className="relative z-20 flex h-[38px] w-full justify-center self-center"
+      className="relative z-20 flex h-[2.375rem] w-full justify-center self-center"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
@@ -1174,13 +1175,13 @@ export function PlanWidget({ plan }) {
         <div className="absolute bottom-full left-1/2 z-30 -translate-x-1/2 pb-2">
           <ol
             role="tooltip"
-            className="flex max-h-[min(360px,50vh)] w-max max-w-[min(24rem,calc(100vw-16px))] flex-col gap-2 overflow-y-auto rounded-xl border border-(--border-light) bg-(--dropdown-bg) px-4 py-4"
+            className="flex max-h-[min(22.5rem,50vh)] w-max max-w-[min(24rem,calc(100vw-1rem))] flex-col gap-2 overflow-y-auto rounded-xl border border-(--border-light) bg-(--dropdown-bg) px-4 py-4"
             style={{ boxShadow: "var(--shadow-menu)" }}
           >
             {plan.steps.map((s, i) => (
-              <li key={i} className="flex max-w-80 items-start gap-2 text-[14px] leading-4">
+              <li key={i} className="flex max-w-80 items-start gap-2 text-[0.875rem] leading-4">
                 <span className={cx(
-                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px]",
+                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[0.625rem]",
                   s.status === "completed" && "border-(--success) bg-(--success) text-white",
                   s.status === "inProgress" && "border-(--accent) text-(--accent)",
                   s.status !== "completed" && s.status !== "inProgress" && "border-(--border-heavy) text-(--fg-faint)"
@@ -1199,18 +1200,18 @@ export function PlanWidget({ plan }) {
         </div>
       )}
       <div
-        className="h-9 w-max max-w-full overflow-hidden rounded-[25px] border border-(--border-light) bg-[rgb(255_255_255/0.7)] backdrop-blur-sm dark:bg-[rgb(38_38_38/0.672)]"
+        className="h-9 w-max max-w-full overflow-hidden rounded-[1.5625rem] border border-(--border-light) bg-[rgb(255_255_255/0.7)] backdrop-blur-sm dark:bg-[rgb(38_38_38/0.672)]"
       >
-        <div className="flex min-h-[36px] max-w-full items-center gap-2 px-3 py-1.5 text-left">
+        <div className="flex min-h-[2.25rem] max-w-full items-center gap-2 px-3 py-1.5 text-left">
           {activeIndex >= 0
             ? <Spinner size={13} className="shrink-0 text-(--accent)" />
             : <IconCheck size={13} className="shrink-0 text-(--success)" />
           }
-          <span className="shrink-0 text-[14px] leading-[21px]">Step {currentIndex + 1} / {plan.steps.length}</span>
+          <span className="shrink-0 text-[0.875rem] leading-[1.3125rem]">Step {currentIndex + 1} / {plan.steps.length}</span>
           <span className="text-(--fg-tertiary)">·</span>
           {diffFiles.length > 0 ? (
             <button
-              className="flex min-w-0 items-center gap-1 text-[14px] leading-[21px] text-(--fg-tertiary) hover:text-(--fg)"
+              className="flex min-w-0 items-center gap-1 text-[0.875rem] leading-[1.3125rem] text-(--fg-tertiary) hover:text-(--fg)"
               onClick={() => setUi({ rightOpen: true, rightTab: "review" })}
             >
               <span className="min-w-0 truncate">{diffFiles.length} file{diffFiles.length === 1 ? "" : "s"} changed</span>
@@ -1218,7 +1219,7 @@ export function PlanWidget({ plan }) {
               {deleted > 0 && <span className="shrink-0 text-(--diff-del-fg)">-{deleted}</span>}
             </button>
           ) : (
-            <span className="min-w-0 truncate text-[14px] leading-[21px] text-(--fg-tertiary)">
+            <span className="min-w-0 truncate text-[0.875rem] leading-[1.3125rem] text-(--fg-tertiary)">
               {current?.step || "Plan complete"}
             </span>
           )}
@@ -1245,13 +1246,13 @@ export function ApprovalCard({ approval: a }) {
   const meta = KIND_META[a.kind] || KIND_META.elicitation;
   const KindIcon = meta.icon;
   return (
-    <div className="fade-in overflow-hidden rounded-[12.5px] border border-(--border) bg-(--surface-raised)" style={{ boxShadow: "var(--shadow-menu)" }}>
+    <div className="fade-in overflow-hidden rounded-[0.78125rem] border border-(--border) bg-(--surface-raised)" style={{ boxShadow: "var(--shadow-menu)" }}>
       <div className="flex items-center gap-2.5 px-3.5 pt-3">
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-(--accent-soft) text-(--accent)">
           <KindIcon size={13} />
         </span>
-        <div className="min-w-0 flex-1 truncate text-[13px] font-medium">{a.title}</div>
-        <span className="shrink-0 rounded-md bg-(--surface-hover) px-1.5 py-0.5 text-[11px] text-(--fg-tertiary)">
+        <div className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium">{a.title}</div>
+        <span className="shrink-0 rounded-md bg-(--surface-hover) px-1.5 py-0.5 text-[0.6875rem] text-(--fg-tertiary)">
           {meta.badge}
         </span>
       </div>
@@ -1261,7 +1262,7 @@ export function ApprovalCard({ approval: a }) {
           <>
             {a.reason && <div className="mb-1.5 text-xs text-(--fg-tertiary)">{a.reason}</div>}
             <pre className="max-h-36 overflow-auto rounded-lg bg-(--code-bg) p-2.5 font-mono text-xs whitespace-pre-wrap break-all">{a.command}</pre>
-            {a.cwd && <div className="mt-1 truncate font-mono text-[11px] text-(--fg-faint)">{a.cwd}</div>}
+            {a.cwd && <div className="mt-1 truncate font-mono text-[0.6875rem] text-(--fg-faint)">{a.cwd}</div>}
           </>
         )}
         {a.kind === "fileChange" && (
@@ -1279,7 +1280,7 @@ export function ApprovalCard({ approval: a }) {
         {a.kind === "permissions" && (
           <>
             <div className="text-xs text-(--fg-tertiary)">{a.reason || "The agent requests additional permissions."}</div>
-            <pre className="mt-1.5 max-h-32 overflow-auto rounded-lg bg-(--code-bg) p-2.5 font-mono text-[11px] whitespace-pre-wrap break-all">
+            <pre className="mt-1.5 max-h-32 overflow-auto rounded-lg bg-(--code-bg) p-2.5 font-mono text-[0.6875rem] whitespace-pre-wrap break-all">
               {safeStringify(a.permissions ?? a.raw?.permissions)}
             </pre>
           </>
@@ -1290,7 +1291,7 @@ export function ApprovalCard({ approval: a }) {
               Kimi Code is waiting for your decision before continuing.
             </div>
             {a.toolCall?.rawInput !== undefined && (
-              <pre className="mt-1.5 max-h-32 overflow-auto rounded-lg bg-(--code-bg) p-2.5 font-mono text-[11px] whitespace-pre-wrap break-all">
+              <pre className="mt-1.5 max-h-32 overflow-auto rounded-lg bg-(--code-bg) p-2.5 font-mono text-[0.6875rem] whitespace-pre-wrap break-all">
                 {safeStringify(a.toolCall.rawInput)}
               </pre>
             )}
@@ -1298,7 +1299,7 @@ export function ApprovalCard({ approval: a }) {
         )}
         {a.kind === "userInput" && <UserInputForm approval={a} />}
         {a.kind === "elicitation" && (
-          <div className="text-[13px] text-(--fg-secondary)">{a.raw?.message || a.title}</div>
+          <div className="text-[0.8125rem] text-(--fg-secondary)">{a.raw?.message || a.title}</div>
         )}
       </div>
 
@@ -1310,7 +1311,7 @@ export function ApprovalCard({ approval: a }) {
               <button
                 key={option.optionId}
                 className={cx(
-                  "rounded-lg px-3 py-1.5 text-[13px] font-medium",
+                  "rounded-lg px-3 py-1.5 text-[0.8125rem] font-medium",
                   reject
                     ? "text-(--danger) hover:bg-(--danger-soft)"
                     : "bg-(--fg) text-(--surface) hover:opacity-85",
@@ -1322,7 +1323,7 @@ export function ApprovalCard({ approval: a }) {
             );
           })}
           <button
-            className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-tertiary) hover:bg-(--surface-hover)"
+            className="rounded-lg px-3 py-1.5 text-[0.8125rem] text-(--fg-tertiary) hover:bg-(--surface-hover)"
             onClick={() => answerApproval(a.reqId, null)}
           >
             Cancel
@@ -1358,7 +1359,7 @@ function ApprovalOptionsBtn({ approval: a }) {
     <>
       <div className="flex overflow-hidden rounded-lg border border-(--border)">
         <button
-          className="px-3 py-1.5 text-[13px] font-medium hover:bg-(--surface-hover)"
+          className="px-3 py-1.5 text-[0.8125rem] font-medium hover:bg-(--surface-hover)"
           onClick={() => answerApproval(a.reqId, "acceptForSession")}
         >
           Always allow
@@ -1399,7 +1400,7 @@ function ApprovalOptionsBtn({ approval: a }) {
 function PrimaryBtn({ children, onClick }) {
   return (
     <button
-      className="rounded-lg bg-(--fg) px-3 py-1.5 text-[13px] font-medium text-(--surface) hover:opacity-85"
+      className="rounded-lg bg-(--fg) px-3 py-1.5 text-[0.8125rem] font-medium text-(--surface) hover:opacity-85"
       onClick={onClick}
     >
       {children}
@@ -1409,7 +1410,7 @@ function PrimaryBtn({ children, onClick }) {
 function DangerBtn({ children, onClick }) {
   return (
     <button
-      className="rounded-lg px-3 py-1.5 text-[13px] text-(--danger) hover:bg-(--danger-soft)"
+      className="rounded-lg px-3 py-1.5 text-[0.8125rem] text-(--danger) hover:bg-(--danger-soft)"
       onClick={onClick}
     >
       {children}
@@ -1434,7 +1435,7 @@ function UserInputForm({ approval }) {
     <div className="flex flex-col gap-3">
       {questions.map((q) => (
         <div key={q.id}>
-          <div className="mb-1 text-[13px] font-medium">{q.question}</div>
+          <div className="mb-1 text-[0.8125rem] font-medium">{q.question}</div>
           {q.options?.length ? (
             <div className="flex flex-wrap gap-1.5">
               {q.options.map((opt) => {
@@ -1457,7 +1458,7 @@ function UserInputForm({ approval }) {
           ) : (
             <input
               type={q.isSecret ? "password" : "text"}
-              className="w-full rounded-lg border border-(--border) bg-(--surface) px-2.5 py-1.5 text-[13px] outline-none focus:border-(--accent)"
+              className="w-full rounded-lg border border-(--border) bg-(--surface) px-2.5 py-1.5 text-[0.8125rem] outline-none focus:border-(--accent)"
               value={values[q.id] || ""}
               onChange={(e) => setVal(q.id, e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") submit(); }}

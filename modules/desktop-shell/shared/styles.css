@@ -4,8 +4,8 @@
 
 .translucent-sidebar .app-sidebar {
   background: color-mix(in srgb, var(--surface-under) 72%, transparent);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(1.5rem);
+  -webkit-backdrop-filter: blur(1.5rem);
 }
 
 .app-sidebar {
@@ -28,18 +28,41 @@
   pointer-events: auto;
 }
 
+.right-panel-frame {
+  width: clamp(20rem, var(--right-panel-size, 28vw), 48rem);
+  min-width: min(20rem, 100%);
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+
+.right-panel-frame[data-expanded="true"] {
+  width: clamp(28rem, 52vw, 48rem);
+}
+
+.sidebar-frame {
+  width: clamp(13.75rem, var(--sidebar-size, 16vw), 32.5rem);
+  max-width: min(32.5rem, 45vw);
+}
+
+.sidebar-header-spacer {
+  width: max(
+    0rem,
+    calc(clamp(13.75rem, var(--sidebar-size, 16vw), 32.5rem) - 11.25rem)
+  );
+}
+
 @keyframes slide-in-right-kf {
-  from { opacity: 0.4; transform: translateX(14px); }
+  from { opacity: 0.4; transform: translateX(0.875rem); }
   to { opacity: 1; transform: none; }
 }
 
 @keyframes slide-in-left-kf {
-  from { opacity: 0.4; transform: translateX(-14px); }
+  from { opacity: 0.4; transform: translateX(-0.875rem); }
   to { opacity: 1; transform: none; }
 }
 
 @keyframes slide-in-up-kf {
-  from { opacity: 0.4; transform: translateY(10px); }
+  from { opacity: 0.4; transform: translateY(0.625rem); }
   to { opacity: 1; transform: none; }
 }
 

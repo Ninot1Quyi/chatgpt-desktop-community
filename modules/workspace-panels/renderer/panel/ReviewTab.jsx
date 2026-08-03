@@ -227,15 +227,15 @@ export default function ReviewTab() {
         <div className="flex h-9 items-center px-2">
           <button
             ref={branchButtonRef}
-            className="flex h-7 w-[87px] shrink-0 items-center gap-1 rounded-lg px-1.5 text-[14px] hover:bg-(--surface-hover)"
+            className="flex h-7 w-[5.4375rem] shrink-0 items-center gap-1 rounded-lg px-1.5 text-[0.875rem] hover:bg-(--surface-hover)"
             onClick={() => openMenu("branch")}
             title={branch || "Branch"}
           >
             <span>Branch</span>
             <IconChevronDown size={13} className="shrink-0 text-(--fg-tertiary)" />
           </button>
-          <span className="ml-1 shrink-0 font-mono text-[14px] text-(--diff-add-fg)">+{totals.added}</span>
-          <span className="ml-1 shrink-0 font-mono text-[14px] text-(--diff-del-fg)">−{totals.deleted}</span>
+          <span className="ml-1 shrink-0 font-mono text-[0.875rem] text-(--diff-add-fg)">+{totals.added}</span>
+          <span className="ml-1 shrink-0 font-mono text-[0.875rem] text-(--diff-del-fg)">−{totals.deleted}</span>
           <div className="min-w-1 flex-1" />
           <div className="flex items-center gap-1.5">
             <span ref={optionsButtonRef}>
@@ -246,13 +246,13 @@ export default function ReviewTab() {
             <ReviewToolButton icon="Columns2" title="Switch to split diff" active={split} onClick={() => setSplit((value) => !value)} />
             <ReviewToolButton icon="FolderOpen" title="Show files" onClick={() => usePanelStore.getState().open("files")} />
             <ReviewToolButton icon="Sparkles" title="Review changes" onClick={askForReview} />
-            <div className="flex h-7 w-[51px] items-center overflow-hidden rounded-[10px] ring-1 ring-inset ring-(--border)">
+            <div className="flex h-7 w-[3.1875rem] items-center overflow-hidden rounded-[0.625rem] ring-1 ring-inset ring-(--border)">
               <span ref={commitButtonRef}>
                 <ReviewToolButton icon="GitCommitHorizontal" title="Commit or push" onClick={() => openMenu("commit")} />
               </span>
               <button
                 ref={moreButtonRef}
-                className="flex h-7 w-[23px] items-center justify-center text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
+                className="flex h-7 w-[1.4375rem] items-center justify-center text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
                 title="More Git actions"
                 aria-label="More Git actions"
                 onClick={() => openMenu("more")}
@@ -263,7 +263,7 @@ export default function ReviewTab() {
           </div>
         </div>
         <button
-          className="flex h-8 w-full items-center gap-2 px-4 text-left font-mono text-[14px] text-(--fg-tertiary) hover:bg-(--surface-hover)"
+          className="flex h-8 w-full items-center gap-2 px-4 text-left font-mono text-[0.875rem] text-(--fg-tertiary) hover:bg-(--surface-hover)"
           onClick={() => openMenu("branch")}
           title={cwd}
         >
@@ -310,20 +310,20 @@ export default function ReviewTab() {
             <div className="flex gap-3 px-3 pt-3 pb-2">
               <LucideIcon name="CircleAlert" size={15} className="mt-0.5 shrink-0 text-(--warning)" />
               <div className="min-w-0">
-                <div className="text-[13px] font-semibold leading-[18px]">Showing tracked changes only</div>
-                <div className="mt-1 text-[13px] leading-[21px] text-(--fg-tertiary)">
+                <div className="text-[0.8125rem] font-semibold leading-[1.125rem]">Showing tracked changes only</div>
+                <div className="mt-1 text-[0.8125rem] leading-[1.3125rem] text-(--fg-tertiary)">
                   Review skipped {untracked.length} untracked files to stay responsive. If these files are generated, clean them up and refresh.
                 </div>
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-(--border-light) px-3 py-2">
               <button
-                className="h-6 rounded-full border border-(--border) bg-(--panel-action-bg) px-2.5 text-[13px] hover:bg-(--panel-action-hover-bg)"
+                className="h-6 rounded-full border border-(--border) bg-(--panel-action-bg) px-2.5 text-[0.8125rem] hover:bg-(--panel-action-hover-bg)"
                 onClick={() => copyText("git clean -nd", "Cleanup preview command copied")}
               >
                 Copy cleanup command
               </button>
-              <button className="h-6 rounded-lg px-2.5 text-[13px] text-(--fg-tertiary) hover:bg-(--surface-hover)" onClick={refresh}>
+              <button className="h-6 rounded-lg px-2.5 text-[0.8125rem] text-(--fg-tertiary) hover:bg-(--surface-hover)" onClick={refresh}>
                 Refresh
               </button>
             </div>
@@ -396,7 +396,7 @@ export default function ReviewTab() {
         {untracked.length > 0 && !skipUntracked && (
           <Section title="Untracked" actions={<SectionAction label="Stage all" onClick={stageAll} />}>
             {untracked.map((p, i) => (
-              <div key={i} data-review-file className="group flex min-h-9 items-center gap-2 px-4 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)">
+              <div key={i} data-review-file className="group flex min-h-9 items-center gap-2 px-4 py-1.5 text-[0.8125rem] text-(--fg-secondary) hover:bg-(--surface-hover)">
                 <FileKindIcon name={p} />
                 <span className="min-w-0 flex-1 truncate font-mono" title={p}>{p}</span>
                 <FileAction label="Open" onClick={() => openFile(p)} />
@@ -433,8 +433,8 @@ export default function ReviewTab() {
 
       {confirmRevertAll && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40" onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmRevertAll(false); }}>
-          <div className="fade-in w-[320px] rounded-2xl border border-(--border) bg-(--surface-raised) p-4" style={{ boxShadow: "var(--shadow-menu)" }}>
-            <div className="text-[13px] font-medium">Revert all changes?</div>
+          <div className="fade-in w-[20rem] rounded-2xl border border-(--border) bg-(--surface-raised) p-4" style={{ boxShadow: "var(--shadow-menu)" }}>
+            <div className="text-[0.8125rem] font-medium">Revert all changes?</div>
             <div className="mt-1 text-xs text-(--fg-tertiary)">This action removes all unstaged changes in this project.</div>
             <div className="mt-3 flex justify-end gap-2">
               <button className="rounded-lg px-3 py-1.5 text-xs text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={() => setConfirmRevertAll(false)}>Cancel</button>
@@ -470,7 +470,7 @@ function SectionAction({ label, onClick, danger }) {
   return (
     <button
       className={cx(
-        "rounded px-1.5 py-0.5 text-[11px]",
+        "rounded px-1.5 py-0.5 text-[0.6875rem]",
         danger ? "text-(--danger) hover:bg-(--danger-soft)" : "text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
       )}
       onClick={onClick}
@@ -484,7 +484,7 @@ function FileAction({ label, onClick, danger }) {
   return (
     <button
       className={cx(
-        "hidden rounded px-1.5 py-0.5 text-[11px] group-hover:block",
+        "hidden rounded px-1.5 py-0.5 text-[0.6875rem] group-hover:block",
         danger ? "text-(--danger) hover:bg-(--danger-soft)" : "text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg)"
       )}
       onClick={onClick}
@@ -531,7 +531,7 @@ function FileKindIcon({ name }) {
   if (!badge) return <IconFile size={14} className="shrink-0 text-(--fg-tertiary)" />;
   return (
     <span
-      className="flex size-[14px] shrink-0 items-center justify-center rounded-[4px] text-[7px] leading-none font-bold text-black/75"
+      className="flex size-[0.875rem] shrink-0 items-center justify-center rounded-[0.25rem] text-[0.4375rem] leading-none font-bold text-black/75"
       style={{ backgroundColor: badge[1] }}
       aria-hidden="true"
     >
@@ -563,11 +563,11 @@ function DiffFile({ file, defaultOpen = false, actions, onRevertHunk, collapseSi
       >
         <IconChevronRight size={12} className={cx("shrink-0 text-(--fg-tertiary) transition-transform", open && "rotate-90")} />
         <FileKindIcon name={name} />
-        <span className="min-w-0 flex-1 truncate font-mono text-[13px]" title={name}>{formatFileName(name)}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[0.8125rem]" title={name}>{formatFileName(name)}</span>
         {actions}
-        {file.isNew && <span className="shrink-0 rounded bg-(--diff-add-bg) px-1 text-[10px] text-(--diff-add-fg)">new</span>}
-        {file.isDeleted && <span className="shrink-0 rounded bg-(--diff-del-bg) px-1 text-[10px] text-(--diff-del-fg)">deleted</span>}
-        <span className="shrink-0 font-mono text-[13px]">
+        {file.isNew && <span className="shrink-0 rounded bg-(--diff-add-bg) px-1 text-[0.625rem] text-(--diff-add-fg)">new</span>}
+        {file.isDeleted && <span className="shrink-0 rounded bg-(--diff-del-bg) px-1 text-[0.625rem] text-(--diff-del-fg)">deleted</span>}
+        <span className="shrink-0 font-mono text-[0.8125rem]">
           {file.added > 0 && <span className="text-(--diff-add-fg)">+{file.added} </span>}
           {file.deleted > 0 && <span className="text-(--diff-del-fg)">−{file.deleted}</span>}
         </span>
@@ -580,7 +580,7 @@ function DiffFile({ file, defaultOpen = false, actions, onRevertHunk, collapseSi
                 @@ -{h.oldStart} +{h.newStart} @@ {h.context}
                 {onRevertHunk && (
                   <button
-                    className="absolute right-2 hidden rounded px-1 text-[10px] font-normal text-(--danger) hover:bg-(--danger-soft) group-hover/hunk:inline"
+                    className="absolute right-2 hidden rounded px-1 text-[0.625rem] font-normal text-(--danger) hover:bg-(--danger-soft) group-hover/hunk:inline"
                     onClick={() => onRevertHunk(file, h)}
                   >
                     Revert hunk

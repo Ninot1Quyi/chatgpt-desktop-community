@@ -137,7 +137,7 @@ export default function PluginsSection() {
 
   return (
     <div>
-      <div className="-mt-3 mb-4 text-[13px] text-(--fg-tertiary)">Manage plugins, skills, and MCPs</div>
+      <div className="-mt-3 mb-4 text-[0.8125rem] text-(--fg-tertiary)">Manage plugins, skills, and MCPs</div>
 
       {/* tab row + search */}
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -155,7 +155,7 @@ export default function PluginsSection() {
             </button>
           ))}
         </div>
-        <div className="flex h-7 w-[220px] items-center gap-2 rounded-full border border-(--border-light) bg-(--input-bg) px-2.5">
+        <div className="flex h-7 w-[13.75rem] items-center gap-2 rounded-full border border-(--border-light) bg-(--input-bg) px-2.5">
           <IconSearch size={12} className="shrink-0 text-(--fg-faint)" />
           <input
             value={query}
@@ -176,13 +176,13 @@ export default function PluginsSection() {
             <div key={p.id} className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-(--fg)/5" onClick={() => setDetail(p)}>
               <PluginIcon plugin={p} size={34} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium">
+                <div className="truncate text-[0.8125rem] font-medium">
                   {pluginName(p)}
                   {(p._marketplace === "personal" || p._marketplace === "ponytail") && (
                     <span className="ml-1.5 font-normal text-(--fg-tertiary)">{p._marketplace}</span>
                   )}
                 </div>
-                <div className="truncate text-[12px] text-(--fg-tertiary)">{p.interface?.shortDescription || ""}</div>
+                <div className="truncate text-[0.75rem] text-(--fg-tertiary)">{p.interface?.shortDescription || ""}</div>
               </div>
               <button
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
@@ -210,8 +210,8 @@ export default function PluginsSection() {
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium">{a.name}</div>
-                <div className="truncate text-[12px] text-(--fg-tertiary)">{a.description || ""}</div>
+                <div className="truncate text-[0.8125rem] font-medium">{a.name}</div>
+                <div className="truncate text-[0.75rem] text-(--fg-tertiary)">{a.description || ""}</div>
               </div>
             </div>
           ))}
@@ -225,8 +225,8 @@ export default function PluginsSection() {
                 {(m.name || "?").charAt(0).toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium">{m.name}</div>
-                <div className="truncate text-[12px] text-(--fg-tertiary)">
+                <div className="truncate text-[0.8125rem] font-medium">{m.name}</div>
+                <div className="truncate text-[0.75rem] text-(--fg-tertiary)">
                   {m.serverInfo?.name || ""}
                   {m.tools ? ` · ${Object.keys(m.tools).length} tools` : ""}
                 </div>
@@ -247,8 +247,8 @@ export default function PluginsSection() {
                 )}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium">{skillName(s)}</div>
-                <div className="truncate text-[12px] text-(--fg-tertiary)">{s.interface?.shortDescription || s.shortDescription || s.description || ""}</div>
+                <div className="truncate text-[0.8125rem] font-medium">{skillName(s)}</div>
+                <div className="truncate text-[0.75rem] text-(--fg-tertiary)">{s.interface?.shortDescription || s.shortDescription || s.description || ""}</div>
               </div>
               <Toggle on={!!s.enabled} onChange={(v) => setSkillEnabled(s, v)} />
             </div>
@@ -263,8 +263,8 @@ export default function PluginsSection() {
                 {(m.name || "?").charAt(0).toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium">{m.name}</div>
-                <div className="truncate text-[12px] text-(--fg-tertiary)">{m.path || ""}</div>
+                <div className="truncate text-[0.8125rem] font-medium">{m.name}</div>
+                <div className="truncate text-[0.75rem] text-(--fg-tertiary)">{m.path || ""}</div>
               </div>
             </div>
           ))}

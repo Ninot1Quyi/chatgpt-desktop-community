@@ -51,7 +51,7 @@ test("reasoning remains opt-in while Kimi can stream thought text when expanded"
 test("hook prompts render as right-aligned user-style feedback bubbles", () => {
   assert.match(itemsSource, /case "hookPrompt": return <HookPrompt item=\{item\} \/>/);
   assert.match(itemsSource, /function HookPrompt\(\{ item \}\) \{/);
-  assert.match(itemsSource, /max-w-\[77%\] rounded-\[20px\] bg-\(--bubble-user\)/);
+  assert.match(itemsSource, /max-w-\[77%\] rounded-\[1\.25rem\] bg-\(--bubble-user\)/);
   assert.match(itemsSource, />Hook feedback<\/div>/);
   assert.match(itemsSource, /function hookPromptText\(item\) \{/);
 });

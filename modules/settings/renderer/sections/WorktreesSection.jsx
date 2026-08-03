@@ -79,7 +79,7 @@ export default function WorktreesSection() {
             }}
             placeholder={appInfo?.home ? `${appInfo.home}/.codex/worktrees` : "~/.codex/worktrees"}
             spellCheck={false}
-            className="h-7 w-[260px] rounded-lg border border-(--border-light) bg-(--surface) px-2.5 font-mono text-[12px] outline-none placeholder:text-(--fg-faint) focus:border-(--border-heavy)"
+            className="h-7 w-[16.25rem] rounded-lg border border-(--border-light) bg-(--surface) px-2.5 font-mono text-[0.75rem] outline-none placeholder:text-(--fg-faint) focus:border-(--border-heavy)"
           />
         </Row>
         <Row title="Automatically delete old worktrees" desc="Recommended for most users. Turn this off only if you want to manage old worktrees and disk usage yourself.">
@@ -104,7 +104,7 @@ export default function WorktreesSection() {
               setLimit(v);
               lsSet("settings.worktreeAutoDeleteLimit", v);
             }}
-            className="h-7 w-20 rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[13px] outline-none focus:border-(--border-heavy)"
+            className="h-7 w-20 rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[0.8125rem] outline-none focus:border-(--border-heavy)"
           />
         </Row>
       </Card>
@@ -114,17 +114,17 @@ export default function WorktreesSection() {
           <Spinner />
         </div>
       ) : error ? (
-        <div className="text-[13px] text-(--fg-tertiary)">Worktrees could not be listed: {error}</div>
+        <div className="text-[0.8125rem] text-(--fg-tertiary)">Worktrees could not be listed: {error}</div>
       ) : worktrees.length === 0 ? (
-        <div className="px-1 text-[13px] text-(--fg-tertiary)">No worktrees.</div>
+        <div className="px-1 text-[0.8125rem] text-(--fg-tertiary)">No worktrees.</div>
       ) : (
         <Card>
           {worktrees.map((path) => (
             <div key={path} className="px-4 py-3.5">
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="text-[12px] font-medium text-(--fg-secondary)">Worktree</div>
-                  <div className="mt-0.5 truncate font-mono text-[12px] text-(--fg-tertiary)" title={path}>
+                  <div className="text-[0.75rem] font-medium text-(--fg-secondary)">Worktree</div>
+                  <div className="mt-0.5 truncate font-mono text-[0.75rem] text-(--fg-tertiary)" title={path}>
                     {path}
                   </div>
                 </div>
@@ -133,8 +133,8 @@ export default function WorktreesSection() {
                 </Btn>
               </div>
               <div className="mt-2.5 border-t border-(--border-light) pt-2.5">
-                <div className="text-[12px] font-medium text-(--fg-secondary)">Conversations</div>
-                <div className="mt-0.5 text-[12px] text-(--fg-faint)">No conversations linked to this worktree.</div>
+                <div className="text-[0.75rem] font-medium text-(--fg-secondary)">Conversations</div>
+                <div className="mt-0.5 text-[0.75rem] text-(--fg-faint)">No conversations linked to this worktree.</div>
               </div>
             </div>
           ))}

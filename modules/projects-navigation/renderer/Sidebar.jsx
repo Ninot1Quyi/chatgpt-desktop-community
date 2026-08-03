@@ -1,8 +1,10 @@
 // Left sidebar: product header + search toggle, nav rows, client-owned pins,
-// runtime / project / thread tree, account footer (archived / help / settings).
+// runtime / project / thread tree, account footer (usage / help / settings),
+// and pending-update entry.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useStore, runtimeConnected, planLabel } from "@app/store.js";
 import { cx } from "@app/lib/cx.js";
+import { cssPixelsToRem } from "@app/lib/cssUnits.js";
 import { useT } from "@app/i18n.jsx";
 import { isPathInside } from "@app/lib/time.js";
 import { externalProjectId, normalizeProjectPath } from "@modules/agent-runtimes";
@@ -13,12 +15,12 @@ import {
   codexRemainingPercent,
   codexResetDate,
 } from "@modules/agent-runtimes";
-import { openExternal, toggleQuickChat, showItemInFolder, rpc, logout, gsPatch } from "@app/api.js";
+import { installUpdate, openExternal, toggleQuickChat, showItemInFolder, rpc, gsPatch, logout } from "@app/api.js";
 import { Menu, Dialog, Spinner, IconButton } from "@app/components/ui.jsx";
 import { EXTERNAL_RUNTIMES, RUNTIMES, runtimeMeta } from "@modules/agent-runtimes";
 import {
   IconPlus, IconSearch, IconMore, IconGear, IconArchive, IconPencil,
-  IconTrash, IconUndo, IconChevronDown, IconChevronRight, IconFolder, IconClock,
+  IconTrash, IconUndo, IconChevronDown, IconChevronRight, IconFolder, IconFolderFilled, IconClock,
   IconUsage, IconInvite, IconLogout, IconBranch, IconX, IconGlobe,
   IconHelpCircle, IconNavNewChat, IconNavPullRequests, IconNavSites, IconNavScheduled, IconNavPlugins,
   IconCircleAlert, IconPin, IconPinFilled, IconQuickChat, IconRefresh, IconHeaderChevronDown,
@@ -34,6 +36,7 @@ import {
   createReorderedIdsPatch,
   createThreadProjectAssignmentPatch,
 } from "./state.js";
+import { shouldShowUpdateEntry } from "./update-entry.mjs";
 
 const NAV_ITEMS = [
   { id: "pull-requests", label: "Pull requests", icon: <IconNavPullRequests size={16} /> },
@@ -109,7 +112,6 @@ function moveThreadToProject(threadId, project) {
   const projectId = project.kind === "virtual" ? null : project.id;
   return commitGlobalStatePatch(createThreadProjectAssignmentPatch(useStore.getState().gs, threadId, projectId));
 }
-
 // ---------------------------------------------------------------------------
 export default function Sidebar() {
   const t = useT();
@@ -214,10 +216,10 @@ export default function Sidebar() {
 
   return (
     <div className="app-sidebar flex h-full w-full flex-col">
-      {/* 46px spacer: the floating global header occupies the top strip */}
-      <div className="h-[46px] shrink-0" />
+      {/* 2.875rem spacer: the floating global header occupies the top strip */}
+      <div className="h-[2.875rem] shrink-0" />
       {/* wordmark row + search (global header sits above the sidebar) */}
-      <div className="flex h-[32px] shrink-0 items-center justify-between pl-4 pr-2">
+      <div className="flex h-[2rem] shrink-0 items-center justify-between pl-4 pr-2">
         <WordmarkMenu />
         <IconButton
           icon={<IconSearch />}
@@ -231,11 +233,11 @@ export default function Sidebar() {
       {/* search field (toggled from the header) */}
       {searchOpen && (
         <div className="shrink-0 px-2 pb-2">
-          <div className="flex h-[30px] items-center gap-2 rounded-full border border-(--border-light) bg-(--surface) px-3">
+          <div className="flex h-[1.875rem] items-center gap-2 rounded-full border border-(--border-light) bg-(--surface) px-3">
             <IconSearch size={13} className="shrink-0 text-(--fg-tertiary)" />
             <input
               autoFocus
-              className="w-full bg-transparent text-[13px] outline-none placeholder:text-(--fg-faint)"
+              className="w-full bg-transparent text-[0.8125rem] outline-none placeholder:text-(--fg-faint)"
               placeholder={t("Search chats and history")}
               value={searchTerm}
               onChange={(e) => useStore.getState().setSearchTerm(e.target.value)}
@@ -247,7 +249,7 @@ export default function Sidebar() {
       )}
 
       {/* primary nav */}
-      <div className="mt-2 flex shrink-0 flex-col gap-px px-2 pb-1">
+      <div className="mt-2 flex shrink-0 flex-col gap-[0.0625rem] px-2 pb-1">
         <div className="group/nav relative">
           <NavRow
             icon={<IconNavNewChat size={16} />}
@@ -375,7 +377,7 @@ export default function Sidebar() {
         })}
 
         {empty && !threadsLoading && (
-          <div className="px-3 pt-8 text-center text-[13px] text-(--fg-tertiary)">
+          <div className="px-3 pt-8 text-center text-[0.8125rem] text-(--fg-tertiary)">
             {archivedView ? t("No archived chats") : t("No chats")}
           </div>
         )}
@@ -399,8 +401,8 @@ function NavRow({ icon, label, active, compact = false, onClick }) {
   return (
     <button
       className={cx(
-        "flex w-full items-center gap-2 rounded-[12.5px] pl-2 text-left text-[14px]",
-        compact ? "h-[29px] pr-1" : "h-[30px] pr-2",
+        "flex w-full items-center gap-2 rounded-[0.78125rem] pl-2 text-left text-[0.875rem]",
+        compact ? "h-[1.8125rem] pr-1" : "h-[1.875rem] pr-2",
         active ? "bg-(--sidebar-row-active) text-(--fg)" : "hover:bg-(--surface-hover)"
       )}
       onClick={onClick}
@@ -413,7 +415,7 @@ function NavRow({ icon, label, active, compact = false, onClick }) {
 
 function SectionLabel({ children }) {
   const t = useT();
-  return <div className="px-4 pt-4 pb-1 text-[14px] font-medium text-(--fg-tertiary)">{t(children)}</div>;
+  return <div className="px-4 pt-4 pb-1 text-[0.875rem] font-medium text-(--fg-tertiary)">{t(children)}</div>;
 }
 
 // ---------------------------------------------------------------------------
@@ -493,7 +495,7 @@ function ProjectSection({
         ref={rowRef}
         draggable={project.kind !== "virtual"}
         className={cx(
-          "group/proj relative mx-2 flex h-[30px] cursor-pointer select-none items-center gap-2 rounded-[12.5px] pr-2 hover:bg-(--surface-hover)",
+          "group/proj relative mx-2 flex h-[1.875rem] cursor-pointer select-none items-center gap-2 rounded-[0.78125rem] pr-2 hover:bg-(--surface-hover)",
           nested ? "pl-6" : "pl-2",
         )}
         onDragStart={(event) => writeSidebarDrag(event, { type: "project", projectId: project.id })}
@@ -529,7 +531,7 @@ function ProjectSection({
             />
           </span>
         </span>
-        <span className="min-w-0 flex-1 truncate text-[14px]">
+        <span className="min-w-0 flex-1 truncate text-[0.875rem]">
           {project.name}
           {project.hostName && (
             <span className="ml-2 text-(--fg-tertiary)">{project.hostName}</span>
@@ -578,9 +580,13 @@ function ProjectSection({
         {hoverCard && !menuOpen && (
           <div
             className="pointer-events-none fixed z-50 w-60 rounded-xl border border-(--border) bg-(--dropdown-bg) px-3 py-2.5"
-            style={{ left: Math.round((rowRef.current?.getBoundingClientRect().right ?? 0) - 8), top: Math.round((rowRef.current?.getBoundingClientRect().top ?? 0) - 6), boxShadow: "var(--shadow-menu)" }}
+            style={{
+              left: cssPixelsToRem(Math.round((rowRef.current?.getBoundingClientRect().right ?? 0) - 8)),
+              top: cssPixelsToRem(Math.round((rowRef.current?.getBoundingClientRect().top ?? 0) - 6)),
+              boxShadow: "var(--shadow-menu)",
+            }}
           >
-            <div className="min-w-0 truncate text-[14px] font-medium">{project.name}</div>
+            <div className="min-w-0 truncate text-[0.875rem] font-medium">{project.name}</div>
             <div className="mt-0.5 text-xs text-(--fg-tertiary)">
               {t(project.threads.length === 1 ? "{count} thread" : "{count} threads", { count: project.threads.length })}
             </div>
@@ -595,7 +601,7 @@ function ProjectSection({
       {open && (
         <>
           {rows.length === 0 ? (
-            <div className="mx-2 flex h-[30px] items-center pl-8 pr-2 text-[13px] text-(--fg-faint)">
+            <div className="mx-2 flex h-[1.875rem] items-center pl-8 pr-2 text-[0.8125rem] text-(--fg-faint)">
               {t("No chats")}
             </div>
           ) : (
@@ -619,7 +625,7 @@ function ProjectSection({
               )}
               {hidden > 0 && (
                 <button
-                  className="mx-2 flex h-[30px] w-[calc(100%-16px)] items-center pl-8 pr-2 text-left text-[13px] text-(--fg-tertiary) hover:text-(--fg)"
+                  className="mx-2 flex h-[1.875rem] w-[calc(100%-1rem)] items-center pl-8 pr-2 text-left text-[0.8125rem] text-(--fg-tertiary) hover:text-(--fg)"
                   onClick={() => setShowAll(true)}
                 >
                   {t("Show more")}
@@ -637,8 +643,8 @@ function ProjectSection({
 function DraftRow() {
   const t = useT();
   return (
-    <div className="mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] bg-(--sidebar-row-active) pl-8 pr-1 text-(--fg)">
-      <span className="min-w-0 flex-1 truncate text-[14px]">{t("New chat")}</span>
+    <div className="mx-2 flex h-[1.875rem] cursor-pointer items-center gap-2 rounded-[0.78125rem] bg-(--sidebar-row-active) pl-8 pr-1 text-(--fg)">
+      <span className="min-w-0 flex-1 truncate text-[0.875rem]">{t("New chat")}</span>
     </div>
   );
 }
@@ -663,7 +669,7 @@ function ChatList({ threads, archived, onRename }) {
       ))}
       {hidden > 0 && (
         <button
-          className="mx-2 flex h-[30px] w-[calc(100%-16px)] items-center pl-8 pr-2 text-left text-[13px] text-(--fg-tertiary) hover:text-(--fg)"
+          className="mx-2 flex h-[1.875rem] w-[calc(100%-1rem)] items-center pl-8 pr-2 text-left text-[0.8125rem] text-(--fg-tertiary) hover:text-(--fg)"
           onClick={() => setShowAll(true)}
         >
           {t("Show more")}
@@ -681,7 +687,7 @@ function RuntimeHeader({ runtime, label, loading, configDir, open, onToggle, onR
         role="button"
         tabIndex={0}
         aria-expanded={open}
-        className="group/runtime flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] px-2 text-[14px] font-medium text-(--fg-tertiary) hover:bg-(--surface-hover)"
+        className="group/runtime flex h-[1.875rem] cursor-pointer items-center gap-2 rounded-[0.78125rem] px-2 text-[0.875rem] font-medium text-(--fg-tertiary) hover:bg-(--surface-hover)"
         onClick={onToggle}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -724,7 +730,7 @@ function RuntimeHeader({ runtime, label, loading, configDir, open, onToggle, onR
 function RuntimeEmpty({ searching, label }) {
   const t = useT();
   return (
-    <div className="px-4 py-2 text-[12px] text-(--fg-faint)">
+    <div className="px-4 py-2 text-[0.75rem] text-(--fg-faint)">
       {searching
         ? t("No matching {provider} sessions", { provider: label })
         : t("No local {provider} sessions", { provider: label })}
@@ -782,7 +788,7 @@ function RuntimeProjectSection({
       )}
       {open && error && (
         <button
-          className="mx-2 rounded-lg px-2 py-1.5 text-left text-[12px] text-(--danger) hover:bg-(--surface-hover)"
+          className="mx-2 rounded-lg px-2 py-1.5 text-left text-[0.75rem] text-(--danger) hover:bg-(--surface-hover)"
           title={error}
           onClick={refresh}
         >
@@ -812,7 +818,7 @@ function ExternalThreadRow({ thread, runtime }) {
     <div
       ref={rowRef}
       className={cx(
-        "group/external relative mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] pl-8 pr-2",
+        "group/external relative mx-2 flex h-[1.875rem] cursor-pointer items-center gap-2 rounded-[0.78125rem] pl-8 pr-2",
         active ? "bg-(--sidebar-row-active) text-(--fg)" : "hover:bg-(--surface-hover)"
       )}
       title={`${title}${thread.cwd ? `\n${thread.cwd}` : ""}`}
@@ -822,9 +828,9 @@ function ExternalThreadRow({ thread, runtime }) {
         setMenuOpen(true);
       }}
     >
-      <span className="min-w-0 flex-1 truncate text-[14px] leading-5">{title}</span>
+      <span className="min-w-0 flex-1 truncate text-[0.875rem] leading-5">{title}</span>
       {pinned && <IconPinFilled size={12} className="shrink-0 text-(--fg-tertiary) group-hover/external:hidden" />}
-      {age && <span className="shrink-0 text-[10px] text-(--fg-faint) group-hover/external:hidden">{age}</span>}
+      {age && <span className="shrink-0 text-[0.625rem] text-(--fg-faint) group-hover/external:hidden">{age}</span>}
       <button
         className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-(--fg-tertiary) hover:bg-(--surface-active) hover:text-(--fg) group-hover/external:flex"
         title={t("{provider} session actions", { provider: label })}
@@ -886,7 +892,7 @@ function WordmarkMenu() {
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="-ml-2 flex h-8 items-center gap-1 rounded-xl border border-transparent px-2 py-0.5 text-[17px] leading-6 hover:bg-(--surface-hover)"
+        className="-ml-2 flex h-8 items-center gap-1 rounded-xl border border-transparent px-2 py-0.5 text-[1.0625rem] leading-6 hover:bg-(--surface-hover)"
         title="Switch product"
         onClick={() => setOpen((value) => !value)}
       >
@@ -904,7 +910,7 @@ function WordmarkMenu() {
             tall: true,
             label: (
               <span>
-                <span className="block text-[13px] font-medium">ChatGPT</span>
+                <span className="block text-[0.8125rem] font-medium">ChatGPT</span>
                 <span className="block text-xs text-(--fg-tertiary)">Create, learn, and explore</span>
               </span>
             ),
@@ -916,7 +922,7 @@ function WordmarkMenu() {
             tall: true,
             label: (
               <span>
-                <span className="block text-[13px] font-medium">Codex</span>
+                <span className="block text-[0.8125rem] font-medium">Codex</span>
                 <span className="block text-xs text-(--fg-tertiary)">Build, debug, and ship</span>
               </span>
             ),
@@ -968,7 +974,7 @@ function ThreadRow({ thread, active, archived, onRename }) {
       ref={rowRef}
       draggable
       className={cx(
-        "group/thr relative mx-2 flex h-[30px] cursor-pointer items-center gap-2 rounded-[12.5px] pl-8 pr-1",
+        "group/thr relative mx-2 flex h-[1.875rem] cursor-pointer items-center gap-2 rounded-[0.78125rem] pl-8 pr-1",
         active ? "bg-(--sidebar-row-active) text-(--fg)" : "hover:bg-(--surface-hover)"
       )}
       onDragStart={(event) => writeSidebarDrag(event, { type: "thread", threadId: thread.id })}
@@ -990,7 +996,7 @@ function ThreadRow({ thread, active, archived, onRename }) {
       onMouseEnter={() => { clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setHoverCard(true), 550); }}
       onMouseLeave={() => { clearTimeout(hoverTimer.current); setHoverCard(false); }}
     >
-      <span className="min-w-0 flex-1 truncate text-[14px] leading-5">{title}</span>
+      <span className="min-w-0 flex-1 truncate text-[0.875rem] leading-5">{title}</span>
       {pinned && <IconPinFilled size={12} className="shrink-0 text-(--fg-tertiary) group-hover/thr:hidden" />}
       {needsInput && <IconCircleAlert size={13} className="shrink-0 text-(--danger)" />}
       {running && (active
@@ -1054,10 +1060,14 @@ function ThreadHoverCard({ thread, title, anchor }) {
   return (
     <div
       className="pointer-events-none fixed z-50 w-56 rounded-xl border border-(--border) bg-(--dropdown-bg) px-3 py-2.5"
-      style={{ left: Math.round(r.right - 8), top: Math.round(r.top - 6), boxShadow: "var(--shadow-menu)" }}
+      style={{
+        left: cssPixelsToRem(Math.round(r.right - 8)),
+        top: cssPixelsToRem(Math.round(r.top - 6)),
+        boxShadow: "var(--shadow-menu)",
+      }}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <span className="min-w-0 truncate text-[13px] font-medium">{title}</span>
+        <span className="min-w-0 truncate text-[0.8125rem] font-medium">{title}</span>
         {age && <span className="shrink-0 text-xs text-(--fg-tertiary)">{age}</span>}
       </div>
       {project && (
@@ -1132,7 +1142,7 @@ function UsageNudge() {
   return (
     <div className="mx-2 mb-2 rounded-xl border border-(--border-light) bg-(--surface) p-3">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[13px] font-medium">{t("{percent}% usage remaining", { percent: remaining })}</span>
+        <span className="text-[0.8125rem] font-medium">{t("{percent}% usage remaining", { percent: remaining })}</span>
         <button
           className="flex h-4 w-4 shrink-0 items-center justify-center text-(--fg-tertiary) hover:text-(--fg)"
           title={t("Dismiss")}
@@ -1149,7 +1159,7 @@ function UsageNudge() {
         <div className="h-full rounded-full bg-(--fg)" style={{ width: `${Math.max(2, remaining)}%` }} />
       </div>
       <button
-        className="mt-3 h-8 w-full rounded-full bg-(--fg) text-[13px] font-medium text-(--surface) hover:opacity-90"
+        className="mt-3 h-8 w-full rounded-full bg-(--fg) text-[0.8125rem] font-medium text-(--surface) hover:opacity-90"
         onClick={() => openExternal("https://chatgpt.com/pricing")}
       >
         {t("Add credits")}
@@ -1164,15 +1174,33 @@ function Footer() {
   const account = useStore((s) => s.account);
   const profile = useStore((s) => s.profile);
   const archivedView = useStore((s) => s.archivedView);
+  const updateStatus = useStore((s) => s.updateStatus);
   const email = account?.email || "";
   const displayName = profile?.name || (email ? email.split("@")[0] : t("Not signed in"));
   const [menuOpen, setMenuOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState(false);
   const profileRef = useRef(null);
+  const showUpdate = shouldShowUpdateEntry(updateStatus);
+  const updateTitle =
+    updateStatus?.status === "downloaded"
+      ? t("Restart to update")
+      : updateStatus?.status === "downloading"
+        ? t("Downloading update — {percent}%", { percent: updateStatus.percent ?? 0 })
+        : t("Version {version} found, downloading…", { version: updateStatus?.version || "" });
+  const handleUpdate = () => {
+    if (updateStatus?.status === "downloaded") {
+      installUpdate();
+      return;
+    }
+    useStore.getState().setUi({
+      settingsOpen: true,
+      settingsSection: "general",
+    });
+  };
 
   return (
-    <div className="shrink-0 border-t border-(--border-light) px-2">
-      <div className="flex h-[46px] items-center gap-2">
+    <div className="sidebar-footer shrink-0 border-t border-(--border-light) px-2">
+      <div className="flex h-[2.875rem] items-center gap-2">
         {/* profile menu (avatar + name), like the reference footer */}
         <button
           ref={profileRef}
@@ -1183,15 +1211,25 @@ function Footer() {
           {profile?.photo ? (
             <img src={profile.photo} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
           ) : (
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-(--accent-soft) text-[10px] font-semibold text-(--accent)">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-(--accent-soft) text-[0.625rem] font-semibold text-(--accent)">
               {(displayName || "?")[0].toUpperCase()}
             </span>
           )}
-          <span className="min-w-0 flex-1 truncate text-[14px] text-(--fg)">{displayName}</span>
+          <span className="min-w-0 flex-1 truncate text-[0.875rem] text-(--fg)">{displayName}</span>
         </button>
+        {showUpdate && (
+          <button
+            className="app-no-drag flex h-7 shrink-0 items-center rounded-lg px-2 text-[0.75rem] font-medium text-(--accent) hover:bg-(--accent-soft)"
+            title={updateTitle}
+            aria-label={updateTitle}
+            onClick={handleUpdate}
+          >
+            {t("Updates")}
+          </button>
+        )}
         <IconButton
           icon={<IconHelpCircle />}
-        size={18}
+          size={18}
           title="Help"
           onClick={() => openExternal(HELP_URL)}
         />
@@ -1242,7 +1280,7 @@ function ProviderDialog({ open, onClose }) {
           <button
             key={m.id}
             className={cx(
-              "flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[12px] transition-colors",
+              "flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[0.75rem] transition-colors",
               tab === m.id ? "bg-(--surface) font-medium shadow-sm" : "text-(--fg-tertiary) hover:text-(--fg)",
             )}
             onClick={() => setTab(m.id)}
@@ -1274,11 +1312,11 @@ function ProviderLogin({ runtime, meta }) {
       <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-(--border-light) bg-(--surface-under)">
         {meta?.icon(24)}
       </span>
-      <div className="text-[12px] text-(--fg-tertiary)">
+      <div className="text-[0.75rem] text-(--fg-tertiary)">
         {t("Not signed in to {provider}", { provider: meta?.label })}
       </div>
       <button
-        className="rounded-full bg-(--fg) px-4 py-1.5 text-[13px] font-medium text-(--surface) disabled:opacity-60"
+        className="rounded-full bg-(--fg) px-4 py-1.5 text-[0.8125rem] font-medium text-(--surface) disabled:opacity-60"
         disabled={waiting}
         onClick={() => {
           if (codex) useStore.getState().startChatgptLogin();
@@ -1344,10 +1382,10 @@ function ProviderAccount({ runtime, meta }) {
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-medium">{name}</div>
-          <div className="truncate text-[12px] text-(--fg-tertiary)">{accountLine}</div>
+          <div className="truncate text-[0.875rem] font-medium">{name}</div>
+          <div className="truncate text-[0.75rem] text-(--fg-tertiary)">{accountLine}</div>
         </div>
-        {plan && <span className="ml-auto shrink-0 text-[14px] font-medium">{plan}</span>}
+        {plan && <span className="ml-auto shrink-0 text-[0.875rem] font-medium">{plan}</span>}
       </div>
       {codex
         ? <CodexUsage />
@@ -1356,13 +1394,13 @@ function ProviderAccount({ runtime, meta }) {
   );
 }
 
-// Small "x% left" bar, same visual language as Settings → Usage.
+// Small "x% left" bar for the Provider dialog.
 function UsageBar({ label, pctLeft, reset }) {
   const t = useT();
   const pct = Math.max(0, Math.min(100, Math.round(pctLeft)));
   return (
     <div>
-      <div className="flex items-baseline justify-between text-[12px]">
+      <div className="flex items-baseline justify-between text-[0.75rem]">
         <span>{label}</span>
         <span className="text-(--fg-tertiary)">
           {reset && <>{t("Resets {date} · ", { date: reset })}</>}
@@ -1382,13 +1420,13 @@ function UsageBar({ label, pctLeft, reset }) {
 function UsageUnavailable({ label }) {
   const t = useT();
   return (
-    <div className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-[12px] text-(--fg-tertiary)">
+    <div className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-[0.75rem] text-(--fg-tertiary)">
       {t("Usage data is not available for {provider}.", { provider: label })}
     </div>
   );
 }
 
-// Codex rate limits via the app-server (same RPC as Settings → Usage).
+// Codex rate limits via the app-server.
 function CodexUsage() {
   const t = useT();
   const [data, setData] = useState(null);
@@ -1432,7 +1470,7 @@ function CodexUsage() {
       {sections.map((section) => (
         <div key={section.id} className="flex flex-col gap-2">
           {sections.length > 1 && (
-            <div className="text-[11px] font-medium text-(--fg-secondary)">{section.name}</div>
+            <div className="text-[0.6875rem] font-medium text-(--fg-secondary)">{section.name}</div>
           )}
           {section.windows.map(({ id, label, window }) => (
             <UsageBar
@@ -1446,17 +1484,17 @@ function CodexUsage() {
       ))}
       {resetSummary && (
         <div className="flex flex-col gap-2 border-t border-(--border-light) pt-2">
-          <div className="flex items-center justify-between text-[11px] text-(--fg-tertiary)">
+          <div className="flex items-center justify-between text-[0.6875rem] text-(--fg-tertiary)">
             <span>{t("Usage limit resets")}</span>
             <span>{t("{count} available", { count: resetCount })}</span>
           </div>
           {resets.map((credit) => (
             <div key={credit.id} className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] text-(--fg-secondary)">
+                <div className="truncate text-[0.75rem] text-(--fg-secondary)">
                   {credit.title || t("Full reset")}
                 </div>
-                <div className="truncate text-[11px] text-(--fg-tertiary)">
+                <div className="truncate text-[0.6875rem] text-(--fg-tertiary)">
                   {credit.expiresAt
                     ? t("Expires {date}", { date: codexResetDate(credit.expiresAt, true) })
                     : credit.status || t("No expiry reported")}
@@ -1464,7 +1502,7 @@ function CodexUsage() {
               </div>
               {credit.status === "available" && (
                 <button
-                  className="shrink-0 rounded-full border border-(--border) px-2.5 py-1 text-[11px] hover:bg-(--surface-hover)"
+                  className="shrink-0 rounded-full border border-(--border) px-2.5 py-1 text-[0.6875rem] hover:bg-(--surface-hover)"
                   onClick={() => useReset(credit.id)}
                 >
                   {t("Use reset")}
@@ -1473,11 +1511,11 @@ function CodexUsage() {
             </div>
           ))}
           {resets.length < resetCount && (
-            <div className="text-[11px] text-(--fg-tertiary)">
+            <div className="text-[0.6875rem] text-(--fg-tertiary)">
               {resetCount - resets.length} reset {resetCount - resets.length === 1 ? "detail is" : "details are"} not available.
             </div>
           )}
-          {resetMsg && <div className="text-[11px] text-(--fg-tertiary)">{resetMsg}</div>}
+          {resetMsg && <div className="text-[0.6875rem] text-(--fg-tertiary)">{resetMsg}</div>}
         </div>
       )}
     </div>
@@ -1500,15 +1538,15 @@ function RenameDialog({ renaming, onClose }) {
       <div className="mb-1 text-xs text-(--fg-tertiary)">{t("Keep it short and recognizable.")}</div>
       <input
         autoFocus
-        className="mt-2 w-full rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[13px] outline-none focus:border-(--accent)"
+        className="mt-2 w-full rounded-lg border border-(--border) bg-(--surface) px-3 py-2 text-[0.8125rem] outline-none focus:border-(--accent)"
         placeholder={t("Add a title…")}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
       />
       <div className="mt-4 flex justify-end gap-2">
-        <button className="rounded-lg px-3 py-1.5 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={onClose}>{t("Cancel")}</button>
-        <button className="rounded-lg bg-(--accent) px-3 py-1.5 text-[13px] font-medium text-(--accent-fg) hover:opacity-90" onClick={submit}>{t("Save")}</button>
+        <button className="rounded-lg px-3 py-1.5 text-[0.8125rem] text-(--fg-secondary) hover:bg-(--surface-hover)" onClick={onClose}>{t("Cancel")}</button>
+        <button className="rounded-lg bg-(--accent) px-3 py-1.5 text-[0.8125rem] font-medium text-(--accent-fg) hover:opacity-90" onClick={submit}>{t("Save")}</button>
       </div>
     </Dialog>
   );

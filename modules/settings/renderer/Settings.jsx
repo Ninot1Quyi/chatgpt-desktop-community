@@ -30,6 +30,7 @@ import {
   IconGear,
   IconGlobe,
   IconMore,
+  IconNavPlugins,
   IconSearch,
   IconShield,
   IconSparkle,
@@ -66,7 +67,6 @@ const IconPaw = (p) => <LucideIcon name="PawPrint" {...p} />;
 const IconKeyboard = (p) => <LucideIcon name="Keyboard" {...p} />;
 const IconCard = (p) => <LucideIcon name="CreditCard" {...p} />;
 const IconCamera = (p) => <LucideIcon name="Aperture" {...p} />;
-const IconPuzzle = (p) => <LucideIcon name="Puzzle" {...p} />;
 const IconMonitor = (p) => <LucideIcon name="Monitor" {...p} />;
 const IconHook = (p) => <LucideIcon name="Webhook" {...p} />;
 const IconPlug = (p) => <LucideIcon name="Plug" {...p} />;
@@ -96,7 +96,7 @@ const SECTIONS = [
     header: "Integrations",
     items: [
       { id: "appshots", label: "Appshots", icon: IconCamera },
-      { id: "plugins", label: "Plugins", icon: IconPuzzle },
+      { id: "plugins", label: "Plugins", icon: IconNavPlugins },
       { id: "browser", label: "Browser", icon: IconGlobe },
       { id: "computer", label: "Computer use", icon: IconMonitor },
     ],
@@ -166,10 +166,10 @@ export default function Settings() {
   return (
     <div className="fade-in absolute inset-0 z-50 flex bg-(--surface)">
       {/* left nav column */}
-      <div className="flex w-[230px] shrink-0 flex-col border-r border-(--border-light) bg-(--surface-under)">
-        <div className="app-drag h-[46px] shrink-0" />
+      <div className="flex w-[14.375rem] shrink-0 flex-col border-r border-(--border-light) bg-(--surface-under)">
+        <div className="app-drag h-[2.875rem] shrink-0" />
         <button
-          className="mx-2 mb-1 flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)"
+          className="mx-2 mb-1 flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[0.8125rem] text-(--fg-secondary) hover:bg-(--surface-hover) hover:text-(--fg)"
           onClick={close}
         >
           <IconChevronLeft size={14} />
@@ -180,7 +180,7 @@ export default function Settings() {
             <IconSearch size={12} className="absolute top-1/2 left-2.5 -translate-y-1/2 text-(--fg-faint)" />
             <input
               autoFocus
-              className="h-7 w-full rounded-full border border-(--border-light) bg-(--surface) pr-3 pl-7 text-[12px] outline-none placeholder:text-(--fg-faint) focus:border-(--accent)"
+              className="h-7 w-full rounded-full border border-(--border-light) bg-(--surface) pr-3 pl-7 text-[0.75rem] outline-none placeholder:text-(--fg-faint) focus:border-(--accent)"
               placeholder={t("Search settings…")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -190,12 +190,12 @@ export default function Settings() {
         <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
           {groups.map((g) => (
             <div key={g.header}>
-              <div className="px-2 pt-3 pb-1 text-[11px] font-medium text-(--fg-tertiary)">{t(g.header)}</div>
+              <div className="px-2 pt-3 pb-1 text-[0.6875rem] font-medium text-(--fg-tertiary)">{t(g.header)}</div>
               {g.items.map((it) => (
                 <button
                   key={it.id}
                   className={cx(
-                    "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px]",
+                    "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[0.8125rem]",
                     section === it.id
                       ? "bg-(--surface-active) font-medium"
                       : "text-(--fg-secondary) hover:bg-(--surface-hover)"
@@ -217,17 +217,17 @@ export default function Settings() {
             </div>
           ))}
           {groups.length === 0 && (
-            <div className="px-2 pt-4 text-[12px] text-(--fg-faint)">{t("No matching settings")}</div>
+            <div className="px-2 pt-4 text-[0.75rem] text-(--fg-faint)">{t("No matching settings")}</div>
           )}
         </nav>
       </div>
 
       {/* right content */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="app-drag h-[46px] shrink-0" />
+        <div className="app-drag h-[2.875rem] shrink-0" />
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-[640px] px-8 pt-2 pb-16">
-            <h1 className="mb-5 text-[22px] font-semibold">{active ? t(active.label) : ""}</h1>
+          <div className="mx-auto max-w-[40rem] px-8 pt-2 pb-16">
+            <h1 className="mb-5 text-[1.375rem] font-semibold">{active ? t(active.label) : ""}</h1>
             <SectionContent id={section} />
           </div>
         </div>
@@ -457,12 +457,7 @@ function RuntimeOrderCard() {
 function UpdateRow() {
   const t = useT();
   const version = useStore((s) => s.appInfo?.version);
-  const [st, setSt] = useState(null);
-  useEffect(() => {
-    let live = true;
-    api.getUpdateStatus().then((s) => live && setSt(s)).catch(() => {});
-    return api.onUpdateStatus((s) => setSt(s));
-  }, []);
+  const st = useStore((s) => s.updateStatus);
   const status = st?.status || "idle";
   const desc =
     status === "dev" ? t("Updates are only available in packaged builds") :
@@ -553,7 +548,7 @@ function ShortcutsSection() {
           />
         </div>
         <button
-          className="flex h-7 shrink-0 items-center rounded-full border border-(--border) px-3 text-[13px] hover:bg-(--surface-hover)"
+          className="flex h-7 shrink-0 items-center rounded-full border border-(--border) px-3 text-[0.8125rem] hover:bg-(--surface-hover)"
           onClick={() => {
             for (const [id] of COMMANDS) setKeybinding(id, null);
             useStore.getState().toast("Shortcuts reset to defaults");
@@ -570,11 +565,11 @@ function ShortcutsSection() {
           return (
             <div key={id} className="flex items-center justify-between gap-4 px-4 py-2.5">
               <div className="min-w-0">
-                <div className="text-[13px]">{label}</div>
-                {desc && <div className="mt-0.5 text-[12px] text-(--fg-tertiary)">{desc}</div>}
+                <div className="text-[0.8125rem]">{label}</div>
+                {desc && <div className="mt-0.5 text-[0.75rem] text-(--fg-tertiary)">{desc}</div>}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
-                {chips.length === 0 && !isCustom && <span className="text-[12px] text-(--fg-faint)">Unassigned</span>}
+                {chips.length === 0 && !isCustom && <span className="text-[0.75rem] text-(--fg-faint)">Unassigned</span>}
                 {chips.map((chip, ci) => (
                   <button
                     key={chip + ci}
@@ -603,9 +598,9 @@ function ShortcutsSection() {
             </div>
           );
         })}
-        {rows.length === 0 && <div className="px-4 py-3 text-[12px] text-(--fg-faint)">No matching shortcuts</div>}
+        {rows.length === 0 && <div className="px-4 py-3 text-[0.75rem] text-(--fg-faint)">No matching shortcuts</div>}
       </Card>
-      <div className="px-1 text-[11px] text-(--fg-faint)">
+      <div className="px-1 text-[0.6875rem] text-(--fg-faint)">
         Click a shortcut to remap it. Non-editable: Enter (send), Shift+Enter (new line), Ctrl+Shift+Space (hotkey window), Ctrl+Alt+N (quick chat).
       </div>
     </>
@@ -657,7 +652,7 @@ function UsageSection() {
 
   return (
     <div className="flex flex-col gap-3">
-      {error && <div className="text-[13px] text-(--fg-tertiary)">Usage data is not available: {error}</div>}
+      {error && <div className="text-[0.8125rem] text-(--fg-tertiary)">Usage data is not available: {error}</div>}
       {!data && !error && (
         <div className="flex justify-center py-6 text-(--fg-tertiary)"><Spinner /></div>
       )}
@@ -683,7 +678,7 @@ function UsageSection() {
                       ? "Current backend-reported credit balance."
                       : "No separate credit balance is available for this account."}
                 >
-                  <span className="text-[13px] text-(--fg-secondary)">{creditBalance}</span>
+                  <span className="text-[0.8125rem] text-(--fg-secondary)">{creditBalance}</span>
                 </Row>
               )}
               {individualLimit && (
@@ -691,7 +686,7 @@ function UsageSection() {
                   title="Monthly usage limit"
                   desc={`Resets ${codexResetDate(individualLimit.resetsAt, true) || "on the next billing cycle"}`}
                 >
-                  <span className="text-[13px] text-(--fg-secondary)">
+                  <span className="text-[0.8125rem] text-(--fg-secondary)">
                     {individualLimit.used} / {individualLimit.limit} · {individualLimit.remainingPercent}% left
                   </span>
                 </Row>
@@ -736,7 +731,7 @@ function UsageSection() {
                   ? `${resets.length} of ${resetCount} reset details are currently available.`
                   : "Earned resets that can restore eligible usage windows."}
               >
-                <span className="text-[13px] text-(--fg-secondary)">{resetCount}</span>
+                <span className="text-[0.8125rem] text-(--fg-secondary)">{resetCount}</span>
               </Row>
               {resets.map((credit) => (
                 <Row
@@ -785,7 +780,7 @@ function LimitRow({ label, pctLeft, reset }) {
   return (
     <div className="px-4 py-3">
       <div className="flex items-baseline justify-between">
-        <span className="text-[13px]">{label}</span>
+        <span className="text-[0.8125rem]">{label}</span>
         <span className="text-xs text-(--fg-tertiary)">
           {reset && <>Resets {reset} · </>}{pct}% left
         </span>
@@ -824,10 +819,10 @@ function AccountSection() {
       </Card>
       <Card title="Account">
         <Row title="Email">
-          <span className="text-[13px] text-(--fg-secondary)">{account?.email || "Not signed in"}</span>
+          <span className="text-[0.8125rem] text-(--fg-secondary)">{account?.email || "Not signed in"}</span>
         </Row>
         <Row title="Plan">
-          <span className="text-[13px] text-(--fg-secondary)">{planLabel(account?.planType) || "—"}</span>
+          <span className="text-[0.8125rem] text-(--fg-secondary)">{planLabel(account?.planType) || "—"}</span>
         </Row>
       </Card>
       <Card title="Backend">
@@ -836,7 +831,7 @@ function AccountSection() {
         <InfoRow label="Client" value={`ChatGPT Desktop Community v${appInfo?.version ?? "?"}`} />
         <Row title="Restart backend" desc="Restart the ChatGPT Desktop Community backend process.">
           <button
-            className="rounded-lg border border-(--border) px-3 py-1.5 text-[13px] hover:bg-(--surface-hover)"
+            className="rounded-lg border border-(--border) px-3 py-1.5 text-[0.8125rem] hover:bg-(--surface-hover)"
             onClick={() => api.restartAppServer()}
           >
             Restart
@@ -861,8 +856,8 @@ function VendorAccountRow({ meta }) {
     <div className="flex items-center gap-3 px-4 py-3">
       <span className="flex h-5 w-5 shrink-0 items-center justify-center">{meta.icon(18)}</span>
       <div className="min-w-0 flex-1">
-        <div className="text-[13px]">{meta.label}</div>
-        <div className="mt-0.5 truncate text-[12px] text-(--fg-tertiary)">{status}</div>
+        <div className="text-[0.8125rem]">{meta.label}</div>
+        <div className="mt-0.5 truncate text-[0.75rem] text-(--fg-tertiary)">{status}</div>
       </div>
       {connected && <LucideIcon name="Check" size={14} className="shrink-0 text-(--success)" />}
       <Btn onClick={() => (codex ? startChatgptLogin() : startExternalLogin(meta.id))}>
@@ -875,8 +870,8 @@ function VendorAccountRow({ meta }) {
 function InfoRow({ label, value }) {
   return (
     <div className="flex items-center justify-between gap-6 px-4 py-3">
-      <span className="shrink-0 text-[13px]">{label}</span>
-      <span className="min-w-0 truncate font-mono text-[12px] text-(--fg-tertiary)" title={value || ""}>
+      <span className="shrink-0 text-[0.8125rem]">{label}</span>
+      <span className="min-w-0 truncate font-mono text-[0.75rem] text-(--fg-tertiary)" title={value || ""}>
         {value || "—"}
       </span>
     </div>
@@ -986,7 +981,7 @@ function ArchivedSection() {
       <div className="-mt-10 mb-3 flex justify-end">
         <button
           disabled={busy || filtered.length === 0}
-          className="flex h-7 items-center gap-1.5 rounded-full bg-(--danger-soft) px-3 text-[13px] font-medium text-(--danger) hover:opacity-85 disabled:opacity-40"
+          className="flex h-7 items-center gap-1.5 rounded-full bg-(--danger-soft) px-3 text-[0.8125rem] font-medium text-(--danger) hover:opacity-85 disabled:opacity-40"
           onClick={() => deleteThreads(filtered)}
         >
           <IconTrash size={13} />
@@ -1004,17 +999,17 @@ function ArchivedSection() {
         />
       </div>
       <div className="mb-4 flex items-center gap-2">
-        <span className="flex h-7 items-center gap-1.5 rounded-full border border-(--border) px-3 text-[13px]">
+        <span className="flex h-7 items-center gap-1.5 rounded-full border border-(--border) px-3 text-[0.8125rem]">
           <LucideIcon name="List" size={13} className="text-(--fg-tertiary)" />
           All chats
           <IconChevronDown size={12} className="text-(--fg-tertiary)" />
         </span>
-        <span className="relative flex h-7 items-center gap-1.5 rounded-full border border-(--border) pl-3 pr-2 text-[13px]">
+        <span className="relative flex h-7 items-center gap-1.5 rounded-full border border-(--border) pl-3 pr-2 text-[0.8125rem]">
           <IconFolder size={13} className="text-(--fg-tertiary)" />
           <select
             value={project}
             onChange={(e) => setProject(e.target.value)}
-            className="appearance-none bg-transparent pr-4 text-[13px] outline-none"
+            className="appearance-none bg-transparent pr-4 text-[0.8125rem] outline-none"
           >
             <option value="all">All projects</option>
             {projects.map((p) => (
@@ -1027,17 +1022,17 @@ function ArchivedSection() {
       {threads === null ? (
         <div className="flex justify-center py-6 text-(--fg-tertiary)"><Spinner /></div>
       ) : groups.length === 0 ? (
-        <div className="px-1 text-[13px] text-(--fg-tertiary)">No archived chats</div>
+        <div className="px-1 text-[0.8125rem] text-(--fg-tertiary)">No archived chats</div>
       ) : (
         groups.map(([name, list]) => (
           <div key={name} className="mb-6">
             <div className="mb-2 flex items-center justify-between px-1">
-              <span className="flex items-center gap-1.5 text-[13px] font-medium text-(--fg-secondary)">
+              <span className="flex items-center gap-1.5 text-[0.8125rem] font-medium text-(--fg-secondary)">
                 <IconFolder size={13} className="text-(--fg-tertiary)" />
                 {name}
               </span>
               <span className="relative flex items-center gap-1">
-                <span className="text-[12px] text-(--fg-tertiary)">{list.length} chats</span>
+                <span className="text-[0.75rem] text-(--fg-tertiary)">{list.length} chats</span>
                 <button
                   className="flex h-5 w-5 items-center justify-center rounded-md text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
                   onClick={() => setMenuFor(menuFor === name ? null : name)}
@@ -1050,7 +1045,7 @@ function ArchivedSection() {
                     style={{ boxShadow: "var(--shadow-menu)" }}
                   >
                     <button
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-(--danger) hover:bg-(--surface-hover)"
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[0.8125rem] text-(--danger) hover:bg-(--surface-hover)"
                       onClick={() => deleteThreads(list)}
                     >
                       <IconTrash size={13} />
@@ -1064,8 +1059,8 @@ function ArchivedSection() {
               {list.slice(0, 50).map((t) => (
                 <div key={t.id} className="flex items-center justify-between gap-4 px-4 py-2.5">
                   <div className="min-w-0">
-                    <div className="truncate text-[13px]">{t.title}</div>
-                    <div className="mt-0.5 text-[11px] text-(--fg-faint)">{fmtDate(t.updatedAtMs)}</div>
+                    <div className="truncate text-[0.8125rem]">{t.title}</div>
+                    <div className="mt-0.5 text-[0.6875rem] text-(--fg-faint)">{fmtDate(t.updatedAtMs)}</div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     <button
@@ -1080,7 +1075,7 @@ function ArchivedSection() {
                       <IconTrash size={13} />
                     </button>
                     <button
-                      className="rounded-lg border border-(--border) px-2.5 py-1 text-[12px] hover:bg-(--surface-hover)"
+                      className="rounded-lg border border-(--border) px-2.5 py-1 text-[0.75rem] hover:bg-(--surface-hover)"
                       onClick={async () => {
                         await api.rpc("thread/unarchive", { threadId: t.id }).catch(() => {});
                         useStore.getState().loadThreads();

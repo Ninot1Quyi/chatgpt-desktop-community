@@ -70,7 +70,7 @@ export default function ExperimentsSection() {
   return (
     <>
       <div className="-mt-3 mb-4 flex items-start justify-between gap-4">
-        <div className="text-[13px] text-(--fg-tertiary)">
+        <div className="text-[0.8125rem] text-(--fg-tertiary)">
           Runtime feature flags from the loaded Codex configuration.
         </div>
         <Btn disabled={busy === "refresh"} onClick={refresh}>
@@ -80,9 +80,9 @@ export default function ExperimentsSection() {
 
       <Card title="Feature flags">
         {features == null ? (
-          <div className="px-4 py-4 text-[12px] text-(--fg-faint)">Loading...</div>
+          <div className="px-4 py-4 text-[0.75rem] text-(--fg-faint)">Loading...</div>
         ) : features.length === 0 ? (
-          <div className="px-4 py-4 text-[12px] text-(--fg-faint)">
+          <div className="px-4 py-4 text-[0.75rem] text-(--fg-faint)">
             {error || "No experimental feature flags reported by the runtime."}
           </div>
         ) : (
@@ -102,7 +102,7 @@ export default function ExperimentsSection() {
       </Card>
 
       {error && features?.length > 0 && (
-        <div className="rounded-xl border border-(--danger) bg-(--danger-soft) px-4 py-3 text-[12px] text-(--danger)">
+        <div className="rounded-xl border border-(--danger) bg-(--danger-soft) px-4 py-3 text-[0.75rem] text-(--danger)">
           {error}
         </div>
       )}

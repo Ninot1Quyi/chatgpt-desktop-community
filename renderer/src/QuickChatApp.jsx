@@ -42,7 +42,7 @@ export default function QuickChatApp() {
 
   if (status !== "ready") {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-(--surface) text-[13px] text-(--fg-tertiary)">
+      <div className="flex h-full w-full items-center justify-center bg-(--surface) text-[0.8125rem] text-(--fg-tertiary)">
         Starting…
       </div>
     );
@@ -52,7 +52,7 @@ export default function QuickChatApp() {
     <div className="flex h-full w-full flex-col bg-(--surface)">
       {/* header: title + expand + close */}
       <div className="app-drag flex h-10 shrink-0 items-center justify-between pl-4 pr-2">
-        <span className="text-[13px] font-medium">{activeThreadId ? "Chat" : "New chat"}</span>
+        <span className="text-[0.8125rem] font-medium">{activeThreadId ? "Chat" : "New chat"}</span>
         <div className="app-no-drag flex items-center gap-1">
           <IconButton icon={<LucideIcon name="Maximize2" size={12} />} title="Open in app" onClick={() => window.open("index.html", "_blank")} />
           <IconButton icon={<IconX size={13} />} title="Close" onClick={() => window.close()} />
@@ -66,11 +66,11 @@ export default function QuickChatApp() {
       ) : (
         <>
           {/* empty state: tab-type rows */}
-          <div className="flex flex-col gap-px px-3 pb-2">
+          <div className="flex flex-col gap-[0.0625rem] px-3 pb-2">
             {TAB_ROWS.map((r) => (
               <button
                 key={r.id}
-                className="flex h-8 items-center gap-2.5 rounded-lg px-2 text-left text-[13px] text-(--fg) hover:bg-(--surface-hover)"
+                className="flex h-8 items-center gap-2.5 rounded-lg px-2 text-left text-[0.8125rem] text-(--fg) hover:bg-(--surface-hover)"
                 onClick={() => newChat()}
               >
                 <span className="flex h-4 w-4 items-center justify-center text-(--fg-tertiary)">{r.icon}</span>
@@ -88,13 +88,13 @@ export default function QuickChatApp() {
                 className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-(--surface-hover)"
                 onClick={() => openThread(t.id)}
               >
-                <span className="min-w-0 flex-1 truncate text-[13px]">{t.name || (t.preview || "").split("\n")[0] || "New chat"}</span>
+                <span className="min-w-0 flex-1 truncate text-[0.8125rem]">{t.name || (t.preview || "").split("\n")[0] || "New chat"}</span>
                 <span className="shrink-0 text-xs text-(--fg-faint)">{quickDate(t.updatedAt)}</span>
               </button>
             ))}
             {threads.length > 3 && (
               <button
-                className="mt-0.5 w-full rounded-lg px-2 py-1.5 text-left text-[13px] text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
+                className="mt-0.5 w-full rounded-lg px-2 py-1.5 text-left text-[0.8125rem] text-(--fg-tertiary) hover:bg-(--surface-hover) hover:text-(--fg)"
                 onClick={() => window.open("index.html", "_blank")}
               >
                 See all

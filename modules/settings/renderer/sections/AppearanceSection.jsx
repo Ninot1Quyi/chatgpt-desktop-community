@@ -22,8 +22,8 @@ export default function AppearanceSection() {
   const update = (patch) => setPrefs(writeAppearance(patch));
   const [pointer, setPointer] = useState(() => lsGet("appearance.pointerCursors", true));
   const [motion, setMotion] = useState(() => lsGet("appearance.reduceMotion", "system"));
-  const [uiFontSize, setUiFontSize] = useState(() => lsGet("appearance.uiFontSize", 14));
-  const [codeFontSize, setCodeFontSize] = useState(() => lsGet("appearance.codeFontSize", 12.5));
+  const [uiFontSize, setUiFontSize] = useState(() => readRemPreference("appearance.uiFontSize", 0.875));
+  const [codeFontSize, setCodeFontSize] = useState(() => readRemPreference("appearance.codeFontSize", 0.78125));
   const [diffMarkers, setDiffMarkers] = useState(() => lsGet("appearance.diffMarkers", true));
 
   return (
@@ -42,11 +42,11 @@ export default function AppearanceSection() {
         </Row>
         <div className="px-4 py-3.5">
           <div className="rounded-xl border border-(--border-light) bg-(--surface) p-4">
-            <div className="text-[18px] font-medium">Aa</div>
-            <div className="mt-1 text-[12px] text-(--fg-tertiary)">ChatGPT Desktop Community</div>
+            <div className="text-[1.125rem] font-medium">Aa</div>
+            <div className="mt-1 text-[0.75rem] text-(--fg-tertiary)">ChatGPT Desktop Community</div>
             <div className="mt-3 flex gap-2">
               <button
-                className="rounded-lg border border-(--border) px-2.5 py-1 text-[12px] hover:bg-(--surface-hover)"
+                className="rounded-lg border border-(--border) px-2.5 py-1 text-[0.75rem] hover:bg-(--surface-hover)"
                 onClick={() => {
                   const { accent, background, foreground, uiFont, codeFont } = readAppearance();
                   navigator.clipboard
@@ -57,7 +57,7 @@ export default function AppearanceSection() {
                 Copy theme
               </button>
               <button
-                className="rounded-lg border border-(--border) px-2.5 py-1 text-[12px] hover:bg-(--surface-hover)"
+                className="rounded-lg border border-(--border) px-2.5 py-1 text-[0.75rem] hover:bg-(--surface-hover)"
                 onClick={async () => {
                   try {
                     const text = await navigator.clipboard.readText();
@@ -157,9 +157,9 @@ export default function AppearanceSection() {
               max={100}
               value={prefs.contrast}
               onChange={(e) => update({ contrast: Number(e.target.value) })}
-              className="w-[140px] accent-(--accent)"
+              className="w-[8.75rem] accent-(--accent)"
             />
-            <span className="w-6 text-right text-[12px] text-(--fg-tertiary)">{prefs.contrast}</span>
+            <span className="w-6 text-right text-[0.75rem] text-(--fg-tertiary)">{prefs.contrast}</span>
           </div>
         </Row>
       </Card>
@@ -182,21 +182,21 @@ export default function AppearanceSection() {
         <Row title="UI font size" desc="Adjust the base size used for the ChatGPT UI">
           <div className="flex items-center gap-2">
             <input
-              type="number" min={11} max={20} step={0.5} value={uiFontSize}
-              onChange={(e) => { const v = Number(e.target.value) || 14; setUiFontSize(v); lsSet("appearance.uiFontSize", v); applyUiFontSize(v); }}
-              className="h-7 w-16 rounded-lg border border-(--border-light) bg-(--surface) px-2 text-[13px] outline-none focus:border-(--border-heavy)"
+              type="number" min={0.6875} max={1.25} step={0.03125} value={uiFontSize}
+              onChange={(e) => { const v = Number(e.target.value) || 0.875; setUiFontSize(v); lsSet("appearance.uiFontSize", v); applyUiFontSize(v); }}
+              className="h-7 w-16 rounded-lg border border-(--border-light) bg-(--surface) px-2 text-[0.8125rem] outline-none focus:border-(--border-heavy)"
             />
-            <span className="text-[12px] text-(--fg-tertiary)">px</span>
+            <span className="text-[0.75rem] text-(--fg-tertiary)">rem</span>
           </div>
         </Row>
         <Row title="Code font size" desc="Adjust the base size used for code across chats and diffs">
           <div className="flex items-center gap-2">
             <input
-              type="number" min={9} max={20} step={0.5} value={codeFontSize}
-              onChange={(e) => { const v = Number(e.target.value) || 12.5; setCodeFontSize(v); lsSet("appearance.codeFontSize", v); applyCodeFontSize(v); }}
-              className="h-7 w-16 rounded-lg border border-(--border-light) bg-(--surface) px-2 text-[13px] outline-none focus:border-(--border-heavy)"
+              type="number" min={0.5625} max={1.25} step={0.03125} value={codeFontSize}
+              onChange={(e) => { const v = Number(e.target.value) || 0.78125; setCodeFontSize(v); lsSet("appearance.codeFontSize", v); applyCodeFontSize(v); }}
+              className="h-7 w-16 rounded-lg border border-(--border-light) bg-(--surface) px-2 text-[0.8125rem] outline-none focus:border-(--border-heavy)"
             />
-            <span className="text-[12px] text-(--fg-tertiary)">px</span>
+            <span className="text-[0.75rem] text-(--fg-tertiary)">rem</span>
           </div>
         </Row>
         <Row title="Diff markers" desc="Show colored line markers in diff views">
@@ -230,11 +230,16 @@ function applyMotion(v) {
     document.getElementById("pref-motion-style")?.remove();
   }
 }
+function readRemPreference(key, fallback) {
+  const value = Number(lsGet(key, fallback));
+  if (!Number.isFinite(value)) return fallback;
+  return value > 4 ? value / 16 : value;
+}
 function applyUiFontSize(v) {
-  document.documentElement.style.setProperty("--codex-chat-font-size", `${v}px`);
+  document.documentElement.style.setProperty("--codex-chat-font-size", `${v}rem`);
 }
 function applyCodeFontSize(v) {
-  document.documentElement.style.setProperty("--codex-code-font-size", `${v}px`);
+  document.documentElement.style.setProperty("--codex-code-font-size", `${v}rem`);
 }
 function applyDiffMarkers(on) {
   document.documentElement.classList.toggle("pref-no-diff-markers", !on);

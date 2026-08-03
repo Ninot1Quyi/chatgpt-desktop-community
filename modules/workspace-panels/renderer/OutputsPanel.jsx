@@ -26,7 +26,7 @@ export default function OutputsPanel() {
 
   return (
     <div
-      className="fade-in absolute top-2 right-3 bottom-2 z-30 flex w-[300px] flex-col overflow-hidden rounded-2xl border border-(--border) bg-(--surface-raised)"
+      className="fade-in absolute top-2 right-3 bottom-2 z-30 flex w-[18.75rem] flex-col overflow-hidden rounded-2xl border border-(--border) bg-(--surface-raised)"
       style={{ boxShadow: "var(--shadow-menu)" }}
     >
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pt-2 pb-3">
@@ -39,7 +39,7 @@ export default function OutputsPanel() {
                 icon={<LucideIcon name="Layers" size={14} />}
                 label="Changes"
                 trailing={
-                  <span className="flex items-center gap-1.5 text-[12px]">
+                  <span className="flex items-center gap-1.5 text-[0.75rem]">
                     <span className="text-(--success)">+{(git.adds ?? 0).toLocaleString()}</span>
                     <span className="text-(--danger)">−{(git.dels ?? 0).toLocaleString()}</span>
                     <LucideIcon name="ChevronDown" size={12} className="text-(--fg-tertiary)" />
@@ -174,7 +174,7 @@ function Row({ icon, label, trailing, title, onClick, ariaExpanded }) {
       title={typeof label === "string" ? title || label : title}
       onClick={onClick}
       aria-expanded={ariaExpanded}
-      className={`flex h-[30px] w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-(--fg) ${onClick ? "hover:bg-(--surface-hover)" : ""}`}
+      className={`flex h-[1.875rem] w-full items-center gap-2.5 rounded-md px-2 text-left text-[0.8125rem] text-(--fg) ${onClick ? "hover:bg-(--surface-hover)" : ""}`}
     >
       <span className="flex h-4 w-4 shrink-0 items-center justify-center text-(--fg-tertiary)">{icon}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -189,7 +189,7 @@ function SubagentsDetails({ agents }) {
       {agents.map((agent) => (
         <div
           key={agent.id}
-          className="flex min-h-[28px] items-center gap-2 rounded-md px-2 text-[12px] text-(--fg-secondary)"
+          className="flex min-h-[1.75rem] items-center gap-2 rounded-md px-2 text-[0.75rem] text-(--fg-secondary)"
           title={[agent.agentThreadId, agent.message].filter(Boolean).join(" · ")}
         >
           <span
@@ -225,7 +225,7 @@ function FileRow({ item }) {
   const isImage = item.kind === "image" || IMAGE_EXTS.some((e) => item.path.toLowerCase().endsWith(e));
   return (
     <button
-      className="flex h-[30px] w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-(--fg) hover:bg-(--surface-hover)"
+      className="flex h-[1.875rem] w-full items-center gap-2.5 rounded-md px-2 text-left text-[0.8125rem] text-(--fg) hover:bg-(--surface-hover)"
       title={item.path}
       onClick={() => openFileInPanel(item.path)}
     >
@@ -244,7 +244,7 @@ function FileRow({ item }) {
 function SourceRow({ item }) {
   return (
     <button
-      className="flex h-[30px] w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-(--fg) hover:bg-(--surface-hover)"
+      className="flex h-[1.875rem] w-full items-center gap-2.5 rounded-md px-2 text-left text-[0.8125rem] text-(--fg) hover:bg-(--surface-hover)"
       title={item.full}
       onClick={() => (item.url ? api.openExternal(item.full) : item.icon ? null : openFileInPanel(item.full))}
     >
@@ -318,7 +318,7 @@ function RowWithRef({ refEl, icon, label, trailing, onClick }) {
       ref={refEl}
       title={typeof label === "string" ? label : undefined}
       onClick={onClick}
-      className="flex h-[30px] w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-(--fg) hover:bg-(--surface-hover)"
+      className="flex h-[1.875rem] w-full items-center gap-2.5 rounded-md px-2 text-left text-[0.8125rem] text-(--fg) hover:bg-(--surface-hover)"
     >
       <span className="flex h-4 w-4 shrink-0 items-center justify-center text-(--fg-tertiary)">{icon}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>

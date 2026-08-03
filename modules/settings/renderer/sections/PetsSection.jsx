@@ -183,27 +183,27 @@ export default function PetsSection() {
     <>
       <div className="-mt-3 mb-4 flex items-start justify-between gap-4">
         <div>
-          <div className="text-[13px] font-medium">Pick a pet</div>
-          <div className="mt-0.5 text-[13px] text-(--fg-tertiary)">
+          <div className="text-[0.8125rem] font-medium">Pick a pet</div>
+          <div className="mt-0.5 text-[0.8125rem] text-(--fg-tertiary)">
             Pets manage threads and surface what needs attention. Only pets with a real manifest and spritesheet can be selected.
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
-            className="flex h-7 items-center gap-1.5 rounded-full border border-(--border) px-3 text-[13px] hover:bg-(--surface-hover)"
+            className="flex h-7 items-center gap-1.5 rounded-full border border-(--border) px-3 text-[0.8125rem] hover:bg-(--surface-hover)"
             onClick={openCreateFolder}
           >
             Create
           </button>
           <button
-            className="flex h-7 items-center gap-1.5 rounded-full border border-(--border) px-3 text-[13px] hover:bg-(--surface-hover)"
+            className="flex h-7 items-center gap-1.5 rounded-full border border-(--border) px-3 text-[0.8125rem] hover:bg-(--surface-hover)"
             onClick={importPet}
           >
             Import
           </button>
           <button
             className={cx(
-              "flex h-7 items-center gap-1.5 rounded-full bg-(--fg) px-3 text-[13px] text-(--surface) hover:opacity-85",
+              "flex h-7 items-center gap-1.5 rounded-full bg-(--fg) px-3 text-[0.8125rem] text-(--surface) hover:opacity-85",
               !selectedItem && "cursor-default opacity-50",
             )}
             onClick={wakePet}
@@ -220,23 +220,23 @@ export default function PetsSection() {
               <div className="flex min-w-0 items-center gap-3">
                 <PetPreview pet={item} />
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-[13px]">
+                  <div className="flex items-center gap-2 text-[0.8125rem]">
                     <span>{item.displayName}</span>
                     {!item.available && (
-                      <span className="rounded-full bg-(--surface-active) px-2 py-0.5 text-[11px] text-(--fg-tertiary)">
+                      <span className="rounded-full bg-(--surface-active) px-2 py-0.5 text-[0.6875rem] text-(--fg-tertiary)">
                         Missing
                       </span>
                     )}
                     {item.source === "custom" && item.available && (
-                      <span className="rounded-full bg-(--accent-soft) px-2 py-0.5 text-[11px] text-(--accent)">
+                      <span className="rounded-full bg-(--accent-soft) px-2 py-0.5 text-[0.6875rem] text-(--accent)">
                         Custom
                       </span>
                     )}
                   </div>
-                  <div className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-(--fg-tertiary)">
+                  <div className="mt-0.5 line-clamp-2 text-[0.75rem] leading-5 text-(--fg-tertiary)">
                     {item.description || petSubtitle(item)}
                   </div>
-                  <div className="mt-0.5 truncate font-mono text-[11px] text-(--fg-tertiary)" title={petSubtitle(item)}>
+                  <div className="mt-0.5 truncate font-mono text-[0.6875rem] text-(--fg-tertiary)" title={petSubtitle(item)}>
                     {petSubtitle(item)}
                   </div>
                 </div>
@@ -245,7 +245,7 @@ export default function PetsSection() {
                 {item.available && <Btn onClick={() => api.openPath(item.directory)}>Open</Btn>}
                 <button
                   className={cx(
-                    "shrink-0 rounded-lg border px-3 py-1.5 text-[13px]",
+                    "shrink-0 rounded-lg border px-3 py-1.5 text-[0.8125rem]",
                     selected
                       ? "border-(--accent) bg-(--accent-soft) text-(--accent)"
                       : item.available
@@ -265,10 +265,10 @@ export default function PetsSection() {
       <Card title="Custom pets">
         <div className="flex items-center justify-between gap-6 px-4 py-3.5">
           <div className="min-w-0">
-            <div className="truncate font-mono text-[12px] text-(--fg-tertiary)" title={petsDir}>
+            <div className="truncate font-mono text-[0.75rem] text-(--fg-tertiary)" title={petsDir}>
               {petsDir}
             </div>
-            <div className="mt-1 text-[12px] leading-5 text-(--fg-tertiary)">
+            <div className="mt-1 text-[0.75rem] leading-5 text-(--fg-tertiary)">
               Put each pet in its own folder with `pet.json` and the referenced spritesheet. Works with `/Users/...`
               and `C:\Users\...` style paths.
             </div>

@@ -131,7 +131,7 @@ export function RightPanelHeader() {
       {/* tab strip: scrollable, "+" pinned at its end (like the reference) */}
       {tabs.length > 0 && (
         <div
-          className="app-drag hide-scrollbar flex h-full min-w-0 max-w-[calc(100%-44px)] shrink items-center gap-1.5 overflow-x-auto pl-1"
+          className="app-no-drag hide-scrollbar flex h-full min-w-0 max-w-[calc(100%-2.75rem)] shrink items-center gap-1.5 overflow-x-auto pl-1"
           onDragOver={(e) => {
             if (draggedTabId == null) return;
             // dragging over strip background (not a tab) → move to the end
@@ -161,7 +161,7 @@ export function RightPanelHeader() {
           </button>
         </div>
       )}
-      <div className="app-drag h-full min-w-4 flex-1" />
+      <div className="app-drag h-full min-w-4 flex-1" data-testid="right-panel-header-drag-region" />
       <IconButton
         icon={expanded ? <IconCompress /> : <IconExpand />}
         title={expanded ? "Restore panel width" : "Expand panel"}
@@ -217,7 +217,7 @@ function PanelTab({ tab, active, showSep, onActivate, onClose }) {
       />
       <button
         className={cx(
-          "relative z-10 flex h-full min-w-0 flex-1 items-center gap-2 pr-1 pl-2.5 text-[13px]",
+          "app-no-drag relative z-10 flex h-full min-w-0 flex-1 items-center gap-2 pr-1 pl-2.5 text-[0.8125rem]",
           active ? "text-(--fg)" : "text-(--fg-secondary)"
         )}
         onClick={onActivate}
@@ -240,7 +240,7 @@ function PanelTab({ tab, active, showSep, onActivate, onClose }) {
       >
         <IconX size={11} />
       </button>
-      {showSep && <div className="absolute -right-1 h-3 w-px bg-(--border)" />}
+      {showSep && <div className="absolute -right-1 h-3 w-[0.0625rem] bg-(--border)" />}
     </div>
   );
 }
@@ -271,7 +271,7 @@ export default function RightPanel() {
   const activeId = usePanelStore((s) => s.activeId);
   if (!tabs.length) {
     return (
-      <div className="right-panel-root pointer-events-none h-full w-full pt-[46px]">
+      <div className="right-panel-root pointer-events-none h-full w-full pt-[2.875rem]">
         <div className="pointer-events-auto h-full">
           <PanelEmptyState />
         </div>
@@ -279,7 +279,7 @@ export default function RightPanel() {
     );
   }
   return (
-    <div className="right-panel-root pointer-events-none flex h-full w-full flex-col pt-[46px]">
+    <div className="right-panel-root pointer-events-none flex h-full w-full flex-col pt-[2.875rem]">
       <div className="pointer-events-auto min-h-0 flex-1">
         {tabs.map((t) => {
           const C = TAB_KINDS[t.kind].component;
@@ -387,13 +387,13 @@ function PanelEmptyState() {
             return (
               <button
                 key={k}
-                className="flex min-h-10 w-full items-center gap-2 rounded-[10px] bg-(--panel-action-bg) px-2.5 py-2 text-left hover:bg-(--panel-action-hover-bg)"
+                className="flex min-h-10 w-full items-center gap-2 rounded-[0.625rem] bg-(--panel-action-bg) px-2.5 py-2 text-left hover:bg-(--panel-action-hover-bg)"
                 onClick={() => usePanelStore.getState().open(k)}
               >
                 <Icon size={16} className="shrink-0 text-(--fg-tertiary)" />
-                <span className="min-w-0 flex-1 truncate text-[13px] leading-[18.5714px] text-(--fg)">{def.title}</span>
+                <span className="min-w-0 flex-1 truncate text-[0.8125rem] leading-[1.1607125rem] text-(--fg)">{def.title}</span>
                 {hint && (
-                  <kbd className="shrink-0 rounded-[10px] bg-(--keybinding-bg) px-1.5 py-0.5 text-xs leading-3 font-[445] text-(--fg-secondary)">{hint}</kbd>
+                  <kbd className="shrink-0 rounded-[0.625rem] bg-(--keybinding-bg) px-1.5 py-0.5 text-xs leading-3 font-[445] text-(--fg-secondary)">{hint}</kbd>
                 )}
               </button>
             );

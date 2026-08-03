@@ -37,3 +37,37 @@ test("project and thread drag write the official shared global-state keys", () =
   assert.match(state, /export function createThreadProjectAssignmentPatch/);
   assert.match(state, /"thread-project-assignments"/);
 });
+
+test("sidebar retains Help while adding a pending-update-only entry", () => {
+  const sidebar = read("modules/projects-navigation/renderer/Sidebar.jsx");
+  const settings = read("modules/settings/renderer/Settings.jsx");
+  const store = read("renderer/src/store.js");
+
+  assert.match(sidebar, /IconHelpCircle/);
+  assert.match(sidebar, /HELP_URL/);
+  assert.match(sidebar, /title="Help"/);
+  assert.match(sidebar, /label: "Usage remaining"/);
+  assert.match(sidebar, /shouldShowUpdateEntry\(updateStatus\)/);
+  assert.match(sidebar, /\{showUpdate && \(/);
+  assert.match(sidebar, /\{t\("Updates"\)\}/);
+  assert.match(sidebar, /installUpdate\(\)/);
+  assert.match(store, /updateStatus: null/);
+  assert.match(store, /set\(\{ updateStatus: s \}\)/);
+  assert.match(settings, /const st = useStore\(\(s\) => s\.updateStatus\)/);
+  assert.doesNotMatch(settings, /api\.getUpdateStatus\(\)/);
+});
+
+test("settings retain the full Pets and Usage surfaces from main", () => {
+  const settings = read("modules/settings/renderer/Settings.jsx");
+  const pets = read("modules/settings/renderer/sections/PetsSection.jsx");
+
+  assert.match(settings, /id: "pets", label: "Pets"/);
+  assert.match(settings, /case "pets":[\s\S]*?<PetsSection/);
+  assert.match(settings, /id: "usage", label: "Usage & billing"/);
+  assert.match(settings, /case "usage":[\s\S]*?<UsageSection/);
+  assert.match(settings, /function UsageSection\(\)/);
+  assert.match(settings, /account\/rateLimitResetCredit\/consume/);
+  assert.match(pets, /export default function PetsSection\(\)/);
+  assert.match(pets, /customCandidateFromDirectory/);
+  assert.match(pets, /first-awake-pet-notification-avatar-ids/);
+});

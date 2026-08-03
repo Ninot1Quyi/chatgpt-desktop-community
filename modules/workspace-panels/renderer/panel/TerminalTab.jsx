@@ -6,6 +6,7 @@ import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { useStore } from "@app/store.js";
 import * as api from "@app/api.js";
+import { rem } from "@app/lib/cssUnits.js";
 import { IconRefresh } from "@app/components/icons.jsx";
 import {
   interactiveCommand,
@@ -41,7 +42,7 @@ const newProcessId = () =>
 // Measure the grid size that fits the container (no fit addon needed).
 function gridSize(el, fontSize, lineHeight) {
   const probe = document.createElement("span");
-  probe.style.cssText = `position:absolute;visibility:hidden;font-family:var(--font-mono,monospace);font-size:${fontSize}px;line-height:${lineHeight};`;
+  probe.style.cssText = `position:absolute;visibility:hidden;font-family:var(--font-mono,monospace);font-size:${rem(fontSize)};line-height:${lineHeight};`;
   probe.textContent = "W".repeat(100);
   el.appendChild(probe);
   const charW = probe.getBoundingClientRect().width / 100 || fontSize * 0.6;

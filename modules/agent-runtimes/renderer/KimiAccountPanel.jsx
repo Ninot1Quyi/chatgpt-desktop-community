@@ -77,7 +77,7 @@ function UsageBar({ row }) {
   const reset = formatReset(row);
   return (
     <div>
-      <div className="flex items-baseline justify-between text-[12px]">
+      <div className="flex items-baseline justify-between text-[0.75rem]">
         <span>{row.label}</span>
         <span className="text-(--fg-tertiary)">
           {reset && <>Resets {reset} · </>}
@@ -95,12 +95,12 @@ function UsageBar({ row }) {
 }
 
 function Divider() {
-  return <div className="h-px bg-(--border-light)" />;
+  return <div className="h-[0.0625rem] bg-(--border-light)" />;
 }
 
 function DetailRow({ label, value }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 text-[11px]">
+    <div className="flex items-baseline justify-between gap-3 text-[0.6875rem]">
       <span className="min-w-0 truncate text-(--fg-tertiary)" title={label}>{label}</span>
       <span className="shrink-0 text-(--fg-secondary)">{value}</span>
     </div>
@@ -109,7 +109,7 @@ function DetailRow({ label, value }) {
 
 function UsageUnavailable({ error, onRefresh }) {
   return (
-    <div className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-[12px]">
+    <div className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-[0.75rem]">
       <div className="text-(--fg-tertiary)">Kimi usage is unavailable{error ? `: ${error}` : "."}</div>
       <button className="mt-2 text-(--accent) hover:underline" onClick={() => onRefresh(true)}>Try again</button>
     </div>
@@ -125,13 +125,13 @@ function ProfileConnection({
 }) {
   const connected = status === "connected";
   return (
-    <div className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-[12px]">
+    <div className="rounded-xl border border-(--border-light) bg-(--surface-under) px-3 py-2.5 text-[0.75rem]">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="font-medium text-(--fg-secondary)">
             {connected ? "Kimi profile connected" : "Kimi profile"}
           </div>
-          <div className="mt-0.5 text-[11px] text-(--fg-tertiary)">
+          <div className="mt-0.5 text-[0.6875rem] text-(--fg-tertiary)">
             {connected
               ? "Your display name and avatar come from an isolated Kimi Web session."
               : "Connect an isolated Kimi Web session to show your display name and avatar."}
@@ -139,7 +139,7 @@ function ProfileConnection({
         </div>
         <button
           type="button"
-          className="shrink-0 rounded-full border border-(--border) px-2.5 py-1 text-[11px] text-(--fg-secondary) hover:bg-(--surface-hover) disabled:opacity-50"
+          className="shrink-0 rounded-full border border-(--border) px-2.5 py-1 text-[0.6875rem] text-(--fg-secondary) hover:bg-(--surface-hover) disabled:opacity-50"
           disabled={loading}
           onClick={connected ? onDisconnect : onConnect}
         >
@@ -147,11 +147,11 @@ function ProfileConnection({
         </button>
       </div>
       {!connected && error && (
-        <div className="mt-2 break-words text-[11px] text-(--danger)">
+        <div className="mt-2 break-words text-[0.6875rem] text-(--danger)">
           Profile unavailable: {error}
         </div>
       )}
-      <div className="mt-2 text-[10px] text-(--fg-faint)">
+      <div className="mt-2 text-[0.625rem] text-(--fg-faint)">
         Kimi Code credentials and quota access remain separate.
       </div>
     </div>
@@ -173,6 +173,7 @@ export function KimiAccountPanel({
   const profileStatus = account?.profileStatus || "not_connected";
   const profileError = account?.errors?.profile;
   const usage = account?.usage;
+  const metadata = usage?.metadata;
   const usageError = account?.errors?.usage || error;
   const rows = [usage?.summary, ...(usage?.limits || [])].filter(Boolean);
   const parallel = usage?.parallel;
@@ -189,7 +190,7 @@ export function KimiAccountPanel({
       : credentialLabel;
 
   return (
-    <div className="flex max-h-[calc(100vh-190px)] flex-col gap-3 overflow-y-auto pr-1">
+    <div className="flex max-h-[calc(100vh-11.875rem)] flex-col gap-3 overflow-y-auto pr-1">
       <div className="flex items-center gap-3">
         {avatar ? (
           <img src={avatar} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
@@ -199,10 +200,10 @@ export function KimiAccountPanel({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-medium">{profile?.username || "Kimi Code account"}</div>
-          <div className="truncate text-[12px] text-(--fg-tertiary)">{accountLine}</div>
+          <div className="truncate text-[0.875rem] font-medium">{profile?.username || "Kimi Code account"}</div>
+          <div className="truncate text-[0.75rem] text-(--fg-tertiary)">{accountLine}</div>
         </div>
-        {plan && <span className="ml-auto shrink-0 text-[14px] font-medium">{plan}</span>}
+        {plan && <span className="ml-auto shrink-0 text-[0.875rem] font-medium">{plan}</span>}
       </div>
 
       {(!loading || account) && (
@@ -222,7 +223,7 @@ export function KimiAccountPanel({
 
       {(rows.length > 0 || parallel || totalQuota.length > 0 || wallet) && (
         <div className="flex flex-col gap-3 rounded-2xl border border-(--border-light) bg-(--surface-under) px-3.5 py-3 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset]">
-          <div className="flex items-center justify-between text-[12px] font-medium text-(--fg-secondary)">
+          <div className="flex items-center justify-between text-[0.75rem] font-medium text-(--fg-secondary)">
             <span>Usage</span>
             {plan && <span className="text-(--fg-tertiary)">{plan}</span>}
           </div>
@@ -236,7 +237,7 @@ export function KimiAccountPanel({
             <>
               {rows.length > 0 && <Divider />}
               <div className="flex flex-col gap-1.5">
-                <div className="text-[11px] font-medium text-(--fg-secondary)">Additional quotas</div>
+                <div className="text-[0.6875rem] font-medium text-(--fg-secondary)">Additional quotas</div>
                 {parallel && (
                   <DetailRow
                     label="Parallel requests"
@@ -258,7 +259,7 @@ export function KimiAccountPanel({
             <>
               {(rows.length > 0 || parallel || totalQuota.length > 0) && <Divider />}
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between text-[11px] font-medium text-(--fg-secondary)">
+                <div className="flex items-center justify-between text-[0.6875rem] font-medium text-(--fg-secondary)">
                   <span>Extra Usage</span>
                   <span className="text-(--fg-tertiary)">{prettyValue(wallet.status) || "Available"}</span>
                 </div>
@@ -286,9 +287,17 @@ export function KimiAccountPanel({
         </div>
       )}
 
+      {(metadata?.subType || metadata?.domain || metadata?.authenticationScope) && (
+        <div className="flex flex-wrap gap-x-2 text-[0.625rem] text-(--fg-faint)">
+          {[metadata.subType, metadata.domain, metadata.authenticationMethod, metadata.authenticationScope]
+            .map(prettyValue)
+            .filter(Boolean)
+            .map((value) => <span key={value}>{value}</span>)}
+        </div>
+      )}
       {account && (
         <button
-          className="flex items-center justify-center gap-1.5 self-end rounded-full border border-(--border) px-2.5 py-1 text-[11px] text-(--fg-secondary) hover:bg-(--surface-hover) disabled:opacity-50"
+          className="flex items-center justify-center gap-1.5 self-end rounded-full border border-(--border) px-2.5 py-1 text-[0.6875rem] text-(--fg-secondary) hover:bg-(--surface-hover) disabled:opacity-50"
           disabled={loading}
           onClick={() => onRefresh(true)}
         >
@@ -296,7 +305,7 @@ export function KimiAccountPanel({
           Refresh all
         </button>
       )}
-      {account && error && <div className="text-[11px] text-(--danger)">Last refresh failed: {error}</div>}
+      {account && error && <div className="text-[0.6875rem] text-(--danger)">Last refresh failed: {error}</div>}
     </div>
   );
 }

@@ -10,6 +10,6 @@ const source = fs.readFileSync(
 test("the first disclosure expansion uses the same transition as later toggles", () => {
   assert.doesNotMatch(source, /firstRender/);
   assert.match(source, /height \$\{duration\}ms \$\{easing\}, opacity \$\{duration\}ms \$\{easing\}/);
-  assert.match(source, /element\.style\.height = "0px";\s+element\.style\.opacity = "0";/);
+  assert.match(source, /element\.style\.height = "0rem";\s+element\.style\.opacity = "0";/);
   assert.match(source, /element\.style\.height = `\$\{element\.scrollHeight\}px`;/);
 });

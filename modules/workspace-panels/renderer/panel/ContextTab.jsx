@@ -82,7 +82,7 @@ function Row({ item }) {
         {isImage ? <IconImage size={14} /> : <IconFile size={14} />}
       </span>
       <button
-        className="min-w-0 flex-1 truncate text-left text-[13px] hover:underline"
+        className="min-w-0 flex-1 truncate text-left text-[0.8125rem] hover:underline"
         title={item.path}
         onClick={() => openPath(item.path)}
       >

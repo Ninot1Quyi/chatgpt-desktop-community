@@ -31,7 +31,7 @@ function PreBlock({ children }) {
     <div className="group/code relative my-2">
       <pre className="!m-0">{children}</pre>
       <button
-        className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-md border border-(--border) bg-(--surface-raised) px-1.5 py-0.5 text-[11px] text-(--fg-tertiary) opacity-0 transition-opacity group-hover/code:opacity-100 hover:text-(--fg)"
+        className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-md border border-(--border) bg-(--surface-raised) px-1.5 py-0.5 text-[0.6875rem] text-(--fg-tertiary) opacity-0 transition-opacity group-hover/code:opacity-100 hover:text-(--fg)"
         onClick={() => {
           navigator.clipboard.writeText(text);
           setCopied(true);
@@ -98,7 +98,7 @@ function FileReference({ path, label }) {
       }}
     >
       <span className="inline-mention-file whitespace-nowrap px-0.5 font-medium">
-        <span className="relative mr-[3px] inline-block h-[1lh] w-4 align-bottom">
+        <span className="relative mr-[0.1875rem] inline-block h-[1lh] w-4 align-bottom">
           <FileIcon
             name={inlineIconName(path)}
             size={16}
@@ -143,7 +143,7 @@ export default function Markdown({ children }) {
                 }}
               >
                 {/^https?:\/\//.test(href || "") && (
-                  <IconGlobe size={11} className="mr-0.5 inline-block align-[-1px] text-(--fg-tertiary)" />
+                  <IconGlobe size={11} className="mr-0.5 inline-block align-[-0.0625rem] text-(--fg-tertiary)" />
                 )}
                 {children}
               </a>

@@ -92,14 +92,14 @@ export default function ConfigurationSection() {
 
   return (
     <>
-      <div className="-mt-3 mb-4 text-[13px] text-(--fg-tertiary)">
+      <div className="-mt-3 mb-4 text-[0.8125rem] text-(--fg-tertiary)">
         Configure approval policy and sandbox settings.{" "}
         <button className="text-(--accent) hover:underline" onClick={() => api.openExternal("https://developers.openai.com/codex/config")}>
           Learn more
         </button>
       </div>
-      <div className="mb-4 rounded-xl border border-(--border-light) bg-(--surface-under) px-4 py-3 text-[13px] text-(--fg-secondary)">
-        <code className="font-mono text-[12px]">thread/rollback</code> is deprecated and will be removed soon
+      <div className="mb-4 rounded-xl border border-(--border-light) bg-(--surface-under) px-4 py-3 text-[0.8125rem] text-(--fg-secondary)">
+        <code className="font-mono text-[0.75rem]">thread/rollback</code> is deprecated and will be removed soon
       </div>
       <Card title="Custom config.toml settings">
         <Row title="User config">
@@ -140,13 +140,13 @@ export default function ConfigurationSection() {
         <div className="px-4 py-3.5">
           <div className="flex items-center justify-between gap-6">
             <div className="min-w-0">
-              <div className="text-[13px]">Available reasoning efforts</div>
-              <div className="mt-0.5 text-[12px] leading-5 text-(--fg-tertiary)">
+              <div className="text-[0.8125rem]">Available reasoning efforts</div>
+              <div className="mt-0.5 text-[0.75rem] leading-5 text-(--fg-tertiary)">
                 Choose which reasoning effort levels appear in model controls. Availability varies by model
               </div>
             </div>
             <button
-              className="flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[12px] text-(--fg-secondary) hover:bg-(--surface-hover)"
+              className="flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-(--border-light) bg-(--surface) px-2.5 text-[0.75rem] text-(--fg-secondary) hover:bg-(--surface-hover)"
               onClick={() => setEffortsOpen(!effortsOpen)}
             >
               {selectedCount} selected
@@ -156,7 +156,7 @@ export default function ConfigurationSection() {
           {effortsOpen && (
             <div className="mt-2.5 rounded-lg border border-(--border-light) bg-(--surface) p-1">
               {efforts.length === 0 && (
-                <div className="px-2 py-1.5 text-[12px] text-(--fg-faint)">No reasoning effort levels reported by the current model.</div>
+                <div className="px-2 py-1.5 text-[0.75rem] text-(--fg-faint)">No reasoning effort levels reported by the current model.</div>
               )}
               {efforts.map((e) => {
                 const id = e.reasoningEffort || e;
@@ -164,7 +164,7 @@ export default function ConfigurationSection() {
                 return (
                   <button
                     key={id}
-                    className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[13px] capitalize hover:bg-(--surface-hover)"
+                    className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[0.8125rem] capitalize hover:bg-(--surface-hover)"
                     onClick={() => toggleEffort(id)}
                   >
                     {id}
@@ -198,7 +198,7 @@ export default function ConfigurationSection() {
             {busy === "reinstall" ? "Reinstalling…" : "Reinstall"}
           </Btn>
         </Row>
-        <div className="px-4 py-3.5 text-[12px] text-(--fg-tertiary)">
+        <div className="px-4 py-3.5 text-[0.75rem] text-(--fg-tertiary)">
           Current version: <span className="font-mono">{version || "—"}</span>
         </div>
       </Card>
