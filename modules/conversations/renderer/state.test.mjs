@@ -59,6 +59,26 @@ test("adopts complete parsed output without replacing live item identities", () 
   assert.equal(result[0].items[1].text, "saved answer");
 });
 
+test("preserves optimistic input when a non-streaming result omits the prompt", () => {
+  const localPromptOnlyTurn = {
+    ...localTurn,
+    items: [localTurn.items[0]],
+  };
+  const result = reconcileExternalTurns([{
+    id: "parsed-turn",
+    status: "completed",
+    items: [{ id: "parsed-message", type: "agentMessage", text: "final answer" }],
+  }], [localPromptOnlyTurn], localPromptOnlyTurn.id);
+
+  assert.equal(result[0].id, "local-turn");
+  assert.equal(result[0].status, "completed");
+  assert.deepEqual(result[0].items.map((item) => item.id), [
+    "local-user",
+    "parsed-message",
+  ]);
+  assert.equal(result[0].items[1].text, "final answer");
+});
+
 test("completes the streamed local turn when final history is empty", () => {
   const result = reconcileExternalTurns([], [localTurn], localTurn.id);
 

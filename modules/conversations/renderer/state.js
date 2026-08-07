@@ -85,8 +85,6 @@ export function reconcileExternalTurns(parsedTurns, localTurns, localTurnId) {
   if (!streamedTurn) return parsedTurns;
 
   const streamedOutput = (streamedTurn.items || []).filter((item) => item.type !== "userMessage");
-  if (streamedOutput.length === 0) return parsedTurns;
-
   const result = [...parsedTurns];
   const currentIndex = result.length - 1;
   const current = result[currentIndex];
@@ -96,7 +94,9 @@ export function reconcileExternalTurns(parsedTurns, localTurns, localTurnId) {
   const streamedUserItems = (streamedTurn.items || []).filter((item) => item.type === "userMessage");
   const compatibleParsedOutput = parsedOutput.length === streamedOutput.length
     && parsedOutput.every((item, index) => item.type === streamedOutput[index]?.type);
-  const reconciledOutput = compatibleParsedOutput
+  const reconciledOutput = streamedOutput.length === 0
+    ? parsedOutput
+    : compatibleParsedOutput
     ? parsedOutput.map((item, index) => ({
         ...item,
         id: streamedOutput[index].id,
